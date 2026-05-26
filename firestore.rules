@@ -1,0 +1,184 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (matches Firebase Auth UID)
+// Fields:
+//   - email: string (required) - email address of user
+//   - role: string (required, 'admin' | 'teacher' | 'support' | 'client') - access role
+//   - name: string (optional) - name of the user
+//
+// Collection: sessions
+// Document ID: auto-generated or custom
+// Fields:
+//   - title: string (required) - session title
+//   - description: string (required) - session description/syllabus
+//   - instructor: string (required) - name of the instructor
+//   - dateTime: string (required) - scheduled date/time in ISO string
+//   - price: number (required, positive) - price of masterclass in INR
+//   - createdAt: timestamp (optional)
+//
+// Collection: registrations
+// Document ID: auto-generated
+// Fields:
+//   - sessionId: string (required) - reference to session ID
+//   - studentName: string (required) - student's full name
+//   - studentEmail: string (required) - student's email address
+//   - studentPhone: string (required) - student's phone number
+//   - orderId: string (required) - Razorpay order ID
+//   - status: string (required, 'pending' | 'completed') - registration/payment status
+//   - amount: number (required) - amount paid in paise
+//   - createdAt: timestamp (required)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Check if user has one of the staff roles
+    function isStaff() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher', 'support'];
+    }
+
+    // Check if user is an admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Bootstrap check for primary administrators (case-insensitive)
+    function isBootstrapUser() {
+      return isAuthenticated() && 
+        'email' in request.auth.token &&
+        request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+    }
+    
+    // Validate required fields exist
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    // Validate that document contains only the allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    // Validate string length
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validate that a value is positive
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] > 0;
+    }
+
+    // ===============================================================
+    // Collection Matching Rules
+    // ===============================================================
+
+    // Users Collection rules
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isStaff();
+      
+      // Permit creation/update if user is self and:
+      // 1) Self-creating as a general 'client', OR
+      // 2) Authenticated user is the bootstrap admin email, OR
+      // 3) Existing authenticated staff is an admin
+      allow create, update: if isOwner(userId) && (
+        (hasRequiredFields(['email', 'role']) && 
+         request.resource.data.role == 'client' && 
+         isValidEmail(request.resource.data.email)) ||
+        isBootstrapUser() ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    // Sessions Collection rules
+    match /sessions/{sessionId} {
+      // Sessions are publicly visible so students can browse
+      allow read: if true;
+      
+      // Creation, update, delete limited to bootstrap admin emails
+      // Using direct token email check (bypasses users-collection isStaff dependency)
+      function isBootstrapAdmin() {
+        return isAuthenticated() &&
+          request.auth.token.email != null &&
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+      }
+
+      allow create: if isBootstrapAdmin();
+
+      allow update: if isBootstrapAdmin() || isStaff();
+        
+      allow delete: if isBootstrapAdmin() || isStaff();
+    }
+
+    // Registrations Collection rules
+    match /registrations/{registrationId} {
+      // Reading registrations is only permitted for staff reporters
+      allow read: if isStaff();
+      
+      // Permit creation client-side to support Spark free plan testing without Cloud Functions
+      allow create: if hasRequiredFields(['sessionId', 'studentName', 'studentEmail', 'studentPhone', 'orderId', 'status', 'amount']) &&
+        validStringLength('studentName', 2, 80) &&
+        isValidEmail(request.resource.data.studentEmail) &&
+        request.resource.data.status in ['pending', 'completed'];
+      
+      // Updates are locked to staff or Cloud Functions server
+      allow update: if isStaff();
+      
+      allow delete: if isAdmin();
+    }
+
+    // Masterclasses Collection (AI-structured syllabus from Gemini)
+    // Schema: { title, price, dateTime, instructor, rawSyllabus, syllabus: [], createdAt }
+    match /masterclasses/{classId} {
+      // Publicly readable so students can browse on the home page
+      allow read: if true;
+
+      // Client-side writes allowed only for bootstrap admin emails
+      function isMcBootstrapAdmin() {
+        return isAuthenticated() &&
+          request.auth.token.email != null &&
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+      }
+
+      allow create: if isMcBootstrapAdmin();
+      allow update: if isMcBootstrapAdmin() || isStaff();
+      allow delete: if isMcBootstrapAdmin() || isStaff();
+    }
+  }
+}
