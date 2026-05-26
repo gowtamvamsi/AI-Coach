@@ -2905,6 +2905,15 @@ function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // New student registration fields
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regUserType, setRegUserType] = useState(""); // 'Student' | 'Working Professional'
+
+  // Forced profile completion overlay state
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false);
+
+
   // Interactive Roadmap element refs (Only updated / observed during 'roadmap' tab active)
   const phaseRefs = useRef([]);
   const capstoneRefs = useRef([]);
@@ -2932,13 +2941,25 @@ function App() {
           const userDoc = await db.collection('users').doc(u.uid).get();
           const emailLower = (u.email || '').toLowerCase();
           const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com';
+          
+          let role = 'client';
+          let hasProfile = false;
+          let nameVal = '';
+          let phoneVal = '';
+          let userTypeVal = '';
+
           if (userDoc.exists) {
-            // Bootstrap admins always get admin role regardless of stored doc
-            // (handles case where doc was created before this fix with wrong role)
+            const userData = userDoc.data();
+            role = userData.role || 'client';
+            nameVal = userData.name || '';
+            phoneVal = userData.phone || '';
+            userTypeVal = userData.userType || '';
+            hasProfile = !!(phoneVal && userTypeVal);
+
             if (isBootstrapAdmin) {
               setUserRole('admin');
             } else {
-              setUserRole(userDoc.data().role);
+              setUserRole(role);
             }
           } else {
             // Check if bootstrap admin email
@@ -2949,14 +2970,27 @@ function App() {
                 name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' ? 'Balaji Chippada' : 'Gowtam Singulur')
               });
               setUserRole('admin');
+              role = 'admin';
             } else {
-              // Standard client profile
+              // Standard client profile - create baseline document first
               await db.collection('users').doc(u.uid).set({
                 email: u.email,
                 role: 'client'
               });
               setUserRole('client');
+              role = 'client';
             }
+          }
+
+          // If not staff, check profile completeness
+          const isStaff = isBootstrapAdmin || role === 'admin' || role === 'teacher' || role === 'support';
+          if (!isStaff && !hasProfile) {
+            setRegName(nameVal || u.displayName || "");
+            setRegPhone(phoneVal || "");
+            setRegUserType(userTypeVal || "");
+            setShowCompleteProfile(true);
+          } else {
+            setShowCompleteProfile(false);
           }
         } catch (err) {
           console.error("Error reading role document:", err);
@@ -2969,6 +3003,7 @@ function App() {
         }
       } else {
         setUserRole(null);
+        setShowCompleteProfile(false);
       }
     });
     return () => unsubscribe();
@@ -3185,10 +3220,36 @@ function App() {
 
     try {
       if (isRegistering) {
-        // Create user
-        await auth.createUserWithEmailAndPassword(loginEmail, loginPassword);
+        // Validation check for new fields
+        if (!regName || !regPhone || !regUserType) {
+          throw new Error("Please fill in all required fields (Name, Phone, and User Type).");
+        }
+
+        // Create user in Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(loginEmail, loginPassword);
+        const newUser = userCredential.user;
+
+        // Immediately write standard client profile fields to Firestore
+        await db.collection('users').doc(newUser.uid).set({
+          name: regName,
+          email: loginEmail,
+          phone: regPhone,
+          userType: regUserType,
+          role: 'client'
+        });
+
+        // Set Auth Display Name
+        try {
+          await newUser.updateProfile({ displayName: regName });
+        } catch (err) {
+          console.warn("Could not set firebase Auth displayName:", err);
+        }
+
         setLoginEmail("");
         setLoginPassword("");
+        setRegName("");
+        setRegPhone("");
+        setRegUserType("");
         setStaffLoginOpen(false);
       } else {
         // Standard login
@@ -3199,6 +3260,48 @@ function App() {
       }
     } catch (err) {
       setLoginError(err.message || "Failed to complete authentication.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // Submit profile completion details for users (such as Google Sign-in users)
+  const handleCompleteProfileSubmit = async (e) => {
+    e.preventDefault();
+    if (!auth || !user) {
+      setLoginError("No authenticated user session found.");
+      return;
+    }
+    if (!regName || !regPhone || !regUserType) {
+      setLoginError("Please fill in all required fields (Name, Phone, and User Type).");
+      return;
+    }
+    setLoginError("");
+    setLoginLoading(true);
+
+    try {
+      // Update Firestore user document with missing profile fields
+      await db.collection('users').doc(user.uid).set({
+        name: regName,
+        email: user.email,
+        phone: regPhone,
+        userType: regUserType,
+        role: 'client'
+      }, { merge: true });
+
+      // Update Auth Display Name
+      try {
+        await user.updateProfile({ displayName: regName });
+      } catch (err) {
+        console.warn("Could not set firebase Auth displayName:", err);
+      }
+
+      setRegName("");
+      setRegPhone("");
+      setRegUserType("");
+      setShowCompleteProfile(false);
+    } catch (err) {
+      setLoginError(err.message || "Failed to complete account profile.");
     } finally {
       setLoginLoading(false);
     }
@@ -3470,7 +3573,7 @@ function App() {
               className={`nav__auth-btn is-active`} 
               onClick={() => {
                 if (isUserStaff) setActiveMainTab('dashboard');
-                else alert(`Logged in as client: ${user.email}`);
+                else alert(`Logged in as student: ${user.email}`);
               }}
             >
               <span className="hero__eyebrow-dot" style={{ background: "var(--c-amber)", width: "5px", height: "5px" }} />
@@ -3484,7 +3587,7 @@ function App() {
                 setStaffLoginOpen(true);
               }}
             >
-              Staff Portal
+              Sign In / Register
             </button>
           )}
 
@@ -3969,34 +4072,48 @@ function App() {
         </div>
       )}
 
-      {/* 3. Staff Portal Login / Registration Modal */}
+      {/* 3. Staff/Client Registration & Login Modal */}
       {staffLoginOpen && (
         <div className="modal-overlay" onClick={() => setStaffLoginOpen(false)}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setStaffLoginOpen(false)}>×</button>
-            <h2 className="modal-title">Staff <em>{isRegistering ? "Registration" : "Portal"}</em></h2>
-            <p className="modal-desc">
-              Log in with credentials to access class management forms. 
-              <br />
-              <span style={{ fontSize: "13px", color: "var(--c-amber)" }}>
-                💡 Tip: Use your authorized administrator Google/Email account for full class creation privileges.
-              </span>
+            <h2 className="modal-title">
+              {isRegistering ? "Create an account" : <>Sign in to <em>Account</em></>}
+            </h2>
+            <p className="modal-desc" style={{ marginBottom: "24px" }}>
+              {isRegistering 
+                ? "Sign up to get access to upcoming cohorts and start learning for free" 
+                : "Log in to access your learning dashboard, sessions, and custom tools."}
             </p>
 
             {loginError && (
-              <div className="status-box status-box--error" style={{ padding: "12px 16px" }}>
+              <div className="status-box status-box--error" style={{ padding: "12px 16px", marginBottom: "20px" }}>
                 <span>⚠</span>
                 <span>{loginError}</span>
               </div>
             )}
 
             <form onSubmit={handleStaffLogin}>
+              {isRegistering && (
+                <div className="form-group">
+                  <label className="form-label">Full Name <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Enter your full name" 
+                    value={regName}
+                    onChange={e => setRegName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
               <div className="form-group">
-                <label className="form-label">Email Address</label>
+                <label className="form-label">Email address <span style={{ color: "var(--c-pink)" }}>*</span></label>
                 <input 
                   type="email" 
                   className="form-input" 
-                  placeholder="e.g. admin@coaching.app" 
+                  placeholder="Enter your full email address" 
                   value={loginEmail}
                   onChange={e => setLoginEmail(e.target.value)}
                   required
@@ -4004,18 +4121,70 @@ function App() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Password</label>
+                <label className="form-label">Password <span style={{ color: "var(--c-pink)" }}>*</span></label>
                 <input 
                   type="password" 
                   className="form-input" 
+                  placeholder="Enter password"
                   value={loginPassword}
                   onChange={e => setLoginPassword(e.target.value)}
                   required
                 />
               </div>
 
-              <button type="submit" className="form-btn" disabled={loginLoading}>
-                {loginLoading ? "Loading..." : isRegistering ? "Register Account" : "Sign In"}
+              {isRegistering && (
+                <React.Fragment>
+                  <div className="form-group">
+                    <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                    <input 
+                      type="tel" 
+                      className="form-input" 
+                      placeholder="Enter your phone number" 
+                      value={regPhone}
+                      onChange={e => setRegPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">What Describes You Best <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                    <div className="form-radio-group">
+                      <label className="form-radio-label">
+                        <input 
+                          type="radio" 
+                          name="userType" 
+                          value="Student" 
+                          checked={regUserType === "Student"} 
+                          onChange={e => setRegUserType(e.target.value)}
+                          required
+                        />
+                        <span className="form-radio-custom"></span>
+                        Student
+                      </label>
+                      <label className="form-radio-label">
+                        <input 
+                          type="radio" 
+                          name="userType" 
+                          value="Working Professional" 
+                          checked={regUserType === "Working Professional"} 
+                          onChange={e => setRegUserType(e.target.value)}
+                          required
+                        />
+                        <span className="form-radio-custom"></span>
+                        Working Professional
+                      </label>
+                    </div>
+                  </div>
+                </React.Fragment>
+              )}
+
+              <button 
+                type="submit" 
+                className="form-btn form-btn--accent" 
+                disabled={loginLoading}
+                style={isRegistering ? { background: "var(--c-pink)", color: "#fff" } : {}}
+              >
+                {loginLoading ? "Loading..." : isRegistering ? "Create Account" : "Sign In"}
               </button>
 
               <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "20px 0" }}>
@@ -4037,19 +4206,118 @@ function App() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
                 </svg>
-                Sign In with Google
+                {isRegistering ? "Sign Up with Google" : "Sign In with Google"}
               </button>
 
-              <div style={{ textAlign: "center", marginTop: "20px", fontSize: "13px", color: "var(--fg-faint)" }}>
-                {isRegistering ? "Already have a staff account?" : "Need a new account?"}{" "}
+              <div style={{ textAlign: "center", marginTop: "24px", fontSize: "14px", color: "var(--fg-dim)" }}>
+                {isRegistering ? "Already have an account?" : "Need an account?"}{" "}
                 <button 
                   type="button" 
-                  style={{ background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}
-                  onClick={() => setIsRegistering(!isRegistering)}
+                  style={{ background: "none", border: "none", color: "var(--c-pink)", cursor: "pointer", textDecoration: "underline", font: "inherit", fontWeight: "500" }}
+                  onClick={() => {
+                    setIsRegistering(!isRegistering);
+                    setLoginError("");
+                  }}
                 >
-                  {isRegistering ? "Sign In instead" : "Register now"}
+                  {isRegistering ? "Sign in" : "Register now"}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Forced Profile Completion Modal */}
+      {showCompleteProfile && (
+        <div className="modal-overlay" style={{ zIndex: 200 }}>
+          <div className="modal-container" onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Complete <em>Profile</em></h2>
+            <p className="modal-desc" style={{ marginBottom: "24px" }}>
+              Just a few more details to set up your account and start learning.
+            </p>
+
+            {loginError && (
+              <div className="status-box status-box--error" style={{ padding: "12px 16px", marginBottom: "20px" }}>
+                <span>⚠</span>
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCompleteProfileSubmit}>
+              <div className="form-group">
+                <label className="form-label">Full Name <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Enter your full name" 
+                  value={regName}
+                  onChange={e => setRegName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email address</label>
+                <input 
+                  type="email" 
+                  className="form-input" 
+                  style={{ opacity: 0.7, cursor: "not-allowed" }}
+                  value={user ? user.email : ""}
+                  disabled
+                  readOnly
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                <input 
+                  type="tel" 
+                  className="form-input" 
+                  placeholder="Enter your phone number" 
+                  value={regPhone}
+                  onChange={e => setRegPhone(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">What Describes You Best <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                <div className="form-radio-group">
+                  <label className="form-radio-label">
+                    <input 
+                      type="radio" 
+                      name="completeUserType" 
+                      value="Student" 
+                      checked={regUserType === "Student"} 
+                      onChange={e => setRegUserType(e.target.value)}
+                      required
+                    />
+                    <span className="form-radio-custom"></span>
+                    Student
+                  </label>
+                  <label className="form-radio-label">
+                    <input 
+                      type="radio" 
+                      name="completeUserType" 
+                      value="Working Professional" 
+                      checked={regUserType === "Working Professional"} 
+                      onChange={e => setRegUserType(e.target.value)}
+                      required
+                    />
+                    <span className="form-radio-custom"></span>
+                    Working Professional
+                  </label>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="form-btn form-btn--accent" 
+                disabled={loginLoading}
+                style={{ background: "var(--c-pink)", color: "#fff" }}
+              >
+                {loginLoading ? "Saving Profile..." : "Complete Account Setup"}
+              </button>
             </form>
           </div>
         </div>

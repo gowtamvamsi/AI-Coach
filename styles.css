@@ -2747,6 +2747,81 @@ body {
   cursor: not-allowed;
 }
 
+/* Radio group & Sleek Custom Radio Buttons */
+.form-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.form-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.form-radio-label input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.form-radio-custom {
+  height: 20px;
+  width: 20px;
+  background-color: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+
+.form-radio-label:hover .form-radio-custom {
+  border-color: var(--c-pink);
+}
+
+.form-radio-label input:checked ~ .form-radio-custom {
+  background-color: var(--bg-elev);
+  border-color: var(--c-pink);
+}
+
+.form-radio-custom::after {
+  content: "";
+  position: absolute;
+  display: none;
+  top: 5px;
+  left: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-pink);
+}
+
+.form-radio-label input:checked ~ .form-radio-custom::after {
+  display: block;
+}
+
+/* Beautiful Accent Button Hover State for create account */
+.form-btn--accent {
+  background: var(--c-pink) !important;
+  color: #fff !important;
+}
+
+.form-btn--accent:hover {
+  background: color-mix(in srgb, var(--c-pink) 85%, #000) !important;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--c-pink) 40%, transparent);
+}
+
+
 /* Staff Portal & Dashboard Container */
 .dashboard {
   max-width: 1100px;
