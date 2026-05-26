@@ -2650,12 +2650,31 @@ body {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
   width: min(520px, 100%);
-  padding: 44px;
+  padding: 32px 36px;
   box-shadow: 0 30px 80px -20px rgba(0,0,0,0.5);
   position: relative;
   animation: modalScaleUp 320ms var(--ease);
   max-height: 90vh;
   overflow-y: auto;
+}
+.modal-container::-webkit-scrollbar {
+  width: 5px;
+}
+.modal-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-container::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+}
+.modal-container::-webkit-scrollbar-thumb:hover {
+  background: var(--c-pink);
+}
+.modal-container .form-group {
+  margin-bottom: 16px;
+}
+.modal-container .modal-desc {
+  margin-bottom: 20px;
 }
 .modal-close {
   position: absolute;
