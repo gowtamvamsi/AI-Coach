@@ -195,5 +195,10 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid;
       allow read: if isStaff() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
+
+    match /email_campaigns/{campaignId} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
   }
 }

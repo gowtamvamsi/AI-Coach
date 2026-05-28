@@ -208,3 +208,115 @@ exports.onSessionUpdateEmailer = functions.firestore
       return null;
     }
   });
+
+// Secure HTTPS Callable function to send direct programmatic emails from Admin Panel
+const nodemailer = require("nodemailer");
+
+exports.sendAudienceEmail = functions.https.onCall(async (data, context) => {
+  // Validate that the request is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication is required to launch broadcasts."
+    );
+  }
+
+  // Fetch caller's profile in Firestore to verify staff permissions
+  const callerUid = context.auth.uid;
+  const callerDoc = await db.collection("users").doc(callerUid).get();
+  if (!callerDoc.exists) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Admin user profile not found."
+    );
+  }
+
+  const callerData = callerDoc.data();
+  const isStaff = callerData.role === "admin" || callerData.role === "teacher" || callerData.role === "support";
+  if (!isStaff) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Access denied. Only authorized staff members can trigger email broadcasts."
+    );
+  }
+
+  const { emails, subject, body, segmentName } = data;
+  if (!emails || !Array.isArray(emails) || emails.length === 0 || !subject || !body) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Missing required fields: emails (non-empty array), subject, body."
+    );
+  }
+
+  const smtpEmail = process.env.SMTP_EMAIL;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+  const smtpPort = parseInt(process.env.SMTP_PORT || "465");
+  const isMock = !smtpEmail || !smtpPass;
+
+  // Log campaign metadata to Firestore for records & history
+  const campaignRef = await db.collection("email_campaigns").add({
+    segmentName: segmentName || "Custom Audience",
+    subject,
+    body,
+    recipientCount: emails.length,
+    senderEmail: smtpEmail || "simulated-sender@theagentengineer.app",
+    status: isMock ? "simulated" : "sent",
+    isMock,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    sentBy: callerData.name || callerData.email || callerUid
+  });
+
+  if (isMock) {
+    console.log(`[SMTP MOCK] Logged simulated campaign ${campaignRef.id} to Firestore. Recipients: ${emails.length}`);
+    emails.forEach(email => {
+      console.log(`[SMTP MOCK EMAIL] To: ${email} | Subject: ${subject}`);
+    });
+    return {
+      success: true,
+      isMock: true,
+      campaignId: campaignRef.id,
+      message: `Audience email campaign simulated successfully (no SMTP keys). Saved ${emails.length} leads under campaign record ${campaignRef.id}.`
+    };
+  }
+
+  try {
+    // Configure NodeMailer SMTP transport
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpEmail,
+        pass: smtpPass
+      }
+    });
+
+    // To protect recipient privacy, we send to SMTP_EMAIL and add leads to BCC!
+    const mailOptions = {
+      from: `"The Agent Engineer" <${smtpEmail}>`,
+      to: smtpEmail,
+      bcc: emails.join(","),
+      subject: subject,
+      text: body
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[SMTP SUCCESS] Sent campaign ${campaignRef.id} via nodemailer:`, info.messageId);
+
+    return {
+      success: true,
+      isMock: false,
+      campaignId: campaignRef.id,
+      messageId: info.messageId,
+      message: `Audience email broadcast sent successfully to ${emails.length} recipients.`
+    };
+  } catch (err) {
+    console.error("Nodemailer transport error:", err);
+    await campaignRef.update({ status: "failed", error: err.message });
+    throw new functions.https.HttpsError(
+      "internal",
+      `Nodemailer email transport failed: ${err.message}`
+    );
+  }
+});
