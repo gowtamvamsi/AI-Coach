@@ -1956,6 +1956,10 @@ function DashboardView({ user, role, onLogout }) {
   const [mcLoading, setMcLoading] = useState(false);
   const [mcPreview, setMcPreview] = useState(null); // last generated syllabus for preview
 
+  // ── Marketing Audience States ──
+  const [users, setUsers] = useState([]);
+  const [selectedMcCampaignId, setSelectedMcCampaignId] = useState("");
+
   // Load sessions for management panel
   useEffect(() => {
     if (!db) return;
@@ -1988,6 +1992,20 @@ function DashboardView({ user, role, onLogout }) {
         setRegistrations(list);
       }, err => {
         console.warn("Could not load registrations list: insufficient permission. That's expected for non-staff.");
+      });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Load users list for marketing segmentation
+  useEffect(() => {
+    if (!db) return;
+    const unsubscribe = db.collection("users")
+      .onSnapshot(snap => {
+        const list = [];
+        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+        setUsers(list);
+      }, err => {
+        console.warn("Could not load users list: insufficient permission.");
       });
     return () => unsubscribe();
   }, [user]);
@@ -2229,8 +2247,7 @@ ${mcRawSyllabus}`;
     }
   };
 
-  // Compute metrics
-
+  // Compute metrics and segments
   const totalRevenue = registrations
     .filter(r => r.status === 'completed')
     .reduce((sum, r) => sum + (r.amount / 100), 0);
@@ -2240,6 +2257,131 @@ ${mcRawSyllabus}`;
 
   const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase());
+
+  // ── Marketing Segmentation & Deduplication Computations ──
+  
+  // 1. Leads Metrics
+  const uniquePaidEmails = Array.from(new Set(
+    registrations
+      .filter(r => r.status === 'completed')
+      .map(r => (r.studentEmail || '').toLowerCase().trim())
+      .filter(Boolean)
+  ));
+  const totalPayingStudents = uniquePaidEmails.length;
+  const totalLeads = users.length;
+  const conversionRate = totalLeads > 0 
+    ? ((totalPayingStudents / totalLeads) * 100).toFixed(1) 
+    : "0.0";
+
+  const totalProfessionals = users.filter(u => u.userType === 'Working Professional').length;
+  const totalAcademicStudents = users.filter(u => u.userType === 'Student').length;
+
+  // 2. Audience Lists
+  // Cold Leads: Signed up in Auth but no completed booking
+  const coldLeadsList = users.filter(u => {
+    const emailLower = (u.email || '').toLowerCase().trim();
+    return !registrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower);
+  });
+
+  // Paid Customers (Warm Segment): Deduction merged registrations & users
+  const paidCustomersList = (() => {
+    const list = [];
+    const seen = new Set();
+    
+    // Add signed up users who paid
+    users.forEach(u => {
+      const emailLower = (u.email || '').toLowerCase().trim();
+      if (registrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower)) {
+        list.push({
+          name: u.name || u.displayName || "Signed Up Student",
+          email: u.email,
+          phone: u.phone || "",
+          userType: u.userType || "Not Specified"
+        });
+        seen.add(emailLower);
+      }
+    });
+    
+    // Add direct registrations we haven't seen yet
+    registrations.forEach(r => {
+      if (r.status === 'completed') {
+        const emailLower = (r.studentEmail || '').toLowerCase().trim();
+        if (emailLower && !seen.has(emailLower)) {
+          list.push({
+            name: r.studentName || "Paid Student",
+            email: r.studentEmail,
+            phone: r.studentPhone || "",
+            userType: "Not Specified"
+          });
+          seen.add(emailLower);
+        }
+      }
+    });
+    return list;
+  })();
+
+  // Working Professionals list
+  const professionalsList = users.filter(u => u.userType === 'Working Professional');
+
+  // Academic Students list
+  const academicStudentsList = users.filter(u => u.userType === 'Student');
+
+  // Abandoned Checkouts: unique pending registrations with no successful registration
+  const abandonedCheckoutsList = (() => {
+    const list = [];
+    const seen = new Set();
+    
+    registrations.forEach(r => {
+      if (r.status === 'pending') {
+        const emailLower = (r.studentEmail || '').toLowerCase().trim();
+        if (emailLower && !seen.has(emailLower)) {
+          const hasCompleted = registrations.some(rc => rc.status === 'completed' && (rc.studentEmail || '').toLowerCase().trim() === emailLower);
+          if (!hasCompleted) {
+            const matchingUser = users.find(u => (u.email || '').toLowerCase().trim() === emailLower);
+            list.push({
+              name: r.studentName || (matchingUser ? (matchingUser.name || matchingUser.displayName) : "Abandoned Checkout"),
+              email: r.studentEmail,
+              phone: r.studentPhone || (matchingUser ? matchingUser.phone : ""),
+              userType: matchingUser ? (matchingUser.userType || "Not Specified") : "Not Specified"
+            });
+            seen.add(emailLower);
+          }
+        }
+      }
+    });
+    return list;
+  })();
+
+  // Session Campaign Filter Roster
+  const activeMcCampaignSession = sessions.find(s => s.id === selectedMcCampaignId) || masterclasses.find(m => m.id === selectedMcCampaignId);
+  const sessionCampaignRoster = registrations.filter(r => r.sessionId === selectedMcCampaignId);
+
+  // 3. Robust client-side HTML5 CSV downloader
+  const handleExportCSV = (list, segmentName) => {
+    if (list.length === 0) {
+      alert("This marketing segment has no contacts to export.");
+      return;
+    }
+    
+    let csvContent = "Name,Email,Phone,User Type,Segment Tag\n";
+    list.forEach(item => {
+      const name = (item.name || item.studentName || "Unknown").replace(/[",]/g, "");
+      const email = (item.email || item.studentEmail || "").replace(/[",]/g, "");
+      const phone = (item.phone || item.studentPhone || "").replace(/[",]/g, "");
+      const type = (item.userType || "Not Specified").replace(/[",]/g, "");
+      csvContent += `"${name}","${email}","${phone}","${type}","${segmentName}"\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `ai_coach_${segmentName.toLowerCase().replace(/\s+/g, '_')}_segment.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="dashboard">
@@ -2653,6 +2795,210 @@ ${mcRawSyllabus}`;
           </div>
         </div>
       </div>
+
+      {/* ── Marketing & Audience Management Panel (Full Width) ── */}
+      <div className="dashboard__panel" style={{ marginTop: "28px" }}>
+        <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+          📈 Marketing & Audience Management
+        </h2>
+        <p className="hero__sub" style={{ marginTop: "4px", fontSize: "14px", color: "var(--fg-dim)", maxWidth: "100%" }}>
+          Deduplicate, filter, and organize student accounts, registrants, and failed checkouts. Export segmented contacts into HubSpot, Klaviyo, or custom audiences.
+        </p>
+
+        {/* KPI Cards Row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "24px", marginBottom: "28px" }}>
+          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px" }}>
+            <div className="phase__weeks-label">Total Leads (Sign-ups)</div>
+            <div className="phase__weeks" style={{ fontSize: "28px", marginTop: "4px" }}>{totalLeads}</div>
+            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Unique email profiles</div>
+          </div>
+          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-pink)" }}>
+            <div className="phase__weeks-label">Paid Customers</div>
+            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-pink)", marginTop: "4px" }}>{totalPayingStudents}</div>
+            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Completed bookings</div>
+          </div>
+          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-emerald)" }}>
+            <div className="phase__weeks-label">Conversion Rate</div>
+            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-emerald)", marginTop: "4px" }}>{conversionRate}%</div>
+            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Leads to paid ratio</div>
+          </div>
+          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-amber)" }}>
+            <div className="phase__weeks-label">Professional Ratio</div>
+            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-amber)", marginTop: "4px" }}>
+              {totalLeads > 0 ? ((totalProfessionals / totalLeads) * 100).toFixed(0) : 0}%
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>
+              {totalProfessionals} Pros / {totalAcademicStudents} Students
+            </div>
+          </div>
+        </div>
+
+        {/* 5 Targeted Audience Segments Grid */}
+        <h3 className="form-label" style={{ marginBottom: "16px", fontSize: "11px", color: "var(--fg-faint)" }}>Standard Marketing Segments</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+          
+          {/* Segment 1: Paid Customers */}
+          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "rgba(232,90,122,0.12)", color: "var(--c-pink)", borderColor: "var(--c-pink)" }}>Warm Segment</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{paidCustomersList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Paid Customers</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Students who have successfully booked and completed at least one paid masterclass.
+              </p>
+            </div>
+            <button 
+              onClick={() => handleExportCSV(paidCustomersList, "Paid Customers")}
+              className="form-btn form-btn--accent" 
+              style={{ background: "var(--c-pink)", marginTop: "auto" }}
+            >
+              📥 Export Segment CSV
+            </button>
+          </div>
+
+          {/* Segment 2: Cold Leads */}
+          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "rgba(107,77,128,0.12)", color: "var(--c-purple)", borderColor: "var(--c-purple)" }}>Cold Segment</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{coldLeadsList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Cold Leads</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Users who signed up for accounts but have never reserved any masterclass seats.
+              </p>
+            </div>
+            <button 
+              onClick={() => handleExportCSV(coldLeadsList, "Cold Leads")}
+              className="form-btn" 
+              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
+            >
+              📥 Export Segment CSV
+            </button>
+          </div>
+
+          {/* Segment 3: Working Professionals */}
+          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "rgba(209,138,42,0.12)", color: "var(--c-amber)", borderColor: "var(--c-amber)" }}>B2B Enterprise</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{professionalsList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Working Professionals</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Signed up accounts who self-identified as active industry professionals. Ideal for advanced upsells.
+              </p>
+            </div>
+            <button 
+              onClick={() => handleExportCSV(professionalsList, "Working Professionals")}
+              className="form-btn" 
+              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
+            >
+              📥 Export Segment CSV
+            </button>
+          </div>
+
+          {/* Segment 4: Academic Students */}
+          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "rgba(45,166,179,0.12)", color: "var(--c-teal)", borderColor: "var(--c-teal)" }}>B2C Career Prep</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{academicStudentsList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Academic Students</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Users currently studying in colleges/universities. Perfect for cohort entry offers and fundamentals.
+              </p>
+            </div>
+            <button 
+              onClick={() => handleExportCSV(academicStudentsList, "Academic Students")}
+              className="form-btn" 
+              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
+            >
+              📥 Export Segment CSV
+            </button>
+          </div>
+
+          {/* Segment 5: Abandoned Checkouts */}
+          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "rgba(194,83,60,0.12)", color: "var(--c-rust)", borderColor: "var(--c-rust)" }}>Retargeting</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{abandonedCheckoutsList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Abandoned Checkout</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Leads who initiated masterclass checkout but never successfully completed payment. High priority conversion leads.
+              </p>
+            </div>
+            <button 
+              onClick={() => handleExportCSV(abandonedCheckoutsList, "Abandoned Checkouts")}
+              className="form-btn" 
+              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
+            >
+              📥 Export Segment CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Interactive Session Campaign Selector */}
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: "24px", marginTop: "12px" }}>
+          <h3 className="form-label" style={{ marginBottom: "12px" }}>Targeted Session Campaign Export</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "16px" }}>
+            <div style={{ flex: 1, minWidth: "240px" }}>
+              <select 
+                className="form-select" 
+                value={selectedMcCampaignId}
+                onChange={e => setSelectedMcCampaignId(e.target.value)}
+              >
+                <option value="">-- Choose Masterclass Session --</option>
+                {sessions.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} ({new Date(s.dateTime).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                if (!selectedMcCampaignId) {
+                  alert("Please choose a masterclass session first.");
+                  return;
+                }
+                const cleanRoster = sessionCampaignRoster.map(r => ({
+                  name: r.studentName,
+                  email: r.studentEmail,
+                  phone: r.studentPhone,
+                  userType: "Registered Cohort Student"
+                }));
+                handleExportCSV(cleanRoster, activeMcCampaignSession ? activeMcCampaignSession.title : "Masterclass Roster");
+              }}
+              className="form-btn" 
+              disabled={!selectedMcCampaignId}
+              style={{ 
+                width: "auto", 
+                margin: 0, 
+                padding: "14px 28px", 
+                background: selectedMcCampaignId ? "var(--fg)" : "transparent",
+                color: selectedMcCampaignId ? "var(--bg)" : "var(--fg-faint)",
+                borderColor: "var(--line-strong)",
+                cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
+              }}
+            >
+              📥 Export Registered Students CSV
+            </button>
+          </div>
+          {selectedMcCampaignId && (
+            <div style={{ marginTop: "12px", fontSize: "13px", color: "var(--fg-dim)" }}>
+              📊 Campaign Status: <b>{sessionCampaignRoster.length} total registrations</b> recorded for <i>"{activeMcCampaignSession ? activeMcCampaignSession.title : 'Selected Masterclass'}"</i>.
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 }
