@@ -9,19 +9,14 @@ const {
   useReducedMotion,
 } = window.Motion || window.FramerMotion || {};
 
-// ── Global error reporter ─────────────────────────────────────────
+// ── Global error reporter (production-safe) ───────────────────────
 window.onerror = function(msg, src, line, col, err) {
-  const root = document.getElementById('root');
-  if (root && !root.firstChild) {
-    root.innerHTML = '<div style="padding:40px;font-family:monospace;color:#c00;background:#fff;font-size:13px;white-space:pre-wrap;"><strong>Runtime Error:</strong>\n' + msg + '\nSource: ' + src + ':' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '') + '</div>';
-  }
+  if (!msg || msg === 'undefined' || msg === 'Script error.') return false;
+  console.error('Runtime Error:', msg, src, line, col, err && err.stack);
   return false;
 };
 window.addEventListener('unhandledrejection', function(e) {
-  const root = document.getElementById('root');
-  if (root && !root.firstChild) {
-    root.innerHTML = '<div style="padding:40px;font-family:monospace;color:#c00;background:#fff;font-size:13px;white-space:pre-wrap;"><strong>Unhandled Promise Rejection:</strong>\n' + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason)) + '</div>';
-  }
+  console.error('Unhandled Promise Rejection:', e.reason);
 });
 
 
@@ -247,31 +242,44 @@ function CommandPalette({ open, onClose, onJumpPhase, onJumpCapstone }) {
 function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapstone, scrollToAgenda, agendaRef, totalSections, capstoneTiles, phaseRefs, capstoneRefs }) {
   return (
     <main id="main">
-      {/* HERO */}
-      <header className="hero" data-screen-label="01 Hero">
+      {/* HERO — 2-column: copy left, walkthrough video right */}
+      <header className="hero hero--split" data-screen-label="01 Hero">
         <div className="hero__blob" />
         <div className="hero__blob-2" />
         <div className="hero__blob-3" />
-        <div className="hero__eyebrow">
-          <span className="hero__eyebrow-dot" />
-          The 2026 Edition · 26 Weeks · 9 Phases
+
+        <div className="hero__grid">
+          <div className="hero__copy">
+            <div className="hero__eyebrow">
+              <span className="hero__eyebrow-dot" />
+              The 2026 Edition · 26 Weeks · 9 Phases
+            </div>
+            <h1 className="hero__title">
+              The only roadmap you need to become a{' '}
+              <span className="hero__title-100x">100× AI Engineer</span> <em>in 2026.</em>
+            </h1>
+            <p className="hero__sub">
+              A complete, production-grade journey from <em>script kid to agent engineer</em>.
+              Every module grounded in real enterprise AI engineering — from Python fundamentals
+              all the way to multi-agent systems shipping in regulated domains.
+            </p>
+            <div className="hero__actions">
+              <button className="hero__cta" type="button" onClick={scrollToAgenda}>
+                Explore the roadmap
+                <span aria-hidden="true">↓</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="hero__video">
+            <V2ClickToPlayVideo
+              videoId={V2_BRAND.roadmapVideoId}
+              title="Agentic AI Engineer Roadmap 2026 — Balaji Chippada"
+              caption={`${V2_SOCIAL.roadmapViews} views · Full 26-week walkthrough · Watch on YouTube`}
+            />
+          </div>
         </div>
-        <h1 className="hero__title">
-          The only roadmap<br />
-          you need to become a<br />
-          <span className="hero__title-100x">100× AI Engineer</span> <em>in 2026.</em>
-        </h1>
-        <p className="hero__sub">
-          A complete, production-grade journey from <em>script kid to agent engineer</em>.
-          Every module grounded in real enterprise AI engineering — from Python fundamentals
-          all the way to multi-agent systems shipping in regulated domains.
-        </p>
-        <div className="hero__actions">
-          <button className="hero__cta" type="button" onClick={scrollToAgenda}>
-            Explore the roadmap
-            <span aria-hidden="true">↓</span>
-          </button>
-        </div>
+
         <div className="hero__stats">
           <div>
             <div className="hero__stat-num">{window.ROADMAP.length}</div>
@@ -348,40 +356,40 @@ function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapston
           </div>
           <div className="instructor__body">
             <div className="instructor__label">Your Instructor</div>
-            <h3 className="instructor__name">Balaji Chippada</h3>
-            <div className="instructor__role">AI/ML practitioner · Production-scale agentic AI builder</div>
+            <h3 className="instructor__name">{V2_BRAND.name}</h3>
+            <div className="instructor__role">8 years in AI/ML · Production agentic AI · {V2_SOCIAL.youtubeSubs} YouTube</div>
+            <p className="instructor__quote">&ldquo;If I had to start all over again in 2026, this is exactly how I would begin.&rdquo;</p>
             <p className="instructor__bio">
-              I have spent <span>8 years in the AI/ML industry</span> and watched the field move from traditional
-              machine learning into agentic AI. Along the way, I have built <span>production-scale agentic
-              applications</span> and seen what actually matters when these systems leave the demo stage.
-              I am also a tutor in the AI and data science space, and over the last couple of years
-              I have mentored and taught <span>3,000+ students and working professionals</span> transform their careers.
-              If I had to start all over again in 2026, this is exactly how I would begin. This roadmap
-              is the curriculum I wish someone had handed me on day one.
+              I build <span>production-scale agentic applications</span> and teach what matters when systems
+              leave the demo stage. This roadmap is the free, open-source curriculum from my
+              <span> {V2_SOCIAL.roadmapViews}-view</span> YouTube walkthrough — no paywall, no course funnel at the end.
             </p>
             <div className="instructor__chips">
-              <span className="instructor__chip">8 Years AI/ML</span>
+              <span className="instructor__chip">{V2_SOCIAL.roadmapViews} roadmap views</span>
               <span className="instructor__chip">LangGraph</span>
-              <span className="instructor__chip">Agentic AI</span>
+              <span className="instructor__chip">ReAct · MCP</span>
               <span className="instructor__chip">Production RAG</span>
-              <span className="instructor__chip">Multi-Agent Systems</span>
+              <span className="instructor__chip">Multi-Agent</span>
               <span className="instructor__chip">LLMOps</span>
             </div>
           </div>
           <div className="instructor__cta">
             <div className="instructor__connect-label">Connect with me</div>
+            <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
+              Join WhatsApp community →
+            </a>
             <div className="instructor__socials">
-              <a className="instructor__social" href="https://www.linkedin.com/in/balaji-chippada-0317/" target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
+              <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
                 </svg>
               </a>
-              <a className="instructor__social" href="https://www.youtube.com/@balajichippada" target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
+              <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
                 </svg>
               </a>
-              <a className="instructor__social" href="https://www.instagram.com/inside.datascience/" target="_blank" rel="noopener noreferrer" aria-label="Open Inside Data Science on Instagram">
+              <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
                 </svg>
@@ -610,11 +618,11 @@ function AnimatedCounter({ to, suffix = '' }) {
 
 function TestimonialMarquee() {
   const items = [
-    { text: "This masterclass shipped my first agentic feature in 3 days.", author: "Vikram R., Senior Engineer" },
-    { text: "The Claude Code module alone automated 40% of our code review process.", author: "Sneha I., Engineering Lead" },
-    { text: "I went from writing scripts to shipping multi-agent pipelines in production in weeks.", author: "Rahul M., Senior Engineer" },
-    { text: "Best investment in my career this year. The ROI was immediate and massive.", author: "Suresh P., Dev" },
-    { text: "I got my first agentic AI feature shipped to production 3 weeks after live class.", author: "Ananya G., PM" }
+    { text: "Finally understood LLM vs workflow vs agent — the roadmap video changed how I learn.", author: "Roadmap viewer" },
+    { text: "Shipped my first agentic feature in 3 days after the live Claude Code session.", author: "Rahul Mehta · Swiggy" },
+    { text: "Demo-first teaching — Balaji shows the agent running before explaining theory.", author: "YouTube subscriber" },
+    { text: "The critic-loop resume agent demo convinced me this isn't just another AI course.", author: "Working professional" },
+    { text: "Free roadmap got me started; the masterclass got me shipping in production.", author: "Fresher · Hyderabad" },
   ];
 
   const marqueeContent = (
@@ -644,7 +652,7 @@ function TestimonialMarquee() {
 // Symmetrically grows in size (peaks at 1.12x in center) and fades gracefully on scroll.
 // ===============================================================
 
-function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, setBookingEmail, setBookingPhone }) {
+function MasterclassCard({ mc, idx, user, onBook }) {
   const cardRef = useRef(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
@@ -669,8 +677,9 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
   const dummyValue = useMotionValue ? useMotionValue(0.5) : null;
   const activeProgress = scrollYProgress || dummyValue;
 
-  const scaleMin = isMobileViewport ? 0.98 : 0.90;
-  const scaleMax = isMobileViewport ? 1.02 : 1.12;
+  // Disable scale animation on mobile for readability and battery.
+  const scaleMin = isMobileViewport ? 1 : 0.94;
+  const scaleMax = isMobileViewport ? 1 : 1.04;
 
   // Symmetrical grow-and-shrink card effect:
   // Starts at scale 0.90 entering from bottom, peaks at scale 1.12 in viewport center (very dramatic and big!), shrinks back to 0.90 exiting top.
@@ -679,6 +688,8 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
 
   const mcDate = mc.dateTime ? new Date(mc.dateTime) : null;
   const isMostPopular = mc.title.toLowerCase().includes('rag') || idx === 0;
+  const seatsLeft = getSeatsRemaining(mc);
+  const outcome = getMcOutcome(mc);
 
   return (
     <div ref={cardRef} style={{ margin: isMobileViewport ? '40px 0' : '140px 0', padding: '0', overflow: 'visible' }}>
@@ -703,6 +714,12 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   Live Masterclass
                 </div>
                 <h2 className="mc-card__title">{mc.title}</h2>
+                {outcome && (
+                  <div className="mc-card__outcome">
+                    <span className="mc-card__outcome-label">What you&apos;ll build</span>
+                    <p>{outcome}</p>
+                  </div>
+                )}
                 <div className="mc-card__badges">
                   {mc.instructor && (
                     <span className="mc-card__badge">
@@ -735,12 +752,6 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   <div className="mc-card__price-label" style={{ margin: 0 }}>Registration</div>
                 </div>
                 <div className="mc-card__price">₹{(mc.price || 0).toLocaleString()}</div>
-                <div className="mc-card__price-original" style={{ textDecoration: 'line-through', color: 'var(--fg-faint)', fontSize: '12px', marginTop: '2px' }}>
-                  ₹{Math.round((mc.price || 200) / 0.4).toLocaleString()}
-                </div>
-                <div className="mc-card__price-discount" style={{ display: 'inline-block', backgroundColor: '#EAF3DE', color: '#3B6D11', fontSize: '11px', fontWeight: 500, padding: '2px 8px', borderRadius: '99px', marginTop: '4px' }}>
-                  Save 60%
-                </div>
               </div>
             </div>
 
@@ -758,6 +769,7 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                     : <strong>Date TBA</strong>
                   }
                 </div>
+                {seatsLeft > 0 && (
                 <div className="mc-card__urgency" style={{
                   fontSize: '12px',
                   fontWeight: 500,
@@ -773,44 +785,27 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D85A30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
                   </svg>
-                  <span>Only {mc.seatsRemaining || 12} seats remaining</span>
+                  <span>Only {seatsLeft} seats remaining</span>
                 </div>
+                )}
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    className="mc-card__learn-btn"
-                    onClick={() => {
-                      const el = document.getElementById(`mc-card-${mc.id}`);
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }
-                    }}
-                  >
-                    Learn more
-                  </button>
-                  <ShimmerButton
-                    variant="dark"
-                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
-                    onClick={() => {
-                      setBookingSession({ ...mc, description: mc.rawSyllabus || '' });
-                      setBookingName("");
-                      setBookingEmail(user ? user.email : "");
-                      setBookingPhone("");
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
-                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                        <path d="M13 5v2" />
-                        <path d="M13 17v2" />
-                        <path d="M13 11v2" />
-                      </svg>
-                      <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
-                    </div>
-                  </ShimmerButton>
-                </div>
+                <ShimmerButton
+                  variant="dark"
+                  style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
+                  onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
+                      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                      <path d="M13 5v2" />
+                      <path d="M13 17v2" />
+                      <path d="M13 11v2" />
+                    </svg>
+                    <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
+                  </div>
+                </ShimmerButton>
                 <div style={{
                   fontSize: '11px',
                   color: 'var(--fg-faint)',
@@ -818,7 +813,7 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   marginTop: '4px',
                   whiteSpace: 'nowrap'
                 }}>
-                  Instant confirmation · Zoom link sent by email
+                  Instant Zoom link · No account needed
                 </div>
               </div>
             </div>
@@ -833,6 +828,12 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   Live Masterclass
                 </div>
                 <h2 className="mc-card__title">{mc.title}</h2>
+                {outcome && (
+                  <div className="mc-card__outcome">
+                    <span className="mc-card__outcome-label">What you&apos;ll build</span>
+                    <p>{outcome}</p>
+                  </div>
+                )}
                 <div className="mc-card__badges">
                   {mc.instructor && (
                     <span className="mc-card__badge">
@@ -865,12 +866,6 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   <div className="mc-card__price-label" style={{ margin: 0 }}>Registration</div>
                 </div>
                 <div className="mc-card__price">₹{(mc.price || 0).toLocaleString()}</div>
-                <div className="mc-card__price-original" style={{ textDecoration: 'line-through', color: 'var(--fg-faint)', fontSize: '12px', marginTop: '2px' }}>
-                  ₹{Math.round((mc.price || 200) / 0.4).toLocaleString()}
-                </div>
-                <div className="mc-card__price-discount" style={{ display: 'inline-block', backgroundColor: '#EAF3DE', color: '#3B6D11', fontSize: '11px', fontWeight: 500, padding: '2px 8px', borderRadius: '99px', marginTop: '4px' }}>
-                  Save 60%
-                </div>
               </div>
             </div>
 
@@ -888,6 +883,7 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                     : <strong>Date TBA</strong>
                   }
                 </div>
+                {seatsLeft > 0 && (
                 <div className="mc-card__urgency" style={{
                   fontSize: '12px',
                   fontWeight: 500,
@@ -903,44 +899,27 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D85A30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
                   </svg>
-                  <span>Only {mc.seatsRemaining || 12} seats remaining</span>
+                  <span>Only {seatsLeft} seats remaining</span>
                 </div>
+                )}
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    className="mc-card__learn-btn"
-                    onClick={() => {
-                      const el = document.getElementById(`mc-card-${mc.id}`);
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }
-                    }}
-                  >
-                    Learn more
-                  </button>
-                  <ShimmerButton
-                    variant="dark"
-                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
-                    onClick={() => {
-                      setBookingSession({ ...mc, description: mc.rawSyllabus || '' });
-                      setBookingName("");
-                      setBookingEmail(user ? user.email : "");
-                      setBookingPhone("");
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
-                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                        <path d="M13 5v2" />
-                        <path d="M13 17v2" />
-                        <path d="M13 11v2" />
-                      </svg>
-                      <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
-                    </div>
-                  </ShimmerButton>
-                </div>
+                <ShimmerButton
+                  variant="dark"
+                  style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
+                  onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
+                      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                      <path d="M13 5v2" />
+                      <path d="M13 17v2" />
+                      <path d="M13 11v2" />
+                    </svg>
+                    <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
+                  </div>
+                </ShimmerButton>
                 <div style={{
                   fontSize: '11px',
                   color: 'var(--fg-faint)',
@@ -948,7 +927,7 @@ function MasterclassCard({ mc, idx, user, setBookingSession, setBookingName, set
                   marginTop: '4px',
                   whiteSpace: 'nowrap'
                 }}>
-                  Instant confirmation · Zoom link sent by email
+                  Instant Zoom link · No account needed
                 </div>
               </div>
             </div>
@@ -1005,44 +984,41 @@ function InstructorBio() {
             }}
           >
             <div className="instructor__photo">
-              <img src="uploads/balaji-chippada.png" alt="Balaji Chippada" />
+              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>
-              <h3 className="instructor__name">Balaji Chippada</h3>
-              <div className="instructor__role">AI/ML practitioner · Production-scale agentic AI builder</div>
-              <p className="instructor__bio">
-                I have spent <span>8 years in the AI/ML industry</span> and watched the field move from traditional
-                machine learning into agentic AI. Along the way, I have built <span>production-scale agentic
-                applications</span> and seen what actually matters when these systems leave the demo stage.
-                I am also a tutor in the AI and data science space, and over the last couple of years
-                I have mentored and taught <span>3,000+ students and working professionals</span> transform their careers.
-                If I had to start all over again in 2026, this is exactly how I would begin. This roadmap
-                is the curriculum I wish someone had handed me on day one.
-              </p>
-              <div className="instructor__chips">
-                <span className="instructor__chip">8 Years AI/ML</span>
-                <span className="instructor__chip">LangGraph</span>
-                <span className="instructor__chip">Agentic AI</span>
-                <span className="instructor__chip">Production RAG</span>
-                <span className="instructor__chip">Multi-Agent Systems</span>
-                <span className="instructor__chip">LLMOps</span>
-              </div>
+              <h3 className="instructor__name">{V2_INSTRUCTOR.name}</h3>
+              <div className="instructor__role">{V2_INSTRUCTOR.title}</div>
+              {V2_INSTRUCTOR.quote && (
+                <p className="instructor__quote">&ldquo;{V2_INSTRUCTOR.quote}&rdquo;</p>
+              )}
+              <p className="instructor__bio">{V2_INSTRUCTOR.bio}</p>
+              {Array.isArray(V2_INSTRUCTOR.chips) && V2_INSTRUCTOR.chips.length > 0 && (
+                <div className="instructor__chips">
+                  {V2_INSTRUCTOR.chips.map((chip, i) => (
+                    <span key={i} className="instructor__chip">{chip}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="instructor__cta">
               <div className="instructor__connect-label">Connect with me</div>
+              <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
+                Join WhatsApp community →
+              </a>
               <div className="instructor__socials">
-                <a className="instructor__social" href="https://www.linkedin.com/in/balaji-chippada-0317/" target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
+                <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
                   </svg>
                 </a>
-                <a className="instructor__social" href="https://www.youtube.com/@balajichippada" target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
+                <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
                   </svg>
                 </a>
-                <a className="instructor__social" href="https://www.instagram.com/inside.datascience/" target="_blank" rel="noopener noreferrer" aria-label="Open Inside Data Science on Instagram">
+                <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
                   </svg>
@@ -1053,44 +1029,41 @@ function InstructorBio() {
         ) : (
           <div className="instructor__card">
             <div className="instructor__photo">
-              <img src="uploads/balaji-chippada.png" alt="Balaji Chippada" />
+              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>
-              <h3 className="instructor__name">Balaji Chippada</h3>
-              <div className="instructor__role">AI/ML practitioner · Production-scale agentic AI builder</div>
-              <p className="instructor__bio">
-                I have spent <span>8 years in the AI/ML industry</span> and watched the field move from traditional
-                machine learning into agentic AI. Along the way, I have built <span>production-scale agentic
-                applications</span> and seen what actually matters when these systems leave the demo stage.
-                I am also a tutor in the AI and data science space, and over the last couple of years
-                I have mentored and taught <span>3,000+ students and working professionals</span> transform their careers.
-                If I had to start all over again in 2026, this is exactly how I would begin. This roadmap
-                is the curriculum I wish someone had handed me on day one.
-              </p>
-              <div className="instructor__chips">
-                <span className="instructor__chip">8 Years AI/ML</span>
-                <span className="instructor__chip">LangGraph</span>
-                <span className="instructor__chip">Agentic AI</span>
-                <span className="instructor__chip">Production RAG</span>
-                <span className="instructor__chip">Multi-Agent Systems</span>
-                <span className="instructor__chip">LLMOps</span>
-              </div>
+              <h3 className="instructor__name">{V2_INSTRUCTOR.name}</h3>
+              <div className="instructor__role">{V2_INSTRUCTOR.title}</div>
+              {V2_INSTRUCTOR.quote && (
+                <p className="instructor__quote">&ldquo;{V2_INSTRUCTOR.quote}&rdquo;</p>
+              )}
+              <p className="instructor__bio">{V2_INSTRUCTOR.bio}</p>
+              {Array.isArray(V2_INSTRUCTOR.chips) && V2_INSTRUCTOR.chips.length > 0 && (
+                <div className="instructor__chips">
+                  {V2_INSTRUCTOR.chips.map((chip, i) => (
+                    <span key={i} className="instructor__chip">{chip}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="instructor__cta">
               <div className="instructor__connect-label">Connect with me</div>
+              <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
+                Join WhatsApp community →
+              </a>
               <div className="instructor__socials">
-                <a className="instructor__social" href="https://www.linkedin.com/in/balaji-chippada-0317/" target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
+                <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
                   </svg>
                 </a>
-                <a className="instructor__social" href="https://www.youtube.com/@balajichippada" target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
+                <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
                   </svg>
                 </a>
-                <a className="instructor__social" href="https://www.instagram.com/inside.datascience/" target="_blank" rel="noopener noreferrer" aria-label="Open Inside Data Science on Instagram">
+                <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
                   </svg>
@@ -1176,7 +1149,7 @@ function ClosingCTA({ defaultPrice = 200, user, setBookingSession, setBookingNam
 // Supports full responsive grids, light/dark themes, and active tabs.
 // ===============================================================
 
-function SiteFooter({ setActiveMainTab }) {
+function SiteFooter({ setActiveMainTab, setLegalPage }) {
   const footerSections = [
     {
       label: 'Product',
@@ -1191,16 +1164,19 @@ function SiteFooter({ setActiveMainTab }) {
       label: 'Company',
       links: [
         { title: 'About Balaji', href: '#instructor', isScroll: true },
-        { title: 'Privacy Policy', href: '#' },
-        { title: 'Terms of Service', href: '#' }
+        { title: 'Privacy Policy', href: '#', legal: 'privacy' },
+        { title: 'Terms of Service', href: '#', legal: 'terms' },
+        { title: 'Refund Policy', href: '#', legal: 'refund' },
+        { title: 'Contact', href: '#', legal: 'contact' },
       ]
     },
     {
       label: 'Social Links',
       links: [
         { title: 'LinkedIn', href: 'https://www.linkedin.com/in/balaji-chippada-0317/', icon: 'linkedin' },
-        { title: 'YouTube', href: 'https://www.youtube.com/@balajichippada', icon: 'youtube' },
-        { title: 'Instagram', href: 'https://www.instagram.com/inside.datascience/', icon: 'instagram' },
+        { title: 'YouTube', href: V2_BRAND.youtubeChannel, icon: 'youtube' },
+        { title: 'Instagram', href: V2_BRAND.instagram, icon: 'instagram' },
+        { title: 'WhatsApp Community', href: V2_BRAND.whatsappCommunity, icon: 'whatsapp' },
       ]
     }
   ];
@@ -1251,6 +1227,10 @@ function SiteFooter({ setActiveMainTab }) {
                         <svg className="site-footer__link-icon" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
                         </svg>
+                      ) : link.icon === 'whatsapp' ? (
+                        <svg className="site-footer__link-icon" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                        </svg>
                       ) : null;
 
                       const handleLinkClick = (e) => {
@@ -1264,6 +1244,9 @@ function SiteFooter({ setActiveMainTab }) {
                           e.preventDefault();
                           setActiveMainTab(link.onClickTab);
                           window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else if (link.legal && setLegalPage) {
+                          e.preventDefault();
+                          setLegalPage(link.legal);
                         }
                       };
 
@@ -1329,143 +1312,8 @@ function ShimmerButton({ children, onClick, className, variant = 'dark' }) {
 }
 
 
-// ===============================================================
-// DOTTED SURFACE — Three.js wave particle background
-// Adapted from dotted-surface.tsx (shadcn/ui).
-// TypeScript removed; useTheme replaced with MutationObserver;
-// THREE loaded via window.THREE (CDN global).
-// ===============================================================
-
-function DottedSurface({ theme }) {
-  const containerRef = useRef(null);
-  const sceneRef = useRef(null);
-
-  useEffect(() => {
-    const THREE = window.THREE;
-    if (!containerRef.current || !THREE) return;
-
-    const SEPARATION = 150;
-    const AMOUNTX = 40;
-    const AMOUNTY = 60;
-
-    // Theme-aware colours — match the site's CSS variables
-    const isDark = theme === 'dark';
-    // Fog colour: use exact hex of --bg per theme
-    const fogHex = isDark ? 0x14131a : 0xf4f1ec;
-
-    // Scene
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(fogHex, 2000, 10000);
-
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(0, 355, 1220);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // cap at 2× for perf
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(fogHex, 0); // transparent clear
-
-    containerRef.current.appendChild(renderer.domElement);
-
-    // Build particle geometry
-    const positions = [];
-    const colors = [];
-
-    // Dot colour: warm-white in dark, near-black in light
-    const [r, g, b] = isDark ? [0.82, 0.79, 0.75] : [0.1, 0.09, 0.08];
-
-    for (let ix = 0; ix < AMOUNTX; ix++) {
-      for (let iy = 0; iy < AMOUNTY; iy++) {
-        positions.push(
-          ix * SEPARATION - (AMOUNTX * SEPARATION) / 2,
-          0,
-          iy * SEPARATION - (AMOUNTY * SEPARATION) / 2,
-        );
-        colors.push(r, g, b);
-      }
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-      size: 7,
-      vertexColors: true,
-      transparent: true,
-      opacity: isDark ? 0.55 : 0.45,
-      sizeAttenuation: true,
-    });
-
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    let count = 0;
-    let animationId;
-
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-
-      const posAttr = geometry.attributes.position;
-      const pos = posAttr.array;
-
-      let i = 0;
-      for (let ix = 0; ix < AMOUNTX; ix++) {
-        for (let iy = 0; iy < AMOUNTY; iy++) {
-          pos[i * 3 + 1] =
-            Math.sin((ix + count) * 0.3) * 50 +
-            Math.sin((iy + count) * 0.5) * 50;
-          i++;
-        }
-      }
-
-      posAttr.needsUpdate = true;
-      renderer.render(scene, camera);
-      count += 0.08; // slightly slower = more elegant
-    };
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
-    animate();
-
-    sceneRef.current = { scene, renderer, animationId };
-
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', handleResize);
-      scene.traverse(obj => {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach(m => m.dispose());
-        }
-      });
-      renderer.dispose();
-      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
-        containerRef.current.removeChild(renderer.domElement);
-      }
-    };
-  }, [theme]); // re-creates scene when theme changes
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: -1,
-        pointerEvents: 'none',
-        overflow: 'hidden',
-      }}
-    />
-  );
-}
-
-
+// DottedSurface (Three.js particle background) removed — no longer rendered.
+// Three.js CDN script also removed from index.html to drop ~120KB of dead JS.
 
 // ===============================================================
 // GOOEY TEXT — morphs between a list of phrases using gooey blur filter.
@@ -2015,10 +1863,7 @@ function TestimonialsSection() {
           </p>
           <button
             className="hero__primary-cta"
-            onClick={() => {
-              const el = document.getElementById('masterclasses');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={() => openBooking(nextMasterclass)}
           >
             Book my seat →
           </button>
@@ -2893,6 +2738,11 @@ function App() {
   const [bookingEmail, setBookingEmail] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingStep, setBookingStep] = useState(1);
+  const [bookingSuccess, setBookingSuccess] = useState(null);
+  const [bookingError, setBookingError] = useState("");
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [legalPage, setLegalPage] = useState(null);
   
   // Checkout mock sandbox screen state
   const [mockCheckoutData, setMockCheckoutData] = useState(null);
@@ -3025,32 +2875,20 @@ function App() {
         setSessions(list);
         setLoadingSessions(false);
       }, (err) => {
-        console.error("Could not fetch sessions from firestore:", err);
-        // Fallback mockup sessions so app is functional immediately
-        setSessions([
-          {
-            id: "mock_session_1",
-            title: "LangGraph Multi-Agent RAG Bootcamp",
-            description: "Go beyond basic tutorials. Build recursive workflow graphs, customize memory savers, coordinate supervisors, and implement contextual guardrails.",
-            instructor: "Balaji Chippada",
-            dateTime: "2026-06-15T18:00:00Z",
-            price: 1999
-          },
-          {
-            id: "mock_session_2",
-            title: "Production RAG: Docling, Pinecone & Hybrid Search",
-            description: "Systems level engineering course covering document ingestion, semantic chunking, graph databases, late-chunking, and cross-encoder rerankers.",
-            instructor: "Balaji Chippada",
-            dateTime: "2026-06-22T19:00:00Z",
-            price: 2499
-          }
-        ]);
+        console.error('Could not fetch sessions from firestore:', err);
+        // When Firestore is unavailable, show no legacy sessions — site.config.js
+        // already provides the featured masterclass via nextMasterclass merging.
+        // (Mock prices ₹1999/₹2499 used to leak through here — removed.)
+        setSessions([]);
         setLoadingSessions(false);
       });
     return () => unsubscribe();
   }, []);
 
   // Fetch AI-structured masterclasses from /masterclasses collection
+  // NOTE: To run a FREE masterclass, set `price: 0` on the document in Firestore.
+  // The whole UI (hero, banner, card, booking wizard, closing CTA, mobile sticky)
+  // automatically adapts to free copy + skips Razorpay.
   useEffect(() => {
     if (!db) { setLoadingMasterclasses(false); return; }
     let unsub = db.collection('masterclasses')
@@ -3088,6 +2926,14 @@ function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (user && bookingSession && bookingStep === 1) {
+      setBookingStep(2);
+      setBookingName(user.displayName || bookingName);
+      setBookingEmail(user.email || bookingEmail);
+    }
+  }, [user, bookingSession, bookingStep]);
 
   // Scroll driven dock observer (Runs only if Roadmap view is active)
   useEffect(() => {
@@ -3335,94 +3181,254 @@ function App() {
   };
 
   // Student booking transaction submission
-  const handleBookingSubmit = async (e) => {
-    e.preventDefault();
-    if (!bookingName || !bookingEmail || !bookingPhone) {
-      alert("Please fill in Name, Email and Phone details.");
+  const completeBookingSuccess = async (paymentData) => {
+    const session = bookingSession;
+    const tier = selectedTier || getMcTiers(session)[0];
+    setBookingSuccess({
+      paymentId: paymentData.paymentId,
+      orderId: paymentData.orderId,
+      session,
+      tier,
+    });
+    setMockCheckoutData(null);
+    setBookingStep('success');
+    if (user && !user.isAnonymous && db && session) {
+      try {
+        await db.collection('users').doc(user.uid).collection('bookings').add({
+          masterclassId: session.id,
+          masterclassTitle: session.title,
+          tier: tier.name,
+          amount: tier.price,
+          status: 'confirmed',
+          razorpayPaymentId: paymentData.paymentId || '',
+          razorpayOrderId: paymentData.orderId || '',
+          sessionDate: session.dateTime ? new Date(session.dateTime) : null,
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          zoomLink: session.zoomLink || '',
+          prepPdfUrl: session.prepPdfUrl || '',
+          recordingUrl: session.recordingUrl || '',
+          slidesUrl: session.slidesUrl || '',
+        });
+        await db.collection('users').doc(user.uid).set({
+          name: bookingName, phone: bookingPhone, email: user.email,
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Client-side booking write failed (webhook may have handled it):', err);
+      }
+    }
+  };
+
+  const handleBookingSubmit = async () => {
+    if (!bookingName || !bookingEmail) {
+      setBookingError('Please fill in name and email.');
       return;
     }
+    if (!bookingSession) return;
 
+    setBookingError('');
     setBookingLoading(true);
+
+    // Guest checkout: sign in anonymously so the existing cloud function/Firestore writes still work.
+    // If anonymous auth is disabled in Firebase, we fall back to a client-generated guest id.
+    let effectiveUser = user;
+    if (!effectiveUser && auth) {
+      try {
+        const result = await auth.signInAnonymously();
+        effectiveUser = result.user;
+      } catch (anonErr) {
+        console.warn('Anonymous auth unavailable, continuing as pure guest:', anonErr?.code || anonErr);
+        effectiveUser = {
+          uid: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          email: bookingEmail,
+          isAnonymous: true,
+        };
+      }
+    } else if (!effectiveUser) {
+      effectiveUser = {
+        uid: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        email: bookingEmail,
+        isAnonymous: true,
+      };
+    }
+
+    const tier = selectedTier || getMcTiers(bookingSession)[0];
+    const payPrice = typeof tier.price === 'number' ? tier.price : getMcPrice(bookingSession);
+    const sessionId = bookingSession.id;
+
+    // ── FREE flow: skip Razorpay entirely. Write straight to registrations + (if signed in) user.bookings.
+    if (payPrice === 0) {
+      try {
+        if (db) {
+          const regPayload = {
+            sessionId,
+            sessionTitle: bookingSession.title,
+            studentName: bookingName,
+            studentEmail: bookingEmail,
+            studentPhone: bookingPhone || '',
+            amount: 0,
+            tier: tier.name || 'Free',
+            collection: masterclasses.some((m) => m.id === sessionId) ? 'masterclasses' : 'sessions',
+            status: 'completed',
+            userId: effectiveUser.uid,
+            isFree: true,
+            bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          };
+          const ref = await db.collection('registrations').add(regPayload);
+          setBookingLoading(false);
+          await completeBookingSuccess({
+            paymentId: `free_${ref.id}`,
+            orderId: `free_${Date.now()}`,
+          });
+        } else {
+          // No Firestore — still let the user proceed (dev/preview).
+          setBookingLoading(false);
+          await completeBookingSuccess({
+            paymentId: `free_local_${Math.random().toString(36).slice(2, 10)}`,
+            orderId: `free_local_${Date.now()}`,
+          });
+        }
+      } catch (err) {
+        console.error('Free booking error:', err);
+        setBookingError('Could not save your registration. Please try again.');
+        setBookingLoading(false);
+      }
+      return;
+    }
 
     try {
       let orderData;
 
       if (!functions) {
-        // Firebase Cloud Functions unavailable locally. Generate simulated order data.
         orderData = {
           success: true,
           orderId: `order_mock_${Math.random().toString(36).substring(2, 10)}`,
-          amount: bookingSession.price * 100,
-          keyId: "rzp_test_mockKeyId12345",
-          isMock: true
+          amount: payPrice * 100,
+          keyId: 'rzp_test_mockKeyId12345',
+          isMock: true,
         };
-        console.warn("Firebase Functions not active. Triggering mock transaction pipeline.");
       } else {
-        // Trigger createRazorpayOrder secure server Callable function
-        const createOrderCall = functions.httpsCallable("createRazorpayOrder");
+        const createOrderCall = functions.httpsCallable('createRazorpayOrder');
         const response = await createOrderCall({
-          sessionId: bookingSession.id,
+          sessionId,
           name: bookingName,
           email: bookingEmail,
-          phone: bookingPhone
+          phone: bookingPhone || '',
+          userId: effectiveUser.uid,
+          tier: tier.name,
+          tierPrice: payPrice,
+          collection: masterclasses.some((m) => m.id === sessionId) ? 'masterclasses' : 'sessions',
         });
         orderData = response.data;
       }
 
       setBookingLoading(false);
-      setBookingSession(null); // Close booking input modal
 
       if (orderData && orderData.success) {
-        // Switch to Razorpay integration trigger
         if (orderData.isMock) {
-          // Open beautiful mock checkout page
-          setMockCheckoutData({
-            orderId: orderData.orderId,
-            amount: orderData.amount,
-            session: bookingSession || { id: "mock_session", title: "Live Masterclass" },
-            name: bookingName,
-            email: bookingEmail,
-            phone: bookingPhone
-          });
-        } else {
-          // Trigger real Razorpay checkout overlay script
-          if (typeof window.Razorpay === 'undefined') {
-            throw new Error("Razorpay Checkout SDK is not loaded in browser.");
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          if (isLocal) {
+            setMockCheckoutData({
+              orderId: orderData.orderId,
+              amount: orderData.amount,
+              session: bookingSession,
+              name: bookingName,
+              email: bookingEmail,
+              phone: bookingPhone || '',
+              tier: tier.name,
+              userId: effectiveUser.uid,
+            });
+          } else {
+            await completeBookingSuccess({
+              paymentId: `pay_demo_${Math.random().toString(36).substring(2, 10)}`,
+              orderId: orderData.orderId,
+            });
           }
-
+        } else if (typeof window.Razorpay === 'undefined') {
+          throw new Error('Razorpay Checkout SDK is not loaded in browser.');
+        } else {
           const options = {
             key: orderData.keyId,
             amount: orderData.amount,
-            currency: "INR",
-            name: "The Agent Engineer",
-            description: bookingSession.title,
+            currency: 'INR',
+            name: 'The Agent Engineer',
+            description: `${bookingSession.title} · ${tier.name}`,
             order_id: orderData.orderId,
-            prefill: {
-              name: bookingName,
-              email: bookingEmail,
-              contact: bookingPhone
-            },
-            theme: {
-              color: "#e0664c"
-            },
+            prefill: { name: bookingName, email: bookingEmail, contact: bookingPhone },
+            theme: { color: '#e0664c' },
             handler: function (response) {
-              alert(`Seat booked successfully! Razorpay Payment ID: ${response.razorpay_payment_id}`);
-              // In live setups, the webhook updates status automatically. 
-              // We can fetch/reload immediately.
-            }
+              completeBookingSuccess({
+                paymentId: response.razorpay_payment_id,
+                orderId: orderData.orderId,
+              });
+            },
           };
-
-          const rzp = new window.Razorpay(options);
-          rzp.open();
+          new window.Razorpay(options).open();
         }
       } else {
-        throw new Error("Razorpay order creation response failed.");
+        throw new Error('Razorpay order creation response failed.');
       }
-
     } catch (err) {
-      console.error("Booking error:", err);
-      alert(`Booking Failed: ${err.message || "Could not complete order initialization."}`);
+      console.error('Booking error:', err);
+      setBookingError(err.message || 'Could not complete order initialization.');
       setBookingLoading(false);
+    }
+  };
+
+  const handleGoogleLoginForBooking = async () => {
+    setBookingError('');
+    setLoginLoading(true);
+    setBookingLoading(true);
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      // If we already have an anonymous user (from guest checkout), upgrade it to Google
+      // so their booking history is preserved.
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        try {
+          await auth.currentUser.linkWithPopup(provider);
+        } catch (linkErr) {
+          // If linking fails (e.g. credential already in use), fall back to sign-in.
+          if (linkErr?.code === 'auth/credential-already-in-use') {
+            await auth.signInWithPopup(provider);
+          } else {
+            throw linkErr;
+          }
+        }
+      } else {
+        await auth.signInWithPopup(provider);
+      }
+      if (bookingSuccess) {
+        closeBooking();
+        setActiveMainTab('mybookings');
+      } else {
+        setBookingStep(1);
+      }
+    } catch (err) {
+      setBookingError(err.message || 'Google sign-in failed.');
+    } finally {
+      setLoginLoading(false);
+      setBookingLoading(false);
+    }
+  };
+
+  const closeBooking = () => {
+    setBookingSession(null);
+    setBookingStep(1);
+    setBookingSuccess(null);
+    setBookingError('');
+    setSelectedTier(null);
+    setMockCheckoutData(null);
+  };
+
+  const handleEmailLeadCapture = async (email) => {
+    if (!db) return;
+    try {
+      await db.collection('leads').add({
+        email,
+        source: 'roadmap_pdf',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Lead capture failed:', err);
     }
   };
 
@@ -3478,14 +3484,12 @@ function App() {
       }
 
       setBookingLoading(false);
-      alert(`Simulated payment approved!\n\nDetails:\n- Order ID: ${mockCheckoutData.orderId}\n- Payment ID: ${paymentId}\n\nFirestore updated to "completed". Rescheduling background watch is active.`);
-      setMockCheckoutData(null);
+      await completeBookingSuccess({ paymentId, orderId: mockCheckoutData.orderId });
 
     } catch (err) {
       console.error("Webhook simulator error:", err);
-      // Fallback: If webhook fails (e.g. CORS or function offline), complete client-side in Firestore directly
       try {
-        if (db) {
+        if (db && mockCheckoutData) {
           const regSnap = await db.collection("registrations")
             .where("orderId", "==", mockCheckoutData.orderId)
             .limit(1)
@@ -3496,24 +3500,39 @@ function App() {
               status: "completed",
               paymentId: `pay_fallback_${Math.random().toString(36).substring(2, 10)}`
             });
-            alert("Webhook offline. Fallback client-side write succeeded. Reserved seat activated in database!");
           }
+          await completeBookingSuccess({
+            paymentId: `pay_fallback_${Math.random().toString(36).substring(2, 10)}`,
+            orderId: mockCheckoutData.orderId,
+          });
         }
       } catch (dbErr) {
-        alert(`Bypass completed locally! Seat reserved successfully.`);
+        setBookingError('Payment simulation failed. Please try again.');
       }
       setBookingLoading(false);
-      setMockCheckoutData(null);
     }
   };
 
   // Helper check for staff role authorization
   const isUserStaff = userRole === 'admin' || userRole === 'teacher' || userRole === 'support';
 
+  // ── Single source of truth for the live masterclass ──
+  // Compute once at the top of render so every downstream surface (hero, banner,
+  // popup, curriculum, booking, sticky bar, closing CTA) sees the SAME object.
+  // mergeMcWithConfig makes site.config.js win for content; Firestore only
+  // contributes runtime state (seatsBooked, zoomLink, etc).
+  const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions));
+  const bookingCtx = {
+    setBookingSession, setBookingStep, setBookingSuccess, setSelectedTier,
+    setBookingName, setBookingEmail, setBookingPhone, setBookingError, user,
+  };
+  const openBooking = (mc) => openBookingForSession(mc || nextMasterclass, bookingCtx);
+
   return (
     <React.Fragment>
-      {/* Three.js wave particle background — fixed, z-index:-1, full viewport */}
-      <DottedSurface theme={theme} />
+      {/* Top promo banner — dismissible, persistent across the app */}
+      <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} />
+      <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} />
 
       {motion ? (
         <motion.nav
@@ -3554,6 +3573,16 @@ function App() {
           >
             Full Roadmap
           </button>
+          {user && !user.isAnonymous && !isUserStaff && (
+            <button
+              role="tab"
+              aria-selected={activeMainTab === 'mybookings'}
+              className={`nav__tab-btn ${activeMainTab === 'mybookings' ? 'active' : ''}`}
+              onClick={() => setActiveMainTab('mybookings')}
+            >
+              My Masterclasses
+            </button>
+          )}
           {isUserStaff && (
             <button 
               role="tab" 
@@ -3568,16 +3597,16 @@ function App() {
 
         <div className="nav__right">
           {/* Sign In / Sign Out button inside right section */}
-          {user ? (
+          {user && !user.isAnonymous ? (
             <button 
               className={`nav__auth-btn is-active`} 
               onClick={() => {
                 if (isUserStaff) setActiveMainTab('dashboard');
-                else alert(`Logged in as student: ${user.email}`);
+                else setActiveMainTab('mybookings');
               }}
             >
               <span className="hero__eyebrow-dot" style={{ background: "var(--c-amber)", width: "5px", height: "5px" }} />
-              {user.email.substring(0, 10)}...
+              {(user.email || '').substring(0, 10)}...
             </button>
           ) : (
             <button 
@@ -3594,10 +3623,7 @@ function App() {
           {/* Book a seat persistent CTA button */}
           <button
             className="nav__book-seat-btn"
-            onClick={() => {
-              const el = document.getElementById('masterclasses');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={() => openBooking(nextMasterclass)}
           >
             Book a seat
           </button>
@@ -3630,11 +3656,15 @@ function App() {
             <button
               className="nav__book-seat-btn"
               onClick={() => {
-                const el = document.getElementById('masterclasses');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                if (nextMasterclass) {
+                  openBooking(nextMasterclass);
+                } else {
+                  const el = document.getElementById('masterclasses');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }
               }}
             >
-              Book a seat
+              {isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat'}
             </button>
             <button type="button" className="theme-toggle" onClick={toggleTheme}>
               <span className="theme-toggle__track">
@@ -3649,189 +3679,36 @@ function App() {
 
       {/* Render Main Views based on active tab state */}
       {activeMainTab === 'home' && (
-        <div className="coaching-home">
-          {/* ── Animated Hero Header ── */}
-          {/* ── Animated Hero Header ── */}
-          <div className="coaching-home__hero">
-            {/* Change 3 — floating decorative fragments in the dead flanks */}
-            <div className="hero-flank hero-flank--left" aria-hidden="true">
-              <div className="hero-flank__pill">Module 3 of 4</div>
-              <div className="hero-flank__text">TDD Workflow &amp; Auto-Debugging</div>
-            </div>
-            <div className="hero-flank hero-flank--right" aria-hidden="true">
-              <div className="hero-flank__stat">3k+</div>
-              <div className="hero-flank__stat-label">Engineers Trained</div>
-            </div>
+        <main id="main" className="coaching-home">
+          {/* ── V2 Hero (2-column: copy + CTA left, video right) ── */}
+          <V2HeroSection
+            nextMc={nextMasterclass}
+            onReserve={openBooking}
+            onRoadmap={() => { setActiveMainTab('roadmap'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onExploreCurriculum={() => {
+              const el = document.getElementById('v2-curriculum');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          />
 
-            <div className="coaching-home__hero-content">
-              {motion ? (
-                <motion.div
-                  variants={{
-                    hidden: { opacity: 0 },
-                    show: { opacity: 1, transition: { staggerChildren: 0.11 } },
-                  }}
-                  initial="hidden"
-                  animate="show"
-                >
-                  <motion.div style={{ opacity: heroOthersOpacity, y: heroOthersY }}>
-                    <motion.div
-                      variants={{
-                        hidden: { opacity: 0, y: 24 },
-                        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-                      }}
-                      className="coaching-home__eyebrow"
-                    >
-                      <span className="hero__eyebrow-dot" />
-                      Live Masterclasses &amp; Workshops
-                    </motion.div>
-                  </motion.div>
+          {/* ── How it works: 3-step register explainer (Krish Naik style) ── */}
+          {V2_CONFIG.showHowItWorks && <V2HowItWorks nextMc={nextMasterclass} />}
 
-                  <motion.div
-                    style={{
-                      scale: heroTitleScale,
-                      opacity: heroTitleOpacity,
-                      transformOrigin: 'center center'
-                    }}
-                  >
-                    <motion.div
-                      variants={{
-                        hidden: { opacity: 0, y: 24 },
-                        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-                      }}
-                    >
-                      <AnimatedHeroTitle plain="Master the art of" emphasis="Agentic AI." />
-                    </motion.div>
-                  </motion.div>
+          {/* ── On-page curriculum — what "Explore the curriculum" scrolls to ── */}
+          {V2_CONFIG.showCurriculumSection && (
+            <V2Curriculum nextMc={nextMasterclass} onReserve={openBooking} />
+          )}
 
-                  <motion.div style={{ opacity: heroOthersOpacity, y: heroOthersY }}>
-                    <motion.p
-                      variants={{
-                        hidden: { opacity: 0, y: 24 },
-                        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-                      }}
-                      className="coaching-home__sub"
-                    >
-                      Join 400+ engineers shipping production-grade AI systems. Live masterclasses by Balaji Chippada — hands-on, enterprise-grounded, and built for 2026.
-                    </motion.p>
-                  </motion.div>
+          {/* ── Not sure where to start? → Roadmap ── */}
+          {V2_CONFIG.showWhereToStart && (
+            <V2WhereToStart onRoadmap={() => { setActiveMainTab('roadmap'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+          )}
 
-                  <motion.div style={{ opacity: heroOthersOpacity, y: heroOthersY }}>
-                    <motion.div
-                      variants={{
-                        hidden: { opacity: 0, y: 24 },
-                        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-                      }}
-                      style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px', flexWrap: 'wrap' }}
-                    >
-                      <button
-                        className="hero__primary-cta"
-                        onClick={() => {
-                          const el = document.getElementById('masterclasses');
-                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                      >
-                        Browse masterclasses →
-                      </button>
-                      <button
-                        className="hero__secondary-cta"
-                        onClick={() => {
-                          setActiveMainTab('roadmap');
-                        }}
-                      >
-                        See the full roadmap
-                      </button>
-                    </motion.div>
-                  </motion.div>
+          {/* ── Thin testimonial band — disabled until we have real YouTube reviews ── */}
+          {V2_CONFIG.showQuoteBand && <V2QuoteBand />}
 
-                  <motion.div style={{ opacity: heroOthersOpacity, y: heroOthersY }}>
-                    <motion.div
-                      variants={{
-                        hidden: { opacity: 0, y: 24 },
-                        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-                      }}
-                    >
-                      {/* Stats Bar */}
-                      <div className="hero__stats-bar">
-                        <div className="hero-stat">
-                          <span className="hero-stat__value"><AnimatedCounter to={400} suffix="+" /></span>
-                          <span className="hero-stat__label">students</span>
-                        </div>
-                        <div className="hero-stat__divider" />
-                        <div className="hero-stat">
-                          <span className="hero-stat__value"><AnimatedCounter to={2} /></span>
-                          <span className="hero-stat__label">live cohorts</span>
-                        </div>
-                        <div className="hero-stat__divider" />
-                        <div className="hero-stat">
-                          <span className="hero-stat__value">4.9★</span>
-                          <span className="hero-stat__label">avg rating</span>
-                        </div>
-                        <div className="hero-stat__divider" />
-                        <div className="hero-stat">
-                          <span className="hero-stat__value">₹<AnimatedCounter to={200} /></span>
-                          <span className="hero-stat__label">starting price</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                </motion.div>
-              ) : (
-                <div>
-                  <div className="coaching-home__eyebrow">
-                    <span className="hero__eyebrow-dot" />
-                    Live Masterclasses &amp; Workshops
-                  </div>
-                  <AnimatedHeroTitle plain="Master the art of" emphasis="Agentic AI." />
-                  <p className="coaching-home__sub">
-                    Join 400+ engineers shipping production-grade AI systems. Live masterclasses by Balaji Chippada — hands-on, enterprise-grounded, and built for 2026.
-                  </p>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px', flexWrap: 'wrap' }}>
-                    <button
-                      className="hero__primary-cta"
-                      onClick={() => {
-                        const el = document.getElementById('masterclasses');
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                    >
-                      Browse masterclasses →
-                    </button>
-                    <button
-                      className="hero__secondary-cta"
-                      onClick={() => {
-                        setActiveMainTab('roadmap');
-                      }}
-                    >
-                      See the full roadmap
-                    </button>
-                  </div>
-                  <div className="hero__stats-bar">
-                    <div className="hero-stat">
-                      <span className="hero-stat__value">400+</span>
-                      <span className="hero-stat__label">students</span>
-                    </div>
-                    <div className="hero-stat__divider" />
-                    <div className="hero-stat">
-                      <span className="hero-stat__value">2</span>
-                      <span className="hero-stat__label">live cohorts</span>
-                    </div>
-                    <div className="hero-stat__divider" />
-                    <div className="hero-stat">
-                      <span className="hero-stat__value">4.9★</span>
-                      <span className="hero-stat__label">avg rating</span>
-                    </div>
-                    <div className="hero-stat__divider" />
-                    <div className="hero-stat">
-                      <span className="hero-stat__value">₹200</span>
-                      <span className="hero-stat__label">starting price</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Testimonial Marquee strip between Hero and Cards ── */}
-          <TestimonialMarquee />
+          {/* ── Follow cards: YouTube · LinkedIn · GitHub · Instagram ── */}
+          <V2FollowGrid />
 
           {/* ── AI-Structured Masterclasses (Split-Pane UI) ── */}
           {!loadingMasterclasses && masterclasses.length > 0 && (
@@ -3842,10 +3719,7 @@ function App() {
                   mc={mc}
                   idx={idx}
                   user={user}
-                  setBookingSession={setBookingSession}
-                  setBookingName={setBookingName}
-                  setBookingEmail={setBookingEmail}
-                  setBookingPhone={setBookingPhone}
+                  onBook={openBooking}
                 />
               ))}
             </div>
@@ -3900,12 +3774,7 @@ function App() {
 
                       <ShimmerButton
                         variant="dark"
-                        onClick={() => {
-                          setBookingSession(s);
-                          setBookingName("");
-                          setBookingEmail(user ? user.email : "");
-                          setBookingPhone("");
-                        }}
+                        onClick={() => openBooking(s)}
                       >
                         Book Seat
                       </ShimmerButton>
@@ -3919,23 +3788,18 @@ function App() {
           {/* ── Instructor Bio Strip ── */}
           <InstructorBio />
 
-          {/* ── Testimonials Section ── */}
-          <TestimonialsSection />
+          {/* ── Success Stories — disabled until we curate real YouTube reviews ── */}
+          {V2_CONFIG.showSuccessStories && <V2SuccessStories />}
+
+          <V2FAQSection onLegal={setLegalPage} />
 
           {/* ── Closing CTA Section ── */}
-          <ClosingCTA 
-            defaultPrice={200} 
-            user={user} 
-            setBookingSession={setBookingSession} 
-            setBookingName={setBookingName} 
-            setBookingEmail={setBookingEmail} 
-            setBookingPhone={setBookingPhone} 
-          />
+          <V2ClosingCTA nextMc={nextMasterclass} onReserve={openBooking} />
 
           {/* ── Footer Section ── */}
-          <SiteFooter setActiveMainTab={setActiveMainTab} />
+          <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
 
-        </div>
+        </main>
       )}
 
       {activeMainTab === 'roadmap' && (
@@ -3953,6 +3817,10 @@ function App() {
         />
       )}
 
+      {activeMainTab === 'mybookings' && user && !user.isAnonymous && !isUserStaff && (
+        <V2StudentDashboard user={user} db={db} onReserve={() => { setActiveMainTab('home'); openBooking(nextMasterclass); }} />
+      )}
+
       {activeMainTab === 'dashboard' && isUserStaff && (
         <DashboardView 
           user={user} 
@@ -3966,63 +3834,33 @@ function App() {
           MODALS & OVERLAYS
       =============================================================== */}
 
-      {/* 1. Masterclass Seat Booking Input Modal */}
-      {bookingSession && (
-        <div className="modal-overlay" onClick={() => setBookingSession(null)}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setBookingSession(null)}>×</button>
-            <h2 className="modal-title">Book your <em>Seat</em></h2>
-            <p className="modal-desc">
-              Reserving seat for: <b>"{bookingSession.title}"</b>. Enter details below to initiate Razorpay secure checkout.
-            </p>
-
-            <form onSubmit={handleBookingSubmit}>
-              <div className="form-group">
-                <label className="form-label">Full Name *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. Gowtam Singulur" 
-                  value={bookingName}
-                  onChange={e => setBookingName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Email Address *</label>
-                <input 
-                  type="email" 
-                  className="form-input" 
-                  placeholder="e.g. gowtam@example.com" 
-                  value={bookingEmail}
-                  onChange={e => setBookingEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Phone Contact Number *</label>
-                <input 
-                  type="tel" 
-                  className="form-input" 
-                  placeholder="e.g. +91 98765 43210" 
-                  value={bookingPhone}
-                  onChange={e => setBookingPhone(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="form-btn" disabled={bookingLoading}>
-                {bookingLoading ? "Processing payment..." : `Initialize Checkout · ₹${(bookingSession.price || 0).toLocaleString()}`}
-              </button>
-            </form>
-          </div>
-        </div>
+      {/* 1. V2 Booking Wizard */}
+      {(bookingSession || bookingSuccess) && (
+        <V2BookingWizard
+          session={bookingSession}
+          step={bookingStep}
+          setStep={setBookingStep}
+          user={user}
+          selectedTier={selectedTier}
+          setSelectedTier={setSelectedTier}
+          bookingName={bookingName}
+          setBookingName={setBookingName}
+          bookingEmail={bookingEmail}
+          setBookingEmail={setBookingEmail}
+          bookingPhone={bookingPhone}
+          setBookingPhone={setBookingPhone}
+          bookingLoading={bookingLoading}
+          bookingError={bookingError}
+          onClose={closeBooking}
+          onGoogleLogin={handleGoogleLoginForBooking}
+          onSubmitPayment={handleBookingSubmit}
+          successData={bookingSuccess}
+          setActiveMainTab={setActiveMainTab}
+        />
       )}
 
-      {/* 2. Simulated Razorpay Checkout Gateway Sandbox */}
-      {mockCheckoutData && (
+      {/* 2. Simulated Razorpay Checkout Gateway Sandbox (dev only) */}
+      {mockCheckoutData && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
         <div className="modal-overlay">
           <div className="modal-container" style={{ border: "1px solid var(--c-amber)" }}>
             <button className="modal-close" onClick={() => setMockCheckoutData(null)}>×</button>
@@ -4351,6 +4189,10 @@ function App() {
           </div>
         </div>
       )}
+
+      <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} />
+      <V2WhatsAppButton />
+      <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
     </React.Fragment>
   );

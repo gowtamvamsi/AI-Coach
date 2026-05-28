@@ -111,10 +111,6 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isStaff();
       
-      // Permit creation/update if user is self and:
-      // 1) Self-creating as a general 'client', OR
-      // 2) Authenticated user is the bootstrap admin email, OR
-      // 3) Existing authenticated staff is an admin
       allow create, update: if isOwner(userId) && (
         (hasRequiredFields(['email', 'role']) && 
          request.resource.data.role == 'client' && 
@@ -124,6 +120,13 @@ service cloud.firestore {
       );
       
       allow delete: if isAdmin();
+
+      match /bookings/{bookingId} {
+        allow read: if isOwner(userId) || isStaff();
+        allow create: if isOwner(userId);
+        allow update: if isStaff();
+        allow delete: if isAdmin();
+      }
     }
 
     // Sessions Collection rules
@@ -179,6 +182,18 @@ service cloud.firestore {
       allow create: if isMcBootstrapAdmin();
       allow update: if isMcBootstrapAdmin() || isStaff();
       allow delete: if isMcBootstrapAdmin() || isStaff();
+    }
+
+    match /leads/{leadId} {
+      allow create: if request.resource.data.keys().hasAll(['email', 'source']) &&
+        isValidEmail(request.resource.data.email);
+      allow read: if isStaff();
+    }
+
+    match /inquiries/{inquiryId} {
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow read: if isStaff() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
   }
 }
