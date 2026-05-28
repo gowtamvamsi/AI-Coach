@@ -271,6 +271,9 @@ body {
   background: linear-gradient(120deg, var(--c-pink), var(--c-rust), var(--c-amber));
   -webkit-background-clip: text; background-clip: text;
   color: transparent;
+  line-height: 1.1;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
 }
 .hero__sub {
   margin-top: 36px;
