@@ -1960,6 +1960,81 @@ function DashboardView({ user, role, onLogout }) {
   const [users, setUsers] = useState([]);
   const [selectedMcCampaignId, setSelectedMcCampaignId] = useState("");
 
+  // ── Email Broadcast States ──
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastSegmentName, setBroadcastSegmentName] = useState("");
+  const [broadcastList, setBroadcastList] = useState([]);
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState("general");
+
+  const CAMPAIGN_TEMPLATES = {
+    general: {
+      subject: "Exclusive Masterclass Invite: Command the AI Engineering Frontier",
+      body: `Hello,\n\nI wanted to reach out and invite you to our upcoming live Masterclasses at The Agent Engineer. \n\nWhether you're just starting or looking to ship production-scale multi-agent systems, our curriculum covers the exact skills demanded by elite engineering teams today.\n\nCheck out our interactive syllabus and reserve your seat here:\nhttps://coaching-site-gowtam-2026.web.app/\n\nBest regards,\nBalaji Chippada\nTutor & AI Architect, The Agent Engineer`
+    },
+    cold_leads: {
+      subject: "Unlock Your Career Transition: Special AI Coach Registration Offer",
+      body: `Hello,\n\nI noticed you created an account on our AI Engineer Roadmap platform but haven't reserved your seat for an upcoming cohort yet.\n\nTo help you kickstart your journey, I'm offering an exclusive free entry / special seat reservation to our next live session. Command the tools, LangGraph orchestrations, and LLMOps that are reshaping technology.\n\nSee what's coming up and secure your access:\nhttps://coaching-site-gowtam-2026.web.app/\n\nTo your success,\nBalaji Chippada`
+    },
+    abandoned: {
+      subject: "Finish Setting Up Your Seat: LangGraph & Agentic AI Masterclass",
+      body: `Hi there,\n\nIt looks like you started booking a seat for our upcoming Masterclass but didn't complete the reservation. \n\nSeats in our live cohorts are strictly limited to ensure personal feedback and high-quality coaching for every student. I'd love to help you cross the finish line and master production-grade RAG and agentic tools.\n\nResume your registration and secure your seat here:\nhttps://coaching-site-gowtam-2026.web.app/\n\nIf you ran into any payment issues or have questions, just reply directly to this email!\n\nBest,\nBalaji Chippada`
+    },
+    professional: {
+      subject: "Enterprise LLMOps & LangGraph: Advanced Masterclasses for Pros",
+      body: `Hello,\n\nAs a working professional on our platform, you understand the speed at which AI engineering is moving. Simply prompting models is no longer enough — the industry is hiring engineers who can build robust, cost-effective, multi-agent frameworks with strict guardrails.\n\nOur upcoming sessions focus on advanced enterprise orchestration, custom Tool/MCP pipelines, and multi-agent LangGraph architectures.\n\nExplore our professional cohort curriculum:\nhttps://coaching-site-gowtam-2026.web.app/\n\nBest regards,\nBalaji Chippada`
+    }
+  };
+
+  const openBroadcastModal = (list, segmentName) => {
+    if (list.length === 0) {
+      alert("This segment has no contacts to broadcast to.");
+      return;
+    }
+    setBroadcastList(list);
+    setBroadcastSegmentName(segmentName);
+    
+    let defaultKey = "general";
+    if (segmentName === "Cold Leads") defaultKey = "cold_leads";
+    else if (segmentName === "Abandoned Checkouts" || segmentName === "Abandoned Checkout") defaultKey = "abandoned";
+    else if (segmentName === "Working Professionals") defaultKey = "professional";
+    
+    setSelectedTemplateKey(defaultKey);
+    setBroadcastSubject(CAMPAIGN_TEMPLATES[defaultKey].subject);
+    setBroadcastBody(CAMPAIGN_TEMPLATES[defaultKey].body);
+    setShowBroadcastModal(true);
+  };
+
+  const handleTemplateChange = (key) => {
+    setSelectedTemplateKey(key);
+    if (CAMPAIGN_TEMPLATES[key]) {
+      setBroadcastSubject(CAMPAIGN_TEMPLATES[key].subject);
+      setBroadcastBody(CAMPAIGN_TEMPLATES[key].body);
+    }
+  };
+
+  const handleLaunchBroadcast = () => {
+    const emails = Array.from(new Set(
+      broadcastList
+        .map(u => (u.email || u.studentEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    ));
+    
+    if (emails.length === 0) {
+      alert("No valid recipient email addresses found.");
+      return;
+    }
+    
+    const subjectEsc = encodeURIComponent(broadcastSubject);
+    const bodyEsc = encodeURIComponent(broadcastBody);
+    const bccEsc = encodeURIComponent(emails.join(","));
+    
+    const mailtoUrl = `mailto:?bcc=${bccEsc}&subject=${subjectEsc}&body=${bodyEsc}`;
+    window.open(mailtoUrl, '_blank');
+    setShowBroadcastModal(false);
+  };
+
   // Load sessions for management panel
   useEffect(() => {
     if (!db) return;
@@ -2849,13 +2924,22 @@ ${mcRawSyllabus}`;
                 Students who have successfully booked and completed at least one paid masterclass.
               </p>
             </div>
-            <button 
-              onClick={() => handleExportCSV(paidCustomersList, "Paid Customers")}
-              className="form-btn form-btn--accent" 
-              style={{ background: "var(--c-pink)", marginTop: "auto" }}
-            >
-              📥 Export Segment CSV
-            </button>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(paidCustomersList, "Paid Customers")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                📥 CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(paidCustomersList, "Paid Customers")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                ✉ Email
+              </button>
+            </div>
           </div>
 
           {/* Segment 2: Cold Leads */}
@@ -2870,13 +2954,22 @@ ${mcRawSyllabus}`;
                 Users who signed up for accounts but have never reserved any masterclass seats.
               </p>
             </div>
-            <button 
-              onClick={() => handleExportCSV(coldLeadsList, "Cold Leads")}
-              className="form-btn" 
-              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
-            >
-              📥 Export Segment CSV
-            </button>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(coldLeadsList, "Cold Leads")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                📥 CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(coldLeadsList, "Cold Leads")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                ✉ Email
+              </button>
+            </div>
           </div>
 
           {/* Segment 3: Working Professionals */}
@@ -2891,13 +2984,22 @@ ${mcRawSyllabus}`;
                 Signed up accounts who self-identified as active industry professionals. Ideal for advanced upsells.
               </p>
             </div>
-            <button 
-              onClick={() => handleExportCSV(professionalsList, "Working Professionals")}
-              className="form-btn" 
-              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
-            >
-              📥 Export Segment CSV
-            </button>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(professionalsList, "Working Professionals")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                📥 CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(professionalsList, "Working Professionals")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                ✉ Email
+              </button>
+            </div>
           </div>
 
           {/* Segment 4: Academic Students */}
@@ -2912,13 +3014,22 @@ ${mcRawSyllabus}`;
                 Users currently studying in colleges/universities. Perfect for cohort entry offers and fundamentals.
               </p>
             </div>
-            <button 
-              onClick={() => handleExportCSV(academicStudentsList, "Academic Students")}
-              className="form-btn" 
-              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
-            >
-              📥 Export Segment CSV
-            </button>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(academicStudentsList, "Academic Students")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                📥 CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(academicStudentsList, "Academic Students")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                ✉ Email
+              </button>
+            </div>
           </div>
 
           {/* Segment 5: Abandoned Checkouts */}
@@ -2933,13 +3044,22 @@ ${mcRawSyllabus}`;
                 Leads who initiated masterclass checkout but never successfully completed payment. High priority conversion leads.
               </p>
             </div>
-            <button 
-              onClick={() => handleExportCSV(abandonedCheckoutsList, "Abandoned Checkouts")}
-              className="form-btn" 
-              style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", marginTop: "auto" }}
-            >
-              📥 Export Segment CSV
-            </button>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(abandonedCheckoutsList, "Abandoned Checkouts")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                📥 CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(abandonedCheckoutsList, "Abandoned Checkouts")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                ✉ Email
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2961,35 +3081,64 @@ ${mcRawSyllabus}`;
                 ))}
               </select>
             </div>
-            <button 
-              type="button"
-              onClick={() => {
-                if (!selectedMcCampaignId) {
-                  alert("Please choose a masterclass session first.");
-                  return;
-                }
-                const cleanRoster = sessionCampaignRoster.map(r => ({
-                  name: r.studentName,
-                  email: r.studentEmail,
-                  phone: r.studentPhone,
-                  userType: "Registered Cohort Student"
-                }));
-                handleExportCSV(cleanRoster, activeMcCampaignSession ? activeMcCampaignSession.title : "Masterclass Roster");
-              }}
-              className="form-btn" 
-              disabled={!selectedMcCampaignId}
-              style={{ 
-                width: "auto", 
-                margin: 0, 
-                padding: "14px 28px", 
-                background: selectedMcCampaignId ? "var(--fg)" : "transparent",
-                color: selectedMcCampaignId ? "var(--bg)" : "var(--fg-faint)",
-                borderColor: "var(--line-strong)",
-                cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
-              }}
-            >
-              📥 Export Registered Students CSV
-            </button>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (!selectedMcCampaignId) {
+                    alert("Please choose a masterclass session first.");
+                    return;
+                  }
+                  const cleanRoster = sessionCampaignRoster.map(r => ({
+                    name: r.studentName,
+                    email: r.studentEmail,
+                    phone: r.studentPhone,
+                    userType: "Registered Cohort Student"
+                  }));
+                  handleExportCSV(cleanRoster, activeMcCampaignSession ? activeMcCampaignSession.title : "Masterclass Roster");
+                }}
+                className="form-btn" 
+                disabled={!selectedMcCampaignId}
+                style={{ 
+                  width: "auto", 
+                  margin: 0, 
+                  padding: "14px 24px", 
+                  background: "transparent",
+                  color: selectedMcCampaignId ? "var(--fg)" : "var(--fg-faint)",
+                  borderColor: "var(--line-strong)",
+                  cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
+                }}
+              >
+                📥 Export CSV
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (!selectedMcCampaignId) {
+                    alert("Please choose a masterclass session first.");
+                    return;
+                  }
+                  const cleanRoster = sessionCampaignRoster.map(r => ({
+                    name: r.studentName,
+                    email: r.studentEmail,
+                    phone: r.studentPhone,
+                    userType: "Registered Cohort Student"
+                  }));
+                  openBroadcastModal(cleanRoster, activeMcCampaignSession ? activeMcCampaignSession.title : "Masterclass Roster");
+                }}
+                className="form-btn form-btn--accent" 
+                disabled={!selectedMcCampaignId}
+                style={{ 
+                  width: "auto", 
+                  margin: 0, 
+                  padding: "14px 24px", 
+                  background: "var(--c-pink)",
+                  cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
+                }}
+              >
+                ✉ Send Email
+              </button>
+            </div>
           </div>
           {selectedMcCampaignId && (
             <div style={{ marginTop: "12px", fontSize: "13px", color: "var(--fg-dim)" }}>
@@ -2998,6 +3147,77 @@ ${mcRawSyllabus}`;
           )}
         </div>
       </div>
+
+      {/* 5. Marketing Email Broadcast Modal */}
+      {showBroadcastModal && (
+        <div className="modal-overlay" style={{ zIndex: 300 }}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ width: "min(640px, 100%)" }}>
+            <button className="modal-close" onClick={() => setShowBroadcastModal(false)}>×</button>
+            <h2 className="modal-title">✉ Send <em>Email Broadcast</em></h2>
+            <p className="modal-desc" style={{ marginBottom: "20px" }}>
+              Launch a prefilled email broadcast to <b>{broadcastList.length} leads</b> in the <b>"{broadcastSegmentName}"</b> segment. All leads are automatically BCC'd to protect student privacy.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">Select Campaign Template</label>
+              <select 
+                className="form-select"
+                value={selectedTemplateKey}
+                onChange={e => handleTemplateChange(e.target.value)}
+              >
+                <option value="general">Masterclass Invite (General / All Leads)</option>
+                <option value="cold_leads">Special Registration Offer (Cold Leads)</option>
+                <option value="abandoned">Checkout Cart Abandonment (Retargeting)</option>
+                <option value="professional">Enterprise LLMOps Upsell (Working Professionals)</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Subject Line</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={broadcastSubject}
+                onChange={e => setBroadcastSubject(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Email Body (Plain Text)</label>
+              <textarea 
+                className="form-textarea" 
+                style={{ minHeight: "220px", fontFamily: "inherit", fontSize: "14px" }}
+                value={broadcastBody}
+                onChange={e => setBroadcastBody(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+              <button 
+                type="button" 
+                className="form-btn form-btn--accent" 
+                onClick={handleLaunchBroadcast}
+                style={{ background: "var(--c-pink)", margin: 0, flex: 2 }}
+              >
+                ✉ Launch Mail Client Broadcast
+              </button>
+              <button 
+                type="button" 
+                className="dashboard__logout-btn" 
+                onClick={() => setShowBroadcastModal(false)}
+                style={{ margin: 0, flex: 1, padding: "14px" }}
+              >
+                Cancel
+              </button>
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--fg-faint)", marginTop: "14px", textAlign: "center", lineHeight: "1.4" }}>
+              💡 <b>How it works:</b> Clicking launch opens your computer's default mail client (Gmail, Outlook, Mail.app) with all emails prefilled in the <b>BCC</b> field and subject/body preformatted so you can review and send in one click!
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
