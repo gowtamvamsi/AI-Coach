@@ -2906,40 +2906,44 @@ ${mcRawSyllabus}`;
       )}
 
       {/* ── Published Masterclasses Management ── */}
-      {isAdmin && masterclasses.length > 0 && (
-        <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
-          <h2 className="dashboard__panel-title" style={{ marginBottom: "16px" }}>
-            Published Masterclasses ({masterclasses.length})
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {masterclasses.map(mc => (
-              <div key={mc.id} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 16px", background: "var(--bg-elev)",
-                border: "1px solid var(--line)", borderRadius: "10px", gap: "12px", flexWrap: "wrap"
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--fg)" }}>{mc.title}</div>
-                  <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "3px" }}>
-                    {mc.syllabus?.length || 0} topics · {mc.instructor} · ₹{(mc.price || 0).toLocaleString()}
-                    {mc.dateTime && ` · ${new Date(mc.dateTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+      {(() => {
+        const activeMcs = masterclasses.filter(m => !m.deleted && m.status !== 'deleted');
+        if (!isAdmin || activeMcs.length === 0) return null;
+        return (
+          <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
+            <h2 className="dashboard__panel-title" style={{ marginBottom: "16px" }}>
+              Published Masterclasses ({activeMcs.length})
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {activeMcs.map(mc => (
+                <div key={mc.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 16px", background: "var(--bg-elev)",
+                  border: "1px solid var(--line)", borderRadius: "10px", gap: "12px", flexWrap: "wrap"
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--fg)" }}>{mc.title}</div>
+                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "3px" }}>
+                      {mc.syllabus?.length || 0} topics · {mc.instructor} · ₹{(mc.price || 0).toLocaleString()}
+                      {mc.dateTime && ` · ${new Date(mc.dateTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => handleDeleteMasterclass(mc.id, mc.title)}
+                    style={{
+                      padding: "6px 14px", fontSize: "12px", fontWeight: 600,
+                      border: "1px solid var(--c-rust)", background: "transparent",
+                      color: "var(--c-rust)", borderRadius: "8px", cursor: "pointer"
+                    }}
+                  >
+                    🗑 Delete
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleDeleteMasterclass(mc.id, mc.title)}
-                  style={{
-                    padding: "6px 14px", fontSize: "12px", fontWeight: 600,
-                    border: "1px solid var(--c-rust)", background: "transparent",
-                    color: "var(--c-rust)", borderRadius: "8px", cursor: "pointer"
-                  }}
-                >
-                  🗑 Delete
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="dashboard__grid">
         {/* Left Panel: Form (Only visible to Administrators) */}
