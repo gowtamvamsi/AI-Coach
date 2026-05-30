@@ -1942,6 +1942,7 @@ function DashboardView({ user, role, onLogout }) {
   const [price, setPrice] = useState("");
   const [dateTime, setDateTime] = useState("");
   const [instructor, setInstructor] = useState("Balaji Chippada");
+  const [videoUrl, setVideoUrl] = useState("");
   
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
@@ -1953,6 +1954,7 @@ function DashboardView({ user, role, onLogout }) {
   const [mcPrice, setMcPrice] = useState("");
   const [mcDateTime, setMcDateTime] = useState("");
   const [mcRawSyllabus, setMcRawSyllabus] = useState("");
+  const [mcVideoUrl, setMcVideoUrl] = useState("");
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [aiStatus, setAiStatus] = useState({ type: '', msg: '' }); // loading | success | error
   const [mcLoading, setMcLoading] = useState(false);
@@ -2207,6 +2209,7 @@ function DashboardView({ user, role, onLogout }) {
       setDescription("");
       setPrice("");
       setDateTime("");
+      setVideoUrl("");
       return;
     }
     let session = isMcCollection 
@@ -2220,6 +2223,7 @@ function DashboardView({ user, role, onLogout }) {
         price: V2_CONFIG_MASTERCLASS.price,
         dateTime: V2_CONFIG_MASTERCLASS.dateTime,
         description: V2_CONFIG_MASTERCLASS.about || V2_CONFIG_MASTERCLASS.subtitle || "",
+        videoUrl: V2_CONFIG_MASTERCLASS.videoUrl || "",
       };
     }
       
@@ -2227,6 +2231,7 @@ function DashboardView({ user, role, onLogout }) {
       setTitle(session.title || "");
       setDescription(session.description || session.rawSyllabus || "");
       setPrice(session.price !== undefined ? session.price : "");
+      setVideoUrl(session.videoUrl || session.youtubeVideoId || session.videoId || "");
       
       // format to datetime-local expected string 'YYYY-MM-DDTHH:MM'
       try {
@@ -2275,7 +2280,8 @@ function DashboardView({ user, role, onLogout }) {
           title,
           price: priceNum,
           dateTime: formattedDate,
-          instructor
+          instructor,
+          videoUrl: videoUrl.trim()
         };
         if (editSessionIsMc) {
           updatePayload.rawSyllabus = description;
@@ -2313,6 +2319,7 @@ function DashboardView({ user, role, onLogout }) {
           price: priceNum,
           dateTime: formattedDate,
           instructor,
+          videoUrl: videoUrl.trim(),
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         setStatus({ type: "success", message: "New Masterclass scheduled successfully!" });
@@ -2322,6 +2329,7 @@ function DashboardView({ user, role, onLogout }) {
         setDescription("");
         setPrice("");
         setDateTime("");
+        setVideoUrl("");
       }
     } catch (err) {
       setStatus({ type: "error", message: err.message || "Failed to commit session to database." });
@@ -2433,6 +2441,7 @@ ${mcRawSyllabus}`;
         dateTime: new Date(mcDateTime).toISOString(),
         rawSyllabus: mcRawSyllabus,
         syllabus,
+        videoUrl: mcVideoUrl.trim(),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
@@ -2443,7 +2452,7 @@ ${mcRawSyllabus}`;
 
       // Reset form
       setMcTitle(''); setMcPrice(''); setMcDateTime(''); setMcRawSyllabus('');
-      setMcInstructor('Balaji Chippada');
+      setMcInstructor('Balaji Chippada'); setMcVideoUrl('');
 
     } catch (err) {
       setAiStatus({ type: 'error', msg: err.message || 'Something went wrong. Check your API key and try again.' });
@@ -2864,6 +2873,13 @@ ${mcRawSyllabus}`;
             </div>
 
             <div className="form-group">
+              <label className="form-label">Promo Video (YouTube URL or ID)</label>
+              <input type="text" className="form-input"
+                placeholder="e.g. https://www.youtube.com/watch?v=Eze6D8jAMjI"
+                value={mcVideoUrl} onChange={e => setMcVideoUrl(e.target.value)} />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Raw Syllabus Text *</label>
               <textarea
                 className="form-input form-textarea"
@@ -3010,6 +3026,17 @@ ${mcRawSyllabus}`;
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Promo Video (YouTube URL or ID)</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. https://www.youtube.com/watch?v=Eze6D8jAMjI"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                />
               </div>
 
               <div style={{ display: "flex", gap: "10px" }}>

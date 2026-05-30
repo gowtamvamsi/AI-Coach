@@ -99,6 +99,7 @@ function mergeMcWithConfig(mc, masterclasses, sessions) {
     about: mc.rawSyllabus || mc.description || V2_CONFIG_MASTERCLASS.about,
     dateTime: mc.dateTime || V2_CONFIG_MASTERCLASS.dateTime,
     price: typeof mc.price === 'number' ? mc.price : V2_CONFIG_MASTERCLASS.price,
+    videoUrl: mc.videoUrl || mc.youtubeVideoId || mc.videoId || V2_CONFIG_MASTERCLASS.videoUrl || null,
     instructor: Object.assign({}, V2_INSTRUCTOR, 
       typeof mc.instructor === 'object' 
         ? mc.instructor 
@@ -412,11 +413,42 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum }) {
 
         {/* RIGHT: video */}
         <div className="v2-hero-right">
-          <V2ClickToPlayVideo
-            videoId={V2_BRAND.roadmapVideoId}
-            title="Agentic AI Engineer Roadmap 2026 — Balaji Chippada"
-            caption={`99% People Learn AI Wrong · ${V2_SOCIAL.roadmapViews} views · Watch on YouTube`}
-          />
+          {(() => {
+            const dynamicVideoUrl = nextMc?.videoUrl || nextMc?.youtubeVideoId || nextMc?.videoId;
+            let finalVideoId = V2_BRAND.roadmapVideoId;
+            let isCustomVideo = false;
+
+            if (dynamicVideoUrl) {
+              const trimmed = dynamicVideoUrl.trim();
+              if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+                finalVideoId = trimmed;
+                isCustomVideo = true;
+              } else {
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = trimmed.match(regExp);
+                if (match && match[2].length === 11) {
+                  finalVideoId = match[2];
+                  isCustomVideo = true;
+                }
+              }
+            }
+
+            const titleText = isCustomVideo 
+              ? `${nextMc.title || "Masterclass"} Promo — Balaji Chippada` 
+              : "Agentic AI Engineer Roadmap 2026 — Balaji Chippada";
+            
+            const captionText = isCustomVideo
+              ? `Watch masterclass trailer · Watch on YouTube`
+              : `99% People Learn AI Wrong · ${V2_SOCIAL.roadmapViews} views · Watch on YouTube`;
+
+            return (
+              <V2ClickToPlayVideo
+                videoId={finalVideoId}
+                title={titleText}
+                caption={captionText}
+              />
+            );
+          })()}
         </div>
       </div>
 
