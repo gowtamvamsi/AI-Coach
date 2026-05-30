@@ -4021,6 +4021,7 @@ function App() {
             isFree: true,
             orderId: 'free_' + Date.now(),
             bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           };
           const ref = await db.collection('registrations').add(regPayload);
           setBookingLoading(false);
