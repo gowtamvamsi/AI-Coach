@@ -3165,11 +3165,21 @@ ${mcRawSyllabus}`;
                 onChange={e => setSelectedMcCampaignId(e.target.value)}
               >
                 <option value="">-- Choose Masterclass Session --</option>
-                {sessions.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.title} ({new Date(s.dateTime).toLocaleDateString()})
-                  </option>
-                ))}
+                {(() => {
+                  const combined = [];
+                  const seen = new Set();
+                  [...masterclasses, ...sessions].forEach(s => {
+                    if (s && s.id && !seen.has(s.id)) {
+                      combined.push(s);
+                      seen.add(s.id);
+                    }
+                  });
+                  return combined.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} ({s.dateTime ? new Date(s.dateTime).toLocaleDateString() : 'Date TBA'})
+                    </option>
+                  ));
+                })()}
               </select>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
