@@ -1980,19 +1980,19 @@ function DashboardView({ user, role, onLogout }) {
   const CAMPAIGN_TEMPLATES = {
     general: {
       subject: "Exclusive Masterclass Invite: Command the AI Engineering Frontier",
-      body: `Hello,\n\nI wanted to reach out and invite you to our upcoming live Masterclasses at The Agent Engineer. \n\nWhether you're just starting or looking to ship production-scale multi-agent systems, our curriculum covers the exact skills demanded by elite engineering teams today.\n\nCheck out our interactive syllabus and reserve your seat here:\nhttps://coaching-site-gowtam-2026.web.app/\n\nBest regards,\nBalaji Chippada\nTutor & AI Architect, The Agent Engineer`
+      body: `Hello,\n\nI wanted to reach out and invite you to our upcoming live Masterclasses at The Agent Engineer. \n\nWhether you're just starting or looking to ship production-scale multi-agent systems, our curriculum covers the exact skills demanded by elite engineering teams today.\n\nCheck out our interactive syllabus and reserve your seat here:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada\nTutor & AI Architect, The Agent Engineer`
     },
     cold_leads: {
       subject: "Unlock Your Career Transition: Special AI Coach Registration Offer",
-      body: `Hello,\n\nI noticed you created an account on our AI Engineer Roadmap platform but haven't reserved your seat for an upcoming cohort yet.\n\nTo help you kickstart your journey, I'm offering an exclusive free entry / special seat reservation to our next live session. Command the tools, LangGraph orchestrations, and LLMOps that are reshaping technology.\n\nSee what's coming up and secure your access:\nhttps://coaching-site-gowtam-2026.web.app/\n\nTo your success,\nBalaji Chippada`
+      body: `Hello,\n\nI noticed you created an account on our AI Engineer Roadmap platform but haven't reserved your seat for an upcoming cohort yet.\n\nTo help you kickstart your journey, I'm offering an exclusive free entry / special seat reservation to our next live session. Command the tools, LangGraph orchestrations, and LLMOps that are reshaping technology.\n\nSee what's coming up and secure your access:\nhttps://balajichippada.com/\n\nTo your success,\nBalaji Chippada`
     },
     abandoned: {
       subject: "Finish Setting Up Your Seat: LangGraph & Agentic AI Masterclass",
-      body: `Hi there,\n\nIt looks like you started booking a seat for our upcoming Masterclass but didn't complete the reservation. \n\nSeats in our live cohorts are strictly limited to ensure personal feedback and high-quality coaching for every student. I'd love to help you cross the finish line and master production-grade RAG and agentic tools.\n\nResume your registration and secure your seat here:\nhttps://coaching-site-gowtam-2026.web.app/\n\nIf you ran into any payment issues or have questions, just reply directly to this email!\n\nBest,\nBalaji Chippada`
+      body: `Hi there,\n\nIt looks like you started booking a seat for our upcoming Masterclass but didn't complete the reservation. \n\nSeats in our live cohorts are strictly limited to ensure personal feedback and high-quality coaching for every student. I'd love to help you cross the finish line and master production-grade RAG and agentic tools.\n\nResume your registration and secure your seat here:\nhttps://balajichippada.com/\n\nIf you ran into any payment issues or have questions, just reply directly to this email!\n\nBest,\nBalaji Chippada`
     },
     professional: {
       subject: "Enterprise LLMOps & LangGraph: Advanced Masterclasses for Pros",
-      body: `Hello,\n\nAs a working professional on our platform, you understand the speed at which AI engineering is moving. Simply prompting models is no longer enough — the industry is hiring engineers who can build robust, cost-effective, multi-agent frameworks with strict guardrails.\n\nOur upcoming sessions focus on advanced enterprise orchestration, custom Tool/MCP pipelines, and multi-agent LangGraph architectures.\n\nExplore our professional cohort curriculum:\nhttps://coaching-site-gowtam-2026.web.app/\n\nBest regards,\nBalaji Chippada`
+      body: `Hello,\n\nAs a working professional on our platform, you understand the speed at which AI engineering is moving. Simply prompting models is no longer enough — the industry is hiring engineers who can build robust, cost-effective, multi-agent frameworks with strict guardrails.\n\nOur upcoming sessions focus on advanced enterprise orchestration, custom Tool/MCP pipelines, and multi-agent LangGraph architectures.\n\nExplore our professional cohort curriculum:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada`
     }
   };
 

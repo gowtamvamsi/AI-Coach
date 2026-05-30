@@ -2,7 +2,7 @@
 // Coaching Site V2 — utilities & components
 // ===============================================================
 
-const V2_SITE_URL = 'https://coaching-site-gowtam-2026.web.app';
+const V2_SITE_URL = 'https://balajichippada.com';
 const V2_ROADMAP_URL = 'https://ch-balaji.github.io/ai-engineer-roadmap/';
 
 // All editable content/copy lives in site.config.js → window.SITE_CONFIG.
