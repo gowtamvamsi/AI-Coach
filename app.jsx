@@ -1934,6 +1934,7 @@ function DashboardView({ user, role, onLogout }) {
   const [registrations, setRegistrations] = useState([]);
   const [editSessionId, setEditSessionId] = useState("");
   const [editSessionIsMc, setEditSessionIsMc] = useState(false);
+  const [selectedRosterClassId, setSelectedRosterClassId] = useState("all");
   
   // Form fields (sessions)
   const [title, setTitle] = useState("");
@@ -2468,6 +2469,56 @@ ${mcRawSyllabus}`;
     }
   };
 
+  // Compute all scheduled and virtual default config masterclasses/sessions in a unified list (excluding soft deleted ones)
+  const combinedClasses = (() => {
+    const list = [];
+    const seen = new Set();
+    
+    // Prepend the virtual/default config masterclass if it's not already in Firestore collections,
+    // AND has not been explicitly deleted/hidden by the admin!
+    const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
+    if (featuredId) {
+      const inMasterclasses = masterclasses.some(m => m.id === featuredId);
+      const inSessions = sessions.some(s => s.id === featuredId);
+      if (!inMasterclasses && !inSessions) {
+        const isExplicitlyDeleted = [...masterclasses, ...sessions].some(x => x.id === featuredId && (x.deleted || x.status === 'deleted'));
+        if (!isExplicitlyDeleted) {
+          list.push({
+            id: featuredId,
+            title: V2_CONFIG_MASTERCLASS.title,
+            price: V2_CONFIG_MASTERCLASS.price,
+            dateTime: V2_CONFIG_MASTERCLASS.dateTime,
+            instructor: V2_CONFIG_MASTERCLASS.instructor?.name || "Balaji Chippada",
+            description: V2_CONFIG_MASTERCLASS.subtitle || V2_CONFIG_MASTERCLASS.about,
+            rawSyllabus: V2_CONFIG_MASTERCLASS.about,
+            syllabus: V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
+              index: `1.${idx + 1}`,
+              topicTitle: c.title,
+              subTopics: c.points
+            })) : [],
+            isMc: true,
+            isDefaultConfigMc: true
+          });
+          seen.add(featuredId);
+        }
+      }
+    }
+
+    masterclasses.forEach(m => {
+      if (m && m.id && !seen.has(m.id) && !m.deleted && m.status !== 'deleted') {
+        list.push({ ...m, isMc: true });
+        seen.add(m.id);
+      }
+    });
+    sessions.forEach(s => {
+      if (s && s.id && !seen.has(s.id) && !s.deleted && s.status !== 'deleted') {
+        list.push({ ...s, isMc: false });
+        seen.add(s.id);
+      }
+    });
+    return list;
+  })();
+
   // Compute active registrations (excluding those for soft-deleted sessions/masterclasses)
   const activeRegistrations = registrations.filter(r => {
     // Find if this registration is for a deleted session/masterclass
@@ -2479,12 +2530,18 @@ ${mcRawSyllabus}`;
     return !isDeletedMc && !isDeletedSession && !isFeaturedDeleted;
   });
 
-  // Compute metrics and segments using active registrations only
-  const totalRevenue = activeRegistrations
+  // Filter registrations by the selected roster class dropdown selection
+  const filteredRegistrations = activeRegistrations.filter(r => {
+    if (selectedRosterClassId === "all") return true;
+    return r.sessionId === selectedRosterClassId;
+  });
+
+  // Compute metrics and segments using filtered registrations only
+  const totalRevenue = filteredRegistrations
     .filter(r => r.status === 'completed')
     .reduce((sum, r) => sum + (r.amount / 100), 0);
 
-  const totalSeats = activeRegistrations
+  const totalSeats = filteredRegistrations
     .filter(r => r.status === 'completed').length;
 
   const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
@@ -2639,83 +2696,9 @@ ${mcRawSyllabus}`;
       {/* ── Sessions Management Section (Admins only) ── */}
       {isAdmin && (
         <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
-          <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({(() => {
-            const tempSeen = new Set();
-            let count = 0;
-            const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
-            if (featuredId) {
-              const inMc = masterclasses.some(m => m.id === featuredId);
-              const inSess = sessions.some(s => s.id === featuredId);
-              if (!inMc && !inSess) {
-                const isExplicitlyDeleted = [...masterclasses, ...sessions].some(x => x.id === featuredId && (x.deleted || x.status === 'deleted'));
-                if (!isExplicitlyDeleted) {
-                  tempSeen.add(featuredId);
-                  count++;
-                }
-              }
-            }
-            masterclasses.forEach(m => {
-              if (m && m.id && !tempSeen.has(m.id) && !m.deleted && m.status !== 'deleted') {
-                tempSeen.add(m.id);
-                count++;
-              }
-            });
-            sessions.forEach(s => {
-              if (s && s.id && !tempSeen.has(s.id) && !s.deleted && s.status !== 'deleted') {
-                tempSeen.add(s.id);
-                count++;
-              }
-            });
-            return count;
-          })()})</h2>
+          <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({combinedClasses.length})</h2>
           {(() => {
-            const combined = [];
-            const seen = new Set();
-            
-            // Prepend the virtual/default config masterclass if it's not already in masterclasses or sessions Firestore lists,
-            // AND has not been explicitly deleted/hidden by the admin!
-            const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
-            if (featuredId) {
-              const inMasterclasses = masterclasses.some(m => m.id === featuredId);
-              const inSessions = sessions.some(s => s.id === featuredId);
-              if (!inMasterclasses && !inSessions) {
-                const isExplicitlyDeleted = [...masterclasses, ...sessions].some(x => x.id === featuredId && (x.deleted || x.status === 'deleted'));
-                if (!isExplicitlyDeleted) {
-                  combined.push({
-                    id: featuredId,
-                    title: V2_CONFIG_MASTERCLASS.title,
-                    price: V2_CONFIG_MASTERCLASS.price,
-                    dateTime: V2_CONFIG_MASTERCLASS.dateTime,
-                    instructor: V2_CONFIG_MASTERCLASS.instructor?.name || "Balaji Chippada",
-                    description: V2_CONFIG_MASTERCLASS.subtitle || V2_CONFIG_MASTERCLASS.about,
-                    rawSyllabus: V2_CONFIG_MASTERCLASS.about,
-                    syllabus: V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
-                      index: `1.${idx + 1}`,
-                      topicTitle: c.title,
-                      subTopics: c.points
-                    })) : [],
-                    isMc: true,
-                    isDefaultConfigMc: true
-                  });
-                  seen.add(featuredId);
-                }
-              }
-            }
-
-            masterclasses.forEach(m => {
-              if (m && m.id && !seen.has(m.id) && !m.deleted && m.status !== 'deleted') {
-                combined.push({ ...m, isMc: true });
-                seen.add(m.id);
-              }
-            });
-            sessions.forEach(s => {
-              if (s && s.id && !seen.has(s.id) && !s.deleted && s.status !== 'deleted') {
-                combined.push({ ...s, isMc: false });
-                seen.add(s.id);
-              }
-            });
-
-            if (combined.length === 0) {
+            if (combinedClasses.length === 0) {
               return (
                 <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--fg-faint)", border: "1px dashed var(--line)", borderRadius: "10px" }}>
                   <div style={{ fontSize: "36px", marginBottom: "10px" }}>📭</div>
@@ -2726,7 +2709,7 @@ ${mcRawSyllabus}`;
 
             return (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-                {combined.map(s => {
+                {combinedClasses.map(s => {
                   const sessionDate = s.dateTime ? new Date(s.dateTime) : null;
                   const isEditing = editSessionId === s.id;
                   return (
@@ -3061,7 +3044,35 @@ ${mcRawSyllabus}`;
 
         {/* Right Panel: Analytics & Registrations */}
         <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <h2 className="dashboard__panel-title">Overview & Bookings</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)", paddingBottom: "12px", gap: "12px", flexWrap: "wrap" }}>
+            <h2 className="dashboard__panel-title" style={{ margin: 0, borderBottom: "none", paddingBottom: 0 }}>Overview & Bookings</h2>
+            <select
+              value={selectedRosterClassId}
+              onChange={(e) => setSelectedRosterClassId(e.target.value)}
+              style={{
+                background: "var(--bg-elev)",
+                color: "var(--fg)",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+                padding: "6px 12px",
+                fontSize: "13px",
+                fontWeight: "500",
+                outline: "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                maxWidth: "240px",
+                fontFamily: "inherit"
+              }}
+              className="roster-select"
+            >
+              <option value="all">🌐 All Scheduled Classes</option>
+              {combinedClasses.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.isMc ? "✨ " : "📅 "} {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div className="phase__weeks-block" style={{ marginTop: 0, padding: "16px" }}>
@@ -3075,7 +3086,7 @@ ${mcRawSyllabus}`;
           </div>
 
           <div style={{ marginTop: "12px" }}>
-            <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({activeRegistrations.length})</h3>
+            <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({filteredRegistrations.length})</h3>
             <div style={{ overflowX: "auto", maxHeight: "340px", border: "1px solid var(--line)", borderRadius: "8px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
                 <thead>
@@ -3086,12 +3097,12 @@ ${mcRawSyllabus}`;
                   </tr>
                 </thead>
                 <tbody>
-                  {activeRegistrations.length === 0 ? (
+                  {filteredRegistrations.length === 0 ? (
                     <tr>
                       <td colSpan="3" style={{ padding: "20px", textAlign: "center", color: "var(--fg-faint)" }}>No bookings registered yet.</td>
                     </tr>
                   ) : (
-                    activeRegistrations.map(r => (
+                    filteredRegistrations.map(r => (
                       <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
                         <td style={{ padding: "10px 14px" }}>
                           <b>{r.studentName}</b>
