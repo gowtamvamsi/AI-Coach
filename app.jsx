@@ -1933,6 +1933,7 @@ function DashboardView({ user, role, onLogout }) {
   const [sessions, setSessions] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [editSessionId, setEditSessionId] = useState("");
+  const [editSessionIsMc, setEditSessionIsMc] = useState(false);
   
   // Form fields (sessions)
   const [title, setTitle] = useState("");
@@ -2196,8 +2197,9 @@ function DashboardView({ user, role, onLogout }) {
   }, []);
 
   // Handle selected session for editing
-  const handleSelectSessionToEdit = (id) => {
+  const handleSelectSessionToEdit = (id, isMcCollection = false) => {
     setEditSessionId(id);
+    setEditSessionIsMc(isMcCollection);
     if (!id) {
       // Reset form to blank creation
       setTitle("");
@@ -2206,11 +2208,24 @@ function DashboardView({ user, role, onLogout }) {
       setDateTime("");
       return;
     }
-    const session = sessions.find(s => s.id === id);
+    let session = isMcCollection 
+      ? masterclasses.find(m => m.id === id)
+      : sessions.find(s => s.id === id);
+      
+    // If not found in Firestore lists, check if it's the featured config masterclass
+    if (!session && V2_CONFIG_MASTERCLASS && id === V2_CONFIG_MASTERCLASS.id) {
+      session = {
+        title: V2_CONFIG_MASTERCLASS.title,
+        price: V2_CONFIG_MASTERCLASS.price,
+        dateTime: V2_CONFIG_MASTERCLASS.dateTime,
+        description: V2_CONFIG_MASTERCLASS.about || V2_CONFIG_MASTERCLASS.subtitle || "",
+      };
+    }
+      
     if (session) {
       setTitle(session.title || "");
-      setDescription(session.description || "");
-      setPrice(session.price || "");
+      setDescription(session.description || session.rawSyllabus || "");
+      setPrice(session.price !== undefined ? session.price : "");
       
       // format to datetime-local expected string 'YYYY-MM-DDTHH:MM'
       try {
@@ -2245,8 +2260,8 @@ function DashboardView({ user, role, onLogout }) {
 
     try {
       const priceNum = parseFloat(price);
-      if (isNaN(priceNum) || priceNum <= 0) {
-        throw new Error("Price must be a valid positive number.");
+      if (isNaN(priceNum) || priceNum < 0) {
+        throw new Error("Price must be a valid non-negative number.");
       }
 
       // Convert date to generic ISO string format
@@ -2254,14 +2269,41 @@ function DashboardView({ user, role, onLogout }) {
 
       if (editSessionId) {
         // Mode: Update Existing Session
-        await db.collection("sessions").doc(editSessionId).update({
+        const targetCollection = editSessionIsMc ? "masterclasses" : "sessions";
+        const updatePayload = {
           title,
-          description,
           price: priceNum,
           dateTime: formattedDate,
           instructor
-        });
-        setStatus({ type: "success", message: "Masterclass updated successfully!" });
+        };
+        if (editSessionIsMc) {
+          updatePayload.rawSyllabus = description;
+        } else {
+          updatePayload.description = description;
+        }
+
+        const docRef = db.collection(targetCollection).doc(editSessionId);
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) {
+          updatePayload.deleted = false;
+          updatePayload.status = "active";
+          updatePayload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+          if (editSessionIsMc && V2_CONFIG_MASTERCLASS) {
+            updatePayload.syllabus = V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
+              index: `1.${idx + 1}`,
+              topicTitle: c.title,
+              subTopics: c.points
+            })) : [];
+          }
+          await docRef.set(updatePayload);
+        } else {
+          // If it exists, make sure we mark it as active / not deleted
+          updatePayload.deleted = false;
+          updatePayload.status = "active";
+          await docRef.update(updatePayload);
+        }
+        
+        setStatus({ type: "success", message: `${editSessionIsMc ? "AI Masterclass" : "Session"} updated successfully!` });
       } else {
         // Mode: Create New Session
         await db.collection("sessions").add({
@@ -2287,12 +2329,18 @@ function DashboardView({ user, role, onLogout }) {
     }
   };
 
-  const handleDeleteSession = async (sessionId, sessionTitle) => {
+  const handleDeleteSession = async (sessionId, sessionTitle, isMcCollection = false) => {
     if (!window.confirm(`Delete "${sessionTitle}"? This cannot be undone.`)) return;
     try {
-      await db.collection("sessions").doc(sessionId).delete();
+      const targetCollection = isMcCollection ? "masterclasses" : "sessions";
+      await db.collection(targetCollection).doc(sessionId).set({
+        deleted: true,
+        status: "deleted",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      
       // If we were editing this session, reset form
-      if (editSessionId === sessionId) handleSelectSessionToEdit("");
+      if (editSessionId === sessionId) handleSelectSessionToEdit("", false);
       setStatus({ type: "success", message: `"${sessionTitle}" deleted.` });
     } catch (err) {
       setStatus({ type: "error", message: err.message || "Failed to delete session." });
@@ -2406,19 +2454,37 @@ ${mcRawSyllabus}`;
   const handleDeleteMasterclass = async (mcId, mcTitle) => {
     if (!window.confirm(`Delete "${mcTitle}"? This cannot be undone.`)) return;
     try {
-      await db.collection('masterclasses').doc(mcId).delete();
+      await db.collection('masterclasses').doc(mcId).set({
+        deleted: true,
+        status: "deleted",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      
+      // If we were editing this session, reset form
+      if (editSessionId === mcId) handleSelectSessionToEdit("", false);
       setStatus({ type: 'success', message: `"${mcTitle}" masterclass deleted.` });
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Failed to delete masterclass.' });
     }
   };
 
-  // Compute metrics and segments
-  const totalRevenue = registrations
+  // Compute active registrations (excluding those for soft-deleted sessions/masterclasses)
+  const activeRegistrations = registrations.filter(r => {
+    // Find if this registration is for a deleted session/masterclass
+    const isDeletedMc = masterclasses.some(m => m.id === r.sessionId && (m.deleted || m.status === 'deleted'));
+    const isDeletedSession = sessions.some(s => s.id === r.sessionId && (s.deleted || s.status === 'deleted'));
+    // Also check if it's the featured ID and it's marked as deleted
+    const isFeaturedDeleted = r.sessionId === (V2_CONFIG_MASTERCLASS?.id) && [...masterclasses, ...sessions].some(x => x.id === r.sessionId && (x.deleted || x.status === 'deleted'));
+    
+    return !isDeletedMc && !isDeletedSession && !isFeaturedDeleted;
+  });
+
+  // Compute metrics and segments using active registrations only
+  const totalRevenue = activeRegistrations
     .filter(r => r.status === 'completed')
     .reduce((sum, r) => sum + (r.amount / 100), 0);
 
-  const totalSeats = registrations
+  const totalSeats = activeRegistrations
     .filter(r => r.status === 'completed').length;
 
   const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
@@ -2428,7 +2494,7 @@ ${mcRawSyllabus}`;
   
   // 1. Leads Metrics
   const uniquePaidEmails = Array.from(new Set(
-    registrations
+    activeRegistrations
       .filter(r => r.status === 'completed')
       .map(r => (r.studentEmail || '').toLowerCase().trim())
       .filter(Boolean)
@@ -2446,7 +2512,7 @@ ${mcRawSyllabus}`;
   // Cold Leads: Signed up in Auth but no completed booking
   const coldLeadsList = users.filter(u => {
     const emailLower = (u.email || '').toLowerCase().trim();
-    return !registrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower);
+    return !activeRegistrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower);
   });
 
   // Paid Customers (Warm Segment): Deduction merged registrations & users
@@ -2457,7 +2523,7 @@ ${mcRawSyllabus}`;
     // Add signed up users who paid
     users.forEach(u => {
       const emailLower = (u.email || '').toLowerCase().trim();
-      if (registrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower)) {
+      if (activeRegistrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower)) {
         list.push({
           name: u.name || u.displayName || "Signed Up Student",
           email: u.email,
@@ -2469,7 +2535,7 @@ ${mcRawSyllabus}`;
     });
     
     // Add direct registrations we haven't seen yet
-    registrations.forEach(r => {
+    activeRegistrations.forEach(r => {
       if (r.status === 'completed') {
         const emailLower = (r.studentEmail || '').toLowerCase().trim();
         if (emailLower && !seen.has(emailLower)) {
@@ -2497,11 +2563,11 @@ ${mcRawSyllabus}`;
     const list = [];
     const seen = new Set();
     
-    registrations.forEach(r => {
+    activeRegistrations.forEach(r => {
       if (r.status === 'pending') {
         const emailLower = (r.studentEmail || '').toLowerCase().trim();
         if (emailLower && !seen.has(emailLower)) {
-          const hasCompleted = registrations.some(rc => rc.status === 'completed' && (rc.studentEmail || '').toLowerCase().trim() === emailLower);
+          const hasCompleted = activeRegistrations.some(rc => rc.status === 'completed' && (rc.studentEmail || '').toLowerCase().trim() === emailLower);
           if (!hasCompleted) {
             const matchingUser = users.find(u => (u.email || '').toLowerCase().trim() === emailLower);
             list.push({
@@ -2573,91 +2639,182 @@ ${mcRawSyllabus}`;
       {/* ── Sessions Management Section (Admins only) ── */}
       {isAdmin && (
         <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
-          <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({sessions.length})</h2>
-          {sessions.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--fg-faint)", border: "1px dashed var(--line)", borderRadius: "10px" }}>
-              <div style={{ fontSize: "36px", marginBottom: "10px" }}>📭</div>
-              <p style={{ margin: 0, fontSize: "14px" }}>No masterclasses yet. Use the form below to schedule your first session.</p>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-              {sessions.map(s => {
-                const sessionDate = s.dateTime ? new Date(s.dateTime) : null;
-                const isEditing = editSessionId === s.id;
-                return (
-                  <div key={s.id} style={{
-                    background: isEditing ? "rgba(var(--c-violet-rgb, 138,92,246),0.08)" : "var(--bg-elev)",
-                    border: `1px solid ${isEditing ? "var(--c-violet, #8a5cf6)" : "var(--line)"}`,
-                    borderRadius: "12px",
-                    padding: "16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                    transition: "border-color 0.2s"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                      <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--fg)", lineHeight: 1.3, flex: 1 }}>{s.title}</h3>
-                      {isEditing && (
-                        <span style={{ fontSize: "10px", background: "var(--c-violet, #8a5cf6)", color: "#fff", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap" }}>Editing</span>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                      <span style={{ fontSize: "11px", color: "var(--fg-dim)" }}>👤 {s.instructor || "—"}</span>
-                      <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-amber, #f59e0b)" }}>₹{(s.price || 0).toLocaleString()}</span>
-                    </div>
-                    {sessionDate && (
-                      <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
-                        📅 {sessionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {" · "}{sessionDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({(() => {
+            const tempSeen = new Set();
+            let count = 0;
+            const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
+            if (featuredId) {
+              const inMc = masterclasses.some(m => m.id === featuredId);
+              const inSess = sessions.some(s => s.id === featuredId);
+              if (!inMc && !inSess) {
+                const isExplicitlyDeleted = [...masterclasses, ...sessions].some(x => x.id === featuredId && (x.deleted || x.status === 'deleted'));
+                if (!isExplicitlyDeleted) {
+                  tempSeen.add(featuredId);
+                  count++;
+                }
+              }
+            }
+            masterclasses.forEach(m => {
+              if (m && m.id && !tempSeen.has(m.id) && !m.deleted && m.status !== 'deleted') {
+                tempSeen.add(m.id);
+                count++;
+              }
+            });
+            sessions.forEach(s => {
+              if (s && s.id && !tempSeen.has(s.id) && !s.deleted && s.status !== 'deleted') {
+                tempSeen.add(s.id);
+                count++;
+              }
+            });
+            return count;
+          })()})</h2>
+          {(() => {
+            const combined = [];
+            const seen = new Set();
+            
+            // Prepend the virtual/default config masterclass if it's not already in masterclasses or sessions Firestore lists,
+            // AND has not been explicitly deleted/hidden by the admin!
+            const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
+            if (featuredId) {
+              const inMasterclasses = masterclasses.some(m => m.id === featuredId);
+              const inSessions = sessions.some(s => s.id === featuredId);
+              if (!inMasterclasses && !inSessions) {
+                const isExplicitlyDeleted = [...masterclasses, ...sessions].some(x => x.id === featuredId && (x.deleted || x.status === 'deleted'));
+                if (!isExplicitlyDeleted) {
+                  combined.push({
+                    id: featuredId,
+                    title: V2_CONFIG_MASTERCLASS.title,
+                    price: V2_CONFIG_MASTERCLASS.price,
+                    dateTime: V2_CONFIG_MASTERCLASS.dateTime,
+                    instructor: V2_CONFIG_MASTERCLASS.instructor?.name || "Balaji Chippada",
+                    description: V2_CONFIG_MASTERCLASS.subtitle || V2_CONFIG_MASTERCLASS.about,
+                    rawSyllabus: V2_CONFIG_MASTERCLASS.about,
+                    syllabus: V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
+                      index: `1.${idx + 1}`,
+                      topicTitle: c.title,
+                      subTopics: c.points
+                    })) : [],
+                    isMc: true,
+                    isDefaultConfigMc: true
+                  });
+                  seen.add(featuredId);
+                }
+              }
+            }
+
+            masterclasses.forEach(m => {
+              if (m && m.id && !seen.has(m.id) && !m.deleted && m.status !== 'deleted') {
+                combined.push({ ...m, isMc: true });
+                seen.add(m.id);
+              }
+            });
+            sessions.forEach(s => {
+              if (s && s.id && !seen.has(s.id) && !s.deleted && s.status !== 'deleted') {
+                combined.push({ ...s, isMc: false });
+                seen.add(s.id);
+              }
+            });
+
+            if (combined.length === 0) {
+              return (
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--fg-faint)", border: "1px dashed var(--line)", borderRadius: "10px" }}>
+                  <div style={{ fontSize: "36px", marginBottom: "10px" }}>📭</div>
+                  <p style={{ margin: 0, fontSize: "14px" }}>No masterclasses yet. Use the form below to schedule your first session.</p>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
+                {combined.map(s => {
+                  const sessionDate = s.dateTime ? new Date(s.dateTime) : null;
+                  const isEditing = editSessionId === s.id;
+                  return (
+                    <div key={s.id} style={{
+                      background: isEditing ? "rgba(var(--c-violet-rgb, 138,92,246),0.08)" : "var(--bg-elev)",
+                      border: `1px solid ${isEditing ? "var(--c-violet, #8a5cf6)" : "var(--line)"}`,
+                      borderRadius: "12px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      transition: "border-color 0.2s"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--fg)", lineHeight: 1.3, flex: 1 }}>{s.title}</h3>
+                        {isEditing && (
+                          <span style={{ fontSize: "10px", background: "var(--c-violet, #8a5cf6)", color: "#fff", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap" }}>Editing</span>
+                        )}
                       </div>
-                    )}
-                    <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--fg-dim)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                      {s.description}
-                    </p>
-                    <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-                      <button
-                        onClick={() => {
-                          handleSelectSessionToEdit(isEditing ? "" : s.id);
-                          // Scroll to form
-                          document.querySelector('.dashboard__grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "7px 12px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          border: "1px solid var(--c-violet, #8a5cf6)",
-                          background: isEditing ? "var(--c-violet, #8a5cf6)" : "transparent",
-                          color: isEditing ? "#fff" : "var(--c-violet, #8a5cf6)",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          transition: "all 0.15s"
-                        }}
-                      >
-                        {isEditing ? "✕ Cancel Edit" : "✎ Edit"}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSession(s.id, s.title)}
-                        style={{
-                          padding: "7px 12px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          border: "1px solid var(--c-rust, #c2533c)",
-                          background: "transparent",
-                          color: "var(--c-rust, #c2533c)",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          transition: "all 0.15s"
-                        }}
-                      >
-                        🗑 Delete
-                      </button>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "var(--fg-dim)" }}>👤 {s.instructor || "—"}</span>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-amber, #f59e0b)" }}>₹{(s.price || 0).toLocaleString()}</span>
+                        <span style={{ 
+                          fontSize: "9px", 
+                          background: s.isMc ? "rgba(236, 72, 153, 0.1)" : "rgba(138, 92, 246, 0.1)", 
+                          color: s.isMc ? "var(--c-pink)" : "var(--c-violet, #8a5cf6)", 
+                          borderRadius: "4px", 
+                          padding: "1px 6px",
+                          fontWeight: "700",
+                          textTransform: "uppercase"
+                        }}>
+                          {s.isMc ? "✨ AI Masterclass" : "📅 Session"}
+                        </span>
+                      </div>
+                      {sessionDate && (
+                        <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
+                          📅 {sessionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {" · "}{sessionDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                      <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--fg-dim)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {s.description || s.rawSyllabus || "No syllabus/description provided."}
+                      </p>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "auto", paddingTop: "8px" }}>
+                        <button
+                          onClick={() => {
+                            handleSelectSessionToEdit(isEditing ? "" : s.id, s.isMc);
+                            // Scroll to form
+                            document.querySelector('.dashboard__grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "7px 12px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            border: "1px solid var(--c-violet, #8a5cf6)",
+                            background: isEditing ? "var(--c-violet, #8a5cf6)" : "transparent",
+                            color: isEditing ? "#fff" : "var(--c-violet, #8a5cf6)",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          {isEditing ? "✕ Cancel Edit" : "✎ Edit"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSession(s.id, s.title, s.isMc)}
+                          style={{
+                            padding: "7px 12px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            border: "1px solid var(--c-rust, #c2533c)",
+                            background: "transparent",
+                            color: "var(--c-rust, #c2533c)",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          🗑 Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
       {/* ── AI Masterclass Panel (Admins only) ── */}
@@ -2918,7 +3075,7 @@ ${mcRawSyllabus}`;
           </div>
 
           <div style={{ marginTop: "12px" }}>
-            <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({registrations.length})</h3>
+            <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({activeRegistrations.length})</h3>
             <div style={{ overflowX: "auto", maxHeight: "340px", border: "1px solid var(--line)", borderRadius: "8px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
                 <thead>
@@ -2929,12 +3086,12 @@ ${mcRawSyllabus}`;
                   </tr>
                 </thead>
                 <tbody>
-                  {registrations.length === 0 ? (
+                  {activeRegistrations.length === 0 ? (
                     <tr>
                       <td colSpan="3" style={{ padding: "20px", textAlign: "center", color: "var(--fg-faint)" }}>No bookings registered yet.</td>
                     </tr>
                   ) : (
-                    registrations.map(r => (
+                    activeRegistrations.map(r => (
                       <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
                         <td style={{ padding: "10px 14px" }}>
                           <b>{r.studentName}</b>
@@ -4281,7 +4438,7 @@ function App() {
   // popup, curriculum, booking, sticky bar, closing CTA) sees the SAME object.
   // mergeMcWithConfig makes site.config.js win for content; Firestore only
   // contributes runtime state (seatsBooked, zoomLink, etc).
-  const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions));
+  const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions), masterclasses, sessions);
   const bookingCtx = {
     setBookingSession, setBookingStep, setBookingSuccess, setSelectedTier,
     setBookingName, setBookingEmail, setBookingPhone, setBookingError, user,
@@ -4470,80 +4627,89 @@ function App() {
           {/* ── Follow cards: YouTube · LinkedIn · GitHub · Instagram ── */}
           <V2FollowGrid />
 
-          {/* ── AI-Structured Masterclasses (Split-Pane UI) ── */}
-          {!loadingMasterclasses && masterclasses.length > 0 && (
-            <div id="masterclasses" style={{ marginBottom: sessions.length > 0 ? "56px" : "0" }}>
-              {masterclasses.map((mc, idx) => (
-                <MasterclassCard 
-                  key={mc.id}
-                  mc={mc}
-                  idx={idx}
-                  user={user}
-                  onBook={openBooking}
-                />
-              ))}
-            </div>
-          )}
+          {(() => {
+            const activeMasterclasses = masterclasses.filter(m => !m.deleted && m.status !== 'deleted');
+            const activeSessions = sessions.filter(s => !s.deleted && s.status !== 'deleted');
 
-          {/* ── Legacy Session Cards (shown when no masterclasses yet, or as secondary) ── */}
-          {(loadingSessions || loadingMasterclasses) && masterclasses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px", color: "var(--fg-faint)" }}>
-              <div style={{ fontSize: "14px", fontFamily: "JetBrains Mono" }}>Loading active classes...</div>
-            </div>
-          ) : masterclasses.length === 0 && sessions.length === 0 ? (
-            <div className="coaching-empty">
-              <div className="coaching-empty__icon">📅</div>
-              <h2 className="coaching-empty__title">Classes schedule pending</h2>
-              <p className="coaching-empty__desc">Our staff is currently preparing the next set of live workshops. Check back shortly!</p>
-            </div>
-          ) : sessions.length > 0 && (
-            <>
-              {masterclasses.length > 0 && (
-                <div style={{ marginBottom: "24px" }}>
-                  <div style={{ fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-faint)", fontFamily: "'JetBrains Mono', monospace", marginBottom: "20px" }}>
-                    More upcoming sessions
+            return (
+              <>
+                {/* ── AI-Structured Masterclasses (Split-Pane UI) ── */}
+                {activeMasterclasses.length > 0 && (
+                  <div id="masterclasses" style={{ marginBottom: activeSessions.length > 0 ? "56px" : "0" }}>
+                    {activeMasterclasses.map((mc, idx) => (
+                      <MasterclassCard 
+                        key={mc.id}
+                        mc={mc}
+                        idx={idx}
+                        user={user}
+                        onBook={openBooking}
+                      />
+                    ))}
                   </div>
-                </div>
-              )}
-              <RevealOnScroll>
-                <div className="session-grid">
-                {sessions.map(s => (
-                  <article key={s.id} className="session-card">
-                    <h2 className="session-card__title">{s.title}</h2>
-                    <p className="session-card__desc">{s.description}</p>
-                    
-                    <div className="session-card__meta">
-                      <div className="session-card__badge">
-                        <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                        </svg>
-                        <span>{new Date(s.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                      </div>
-                      <div className="session-card__badge">
-                        <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        <span>Instructor: {s.instructor || "Balaji Chippada"}</span>
-                      </div>
-                    </div>
+                )}
 
-                    <div className="session-card__price-row">
-                      <span className="session-card__price-label">Registration Ticket</span>
-                      <span className="session-card__price">₹{(s.price || 0).toLocaleString()}</span>
-                    </div>
+                {/* ── Legacy Session Cards (shown when no masterclasses yet, or as secondary) ── */}
+                {(loadingSessions || loadingMasterclasses) && activeMasterclasses.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "60px", color: "var(--fg-faint)" }}>
+                    <div style={{ fontSize: "14px", fontFamily: "JetBrains Mono" }}>Loading active classes...</div>
+                  </div>
+                ) : activeMasterclasses.length === 0 && activeSessions.length === 0 ? (
+                  <div className="coaching-empty">
+                    <div className="coaching-empty__icon">📅</div>
+                    <h2 className="coaching-empty__title">Classes schedule pending</h2>
+                    <p className="coaching-empty__desc">Our staff is currently preparing the next set of live workshops. Check back shortly!</p>
+                  </div>
+                ) : activeSessions.length > 0 && (
+                  <>
+                    {activeMasterclasses.length > 0 && (
+                      <div style={{ marginBottom: "24px" }}>
+                        <div style={{ fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-faint)", fontFamily: "'JetBrains Mono', monospace", marginBottom: "20px" }}>
+                          More upcoming sessions
+                        </div>
+                      </div>
+                    )}
+                    <RevealOnScroll>
+                      <div className="session-grid">
+                      {activeSessions.map(s => (
+                        <article key={s.id} className="session-card">
+                          <h2 className="session-card__title">{s.title}</h2>
+                          <p className="session-card__desc">{s.description}</p>
+                          
+                          <div className="session-card__meta">
+                            <div className="session-card__badge">
+                              <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                              </svg>
+                              <span>{new Date(s.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                            </div>
+                            <div className="session-card__badge">
+                              <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                              </svg>
+                              <span>Instructor: {s.instructor || "Balaji Chippada"}</span>
+                            </div>
+                          </div>
 
-                      <ShimmerButton
-                        variant="dark"
-                        onClick={() => openBooking(s)}
-                      >
-                        Book Seat
-                      </ShimmerButton>
-                  </article>
-                ))}
-                </div>
-              </RevealOnScroll>
-            </>
-          )}
+                          <div className="session-card__price-row">
+                            <span className="session-card__price-label">Registration Ticket</span>
+                            <span className="session-card__price">₹{(s.price || 0).toLocaleString()}</span>
+                          </div>
+
+                          <ShimmerButton
+                            variant="dark"
+                            onClick={() => openBooking(s)}
+                          >
+                            Book Seat
+                          </ShimmerButton>
+                        </article>
+                      ))}
+                      </div>
+                    </RevealOnScroll>
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {/* ── Instructor Bio Strip ── */}
           <InstructorBio />

@@ -65,7 +65,17 @@ const V2_CONFIG_MASTERCLASS = _SC.nextMasterclass || null;
 // seat count, zoom link / recording link the admin pastes later, status.
 //
 // This is intentional: if you want to change anything visible, edit site.config.js.
-function mergeMcWithConfig(mc) {
+function mergeMcWithConfig(mc, masterclasses, sessions) {
+  // If the featured masterclass is explicitly marked as deleted in Firestore, return null!
+  const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
+  if (featuredId) {
+    const isDeleted = [...(masterclasses || []), ...(sessions || [])]
+      .some(item => item && item.id === featuredId && (item.deleted || item.status === 'deleted'));
+    if (isDeleted) {
+      return null;
+    }
+  }
+
   if (!V2_CONFIG_MASTERCLASS && !mc) return null;
   if (!V2_CONFIG_MASTERCLASS) return mc;             // no config → use Firestore as-is
   if (!mc) return Object.assign({}, V2_CONFIG_MASTERCLASS, { instructor: V2_INSTRUCTOR });
@@ -118,7 +128,9 @@ function getSeatsRemaining(mc) {
 }
 
 function getNextUpcomingMasterclass(masterclasses, sessions) {
-  const all = [...(masterclasses || []), ...(sessions || [])].filter(Boolean);
+  const all = [...(masterclasses || []), ...(sessions || [])]
+    .filter(Boolean)
+    .filter(item => !item.deleted && item.status !== 'deleted');
   const now = Date.now();
 
   // Find all valid upcoming classes in the future
@@ -131,14 +143,20 @@ function getNextUpcomingMasterclass(masterclasses, sessions) {
     return upcoming[0];
   }
 
-  // 2. If no dynamic upcoming sessions, fall back to matching the featured config ID
+  // 2. If no dynamic upcoming sessions, check if the featured config session was explicitly deleted
   const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
   if (featuredId) {
+    const isExplicitlyDeleted = [...(masterclasses || []), ...(sessions || [])]
+      .some(item => item && item.id === featuredId && (item.deleted || item.status === 'deleted'));
+    if (isExplicitlyDeleted) {
+      return null;
+    }
+
     const match = all.find((item) => item && item.id === featuredId);
     if (match) return match;
   }
 
-  // 3. Fallback to null (which triggers direct merge with site.config.js nextMasterclass config)
+  // 3. Fallback to null (no upcoming session found)
   return null;
 }
 
@@ -959,6 +977,7 @@ function V2Countdown({ dateTime }) {
 // Auto-show modal on first visit per masterclass. Two-view: summary → details.
 // Inspired by Krish Naik's webinar popup. Per-mc storage key.
 function V2WelcomePopup({ nextMc, onReserve }) {
+  if (!nextMc) return null;
   const merged = mergeMcWithConfig(nextMc);
   const popupKey = merged ? `v2_welcome_popup_dismissed:${merged.id || 'default'}` : null;
   const [open, setOpen] = useState(false);
@@ -1172,6 +1191,7 @@ function V2HowItWorks({ nextMc }) {
 // On-page curriculum section — what the "Explore the curriculum" hero button scrolls to.
 // Reads instructor + about + curriculum modules from site.config.js so this is fully editable.
 function V2Curriculum({ nextMc, onReserve }) {
+  if (!nextMc) return null;
   const merged = mergeMcWithConfig(nextMc);
   if (!merged) return null;
   const instructor = merged.instructor || V2_INSTRUCTOR;
