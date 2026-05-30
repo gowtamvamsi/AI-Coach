@@ -79,7 +79,11 @@ function mergeMcWithConfig(mc) {
     about: mc.rawSyllabus || mc.description || V2_CONFIG_MASTERCLASS.about,
     dateTime: mc.dateTime || V2_CONFIG_MASTERCLASS.dateTime,
     price: typeof mc.price === 'number' ? mc.price : V2_CONFIG_MASTERCLASS.price,
-    instructor: Object.assign({}, V2_INSTRUCTOR, { name: mc.instructor || V2_INSTRUCTOR.name })
+    instructor: Object.assign({}, V2_INSTRUCTOR, 
+      typeof mc.instructor === 'object' 
+        ? mc.instructor 
+        : { name: mc.instructor || V2_INSTRUCTOR.name }
+    )
   };
 
   // Map AI-generated structured syllabus array into curriculum array structure
@@ -1014,7 +1018,8 @@ function V2WelcomePopup({ nextMc, onReserve }) {
   const wp = (_SC.welcomePopup || {});
   const livePill = wp.livePillLabel || (free ? 'FREE WEBINAR' : 'PAID COHORT');
   const instructor = merged.instructor || V2_INSTRUCTOR;
-  const initials = (instructor.name || 'B').split(' ').map((s) => s[0]).slice(0, 2).join('');
+  const instName = typeof instructor.name === 'string' ? instructor.name : 'Balaji Chippada';
+  const initials = instName.split(' ').map((s) => s[0]).slice(0, 2).join('');
 
   // Poster: real image when provided, else gradient block.
   const poster = merged.thumbnail ? (
@@ -1170,7 +1175,8 @@ function V2Curriculum({ nextMc, onReserve }) {
   const merged = mergeMcWithConfig(nextMc);
   if (!merged) return null;
   const instructor = merged.instructor || V2_INSTRUCTOR;
-  const initials = (instructor.name || 'B').split(' ').map((s) => s[0]).slice(0, 2).join('');
+  const instName = typeof instructor.name === 'string' ? instructor.name : 'Balaji Chippada';
+  const initials = instName.split(' ').map((s) => s[0]).slice(0, 2).join('');
   const modules = Array.isArray(merged.curriculum) ? merged.curriculum : [];
   const free = isMcFree(merged);
 
