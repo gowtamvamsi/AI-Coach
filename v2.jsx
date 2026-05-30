@@ -66,12 +66,22 @@ const V2_CONFIG_MASTERCLASS = _SC.nextMasterclass || null;
 //
 // This is intentional: if you want to change anything visible, edit site.config.js.
 function mergeMcWithConfig(mc, masterclasses, sessions) {
-  // If the featured masterclass is explicitly marked as deleted in Firestore, return null!
+  // If the featured masterclass is explicitly marked as deleted in Firestore, we should not fall back to it
   const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
+  let isFeaturedDeleted = false;
   if (featuredId) {
-    const isDeleted = [...(masterclasses || []), ...(sessions || [])]
+    isFeaturedDeleted = [...(masterclasses || []), ...(sessions || [])]
       .some(item => item && item.id === featuredId && (item.deleted || item.status === 'deleted'));
-    if (isDeleted) {
+  }
+
+  if (mc) {
+    // If the dynamic class is the featured one and it's deleted, don't display it
+    if (featuredId && mc.id === featuredId && isFeaturedDeleted) {
+      return null;
+    }
+  } else {
+    // Fallback mode: if no upcoming dynamic class, check if the config class is deleted or missing
+    if (isFeaturedDeleted || !V2_CONFIG_MASTERCLASS) {
       return null;
     }
   }
