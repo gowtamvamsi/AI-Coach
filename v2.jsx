@@ -142,19 +142,25 @@ function getNextUpcomingMasterclass(masterclasses, sessions) {
   const all = [...(masterclasses || []), ...(sessions || [])]
     .filter(Boolean)
     .filter(item => !item.deleted && item.status !== 'deleted');
-  const now = Date.now();
 
-  // Find all valid upcoming classes in the future
-  const upcoming = all
-    .filter((item) => item.dateTime && new Date(item.dateTime).getTime() > now)
-    .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+  const getSafeTimestamp = (val) => {
+    if (!val) return 0;
+    if (typeof val.toDate === 'function') return val.toDate().getTime();
+    if (val.seconds) return val.seconds * 1000;
+    const t = new Date(val).getTime();
+    return isNaN(t) ? 0 : t;
+  };
 
-  // 1. If there is a dynamic upcoming class in Firestore, advertise it!
-  if (upcoming.length > 0) {
-    return upcoming[0];
+  // 1. Sort all active dynamic classes (excluding the config one if present) by creation time descending
+  const dynamicClasses = all
+    .filter(item => item.id !== (V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id))
+    .sort((a, b) => getSafeTimestamp(b.createdAt) - getSafeTimestamp(a.createdAt));
+
+  if (dynamicClasses.length > 0) {
+    return dynamicClasses[0];
   }
 
-  // 2. If no dynamic upcoming sessions, check if the featured config session was explicitly deleted
+  // 2. Fallback: if no active dynamic sessions, check if the featured config session was explicitly deleted
   const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
   if (featuredId) {
     const isExplicitlyDeleted = [...(masterclasses || []), ...(sessions || [])]
