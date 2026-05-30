@@ -70,16 +70,40 @@ function mergeMcWithConfig(mc) {
   if (!V2_CONFIG_MASTERCLASS) return mc;             // no config → use Firestore as-is
   if (!mc) return Object.assign({}, V2_CONFIG_MASTERCLASS, { instructor: V2_INSTRUCTOR });
 
-  // Runtime state only — everything else comes from config.
+  // Map dynamic Firestore content so it completely overrides hardcoded details
+  const dynamicContent = {
+    id: mc.id || mc.uid || V2_CONFIG_MASTERCLASS.id,
+    title: mc.title || V2_CONFIG_MASTERCLASS.title,
+    shortTitle: mc.shortTitle || mc.title || V2_CONFIG_MASTERCLASS.shortTitle,
+    subtitle: mc.description || mc.subtitle || V2_CONFIG_MASTERCLASS.subtitle,
+    about: mc.rawSyllabus || mc.description || V2_CONFIG_MASTERCLASS.about,
+    dateTime: mc.dateTime || V2_CONFIG_MASTERCLASS.dateTime,
+    price: typeof mc.price === 'number' ? mc.price : V2_CONFIG_MASTERCLASS.price,
+    instructor: Object.assign({}, V2_INSTRUCTOR, { name: mc.instructor || V2_INSTRUCTOR.name })
+  };
+
+  // Map AI-generated structured syllabus array into curriculum array structure
+  if (Array.isArray(mc.syllabus) && mc.syllabus.length > 0) {
+    dynamicContent.curriculum = mc.syllabus.map((s, i) => ({
+      module: s.index ? `Module ${s.index}` : `Module ${String(i + 1).padStart(2, '0')}`,
+      title: s.topicTitle || s.title,
+      points: s.subTopics || s.points || []
+    }));
+  } else if (Array.isArray(mc.curriculum)) {
+    dynamicContent.curriculum = mc.curriculum;
+  }
+
+  // Runtime live states
   const runtime = {};
   if (typeof mc.seatsBooked === 'number') runtime.seatsBooked = mc.seatsBooked;
+  if (mc.seatsTotal) runtime.seatsTotal = mc.seatsTotal;
   if (mc.status) runtime.status = mc.status;
   if (mc.zoomLink) runtime.zoomLink = mc.zoomLink;
   if (mc.recordingUrl) runtime.recordingUrl = mc.recordingUrl;
   if (mc.slidesUrl) runtime.slidesUrl = mc.slidesUrl;
   if (mc.prepPdfUrl) runtime.prepPdfUrl = mc.prepPdfUrl;
 
-  return Object.assign({}, V2_CONFIG_MASTERCLASS, runtime, { instructor: V2_INSTRUCTOR });
+  return Object.assign({}, V2_CONFIG_MASTERCLASS, dynamicContent, runtime);
 }
 
 function getSeatsRemaining(mc) {
@@ -90,24 +114,28 @@ function getSeatsRemaining(mc) {
 }
 
 function getNextUpcomingMasterclass(masterclasses, sessions) {
-  const all = [...(masterclasses || []), ...(sessions || [])];
+  const all = [...(masterclasses || []), ...(sessions || [])].filter(Boolean);
+  const now = Date.now();
 
-  // If site.config.js declares a featured masterclass id, prefer the matching
-  // Firestore doc so seatsBooked / zoomLink / status come from the RIGHT event.
+  // Find all valid upcoming classes in the future
+  const upcoming = all
+    .filter((item) => item.dateTime && new Date(item.dateTime).getTime() > now)
+    .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+  // 1. If there is a dynamic upcoming class in Firestore, advertise it!
+  if (upcoming.length > 0) {
+    return upcoming[0];
+  }
+
+  // 2. If no dynamic upcoming sessions, fall back to matching the featured config ID
   const featuredId = V2_CONFIG_MASTERCLASS && V2_CONFIG_MASTERCLASS.id;
   if (featuredId) {
     const match = all.find((item) => item && item.id === featuredId);
     if (match) return match;
-    // No matching Firestore doc — return null so mergeMcWithConfig falls back
-    // to the config-only object (still renders cleanly with no live state).
-    return null;
   }
 
-  // No featured id configured → fall back to "earliest upcoming" behaviour.
-  const now = Date.now();
-  return all
-    .filter((item) => item && item.dateTime && new Date(item.dateTime).getTime() > now)
-    .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime))[0] || null;
+  // 3. Fallback to null (which triggers direct merge with site.config.js nextMasterclass config)
+  return null;
 }
 
 function formatMcShortDate(dateTime) {
