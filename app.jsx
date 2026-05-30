@@ -4019,13 +4019,14 @@ function App() {
             status: 'completed',
             userId: effectiveUser.uid,
             isFree: true,
+            orderId: 'free_' + Date.now(),
             bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
           };
           const ref = await db.collection('registrations').add(regPayload);
           setBookingLoading(false);
           await completeBookingSuccess({
             paymentId: `free_${ref.id}`,
-            orderId: `free_${Date.now()}`,
+            orderId: regPayload.orderId,
           });
         } else {
           // No Firestore — still let the user proceed (dev/preview).
