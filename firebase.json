@@ -22,7 +22,39 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
+        ]
+      },
+      {
+        "source": "/llms.txt",
+        "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
+      },
+      {
+        "source": "/llms-full.txt",
+        "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
+      },
+      {
+        "source": "/robots.txt",
+        "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
+      },
+      {
+        "source": "/sitemap.xml",
+        "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
+      }
+    ],
     "rewrites": [
+      {
+        "source": "/api/youtube-playlist",
+        "function": "getYouTubePlaylist"
+      },
       {
         "source": "**",
         "destination": "/index.html"

@@ -7,19 +7,17 @@ window.ROADMAP = [
     short: "Python + Async Engineering",
     color: "teal-deep",
     weeks: "Weeks 1–3",
-    weeksDetail: "3 weeks · 8 modules",
+    weeksDetail: "3 weeks · 6 modules",
     difficulty: 2,
     summary: "Every agent framework runs on Python. Skip this and everything later breaks in mysterious ways.",
     endState: "You can build a FastAPI endpoint that calls three different LLMs in parallel, times out the slow one, and logs the result without blocking the response.",
     sections: [
       { n: "1.1", title: "Core Python", items: ["Variables, types, control flow", "Functions, *args/**kwargs, decorators", "List & dict comprehensions", "Generator expressions", "Type hints (you'll need these for Pydantic later)"] },
       { n: "1.2", title: "Object-Oriented Python", items: ["Classes, __init__, instance vs class methods", "Inheritance, encapsulation, polymorphism", "Dataclasses", "Pydantic models — every agent framework uses them for tool schemas"] },
-      { n: "1.3", title: "Data Structures", items: ["List, Tuple, Set, Dict, NamedTuple", "collections.defaultdict, Counter, deque", "When to use which (interview territory)"] },
-      { n: "1.4", title: "Error & File Handling", items: ["try/except/finally", "Custom exception classes", "Context managers (with, contextlib)", "Reading/writing JSON, CSV, plain text, binary"] },
-      { n: "1.5", title: "Working with HTTP APIs", items: ["The requests library", "HTTP verbs, headers, status codes", "Authentication (Bearer tokens, API keys)", "Rate limits, retries, exponential backoff with tenacity"] },
-      { n: "1.6", title: "Database Connectivity", items: ["psycopg2 for raw PostgreSQL", "SQLAlchemy ORM basics", "Connection pooling and why it matters under load", "Raw SQL when the ORM gets in the way"] },
-      { n: "1.7", title: "FastAPI", items: ["First /chat endpoint", "Pydantic request/response models", "Dependency injection", "Automatic OpenAPI docs", "Running with uvicorn"] },
-      { n: "1.8", title: "Async Programming", items: ["asyncio fundamentals — event loop, coroutines", "async/await syntax", "asyncio.gather for parallel LLM calls", "asyncio.wait_for for timeout protection", "asyncio.create_task for fire-and-forget logging"] }
+      { n: "1.3", title: "Working with HTTP APIs", items: ["The requests library", "HTTP verbs, headers, status codes", "Authentication (Bearer tokens, API keys)", "Rate limits, retries, exponential backoff with tenacity"] },
+      { n: "1.4", title: "Database Connectivity", items: ["psycopg2 for raw PostgreSQL", "SQLAlchemy ORM basics", "Connection pooling and why it matters under load", "Raw SQL when the ORM gets in the way"] },
+      { n: "1.5", title: "FastAPI", items: ["First /chat endpoint", "Pydantic request/response models", "Dependency injection", "Automatic OpenAPI docs", "Running with uvicorn"] },
+      { n: "1.6", title: "Async Programming", items: ["asyncio fundamentals — event loop, coroutines", "async/await syntax", "asyncio.gather for parallel LLM calls", "asyncio.wait_for for timeout protection", "asyncio.create_task for fire-and-forget logging"] }
     ]
   },
   {
@@ -259,6 +257,17 @@ window.OUT_OF_SCOPE = [
     pointer: "Streamlit for internal tools, Vercel AI SDK + Next.js when you need a real product UI."
   }
 ];
+
+// Default materials slot per phase (admin or data.js can fill Drive URLs)
+window.ROADMAP.forEach((p) => {
+  if (!p.materials) {
+    p.materials = {
+      driveFolderUrl: null,
+      driveZipUrl: null,
+      label: p.title ? `${p.title} — materials` : 'Phase materials',
+    };
+  }
+});
 
 window.NEXT_STEPS = [
   {

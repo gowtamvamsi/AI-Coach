@@ -200,5 +200,16 @@ service cloud.firestore {
       allow read, create: if isStaff();
       allow update, delete: if isAdmin();
     }
+
+    // Roadmap video links (admin-managed, public read)
+    match /roadmapVideos/{videoId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || isBootstrapUser();
+    }
+
+    // Per-user roadmap learning progress
+    match /users/{userId}/roadmapProgress/{docId} {
+      allow read, write: if isOwner(userId);
+    }
   }
 }

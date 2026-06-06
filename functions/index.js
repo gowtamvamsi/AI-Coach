@@ -320,3 +320,122 @@ exports.sendAudienceEmail = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+function parseYouTubePlaylistResponse(data) {
+  const videos = [];
+  let continuation = null;
+  const seen = new WeakSet();
+  function walk(node) {
+    if (!node || typeof node !== "object" || seen.has(node)) return;
+    seen.add(node);
+    if (node.playlistVideoRenderer) {
+      const v = node.playlistVideoRenderer;
+      const title = v.title?.simpleText
+        || (v.title?.runs || []).map((r) => r.text).join("")
+        || "Video";
+      const thumbs = v.thumbnail?.thumbnails || [];
+      const thumbnail = thumbs[thumbs.length - 1]?.url
+        || (v.videoId ? `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg` : "");
+      if (v.videoId) videos.push({ videoId: v.videoId, title, thumbnail });
+    }
+    if (node.continuationItemRenderer && !continuation) {
+      continuation = node.continuationItemRenderer.continuationEndpoint
+        ?.continuationCommand?.token || null;
+    }
+    if (Array.isArray(node)) node.forEach(walk);
+    else Object.keys(node).forEach((k) => walk(node[k]));
+  }
+  walk(data);
+  return { videos, continuation };
+}
+
+function extractYtInitialDataFromHtml(html) {
+  const markers = ['var ytInitialData = ', 'window["ytInitialData"] = '];
+  for (const marker of markers) {
+    const idx = html.indexOf(marker);
+    if (idx < 0) continue;
+    let start = idx + marker.length;
+    let depth = 0;
+    for (let i = start; i < html.length; i++) {
+      if (html[i] === "{") depth++;
+      else if (html[i] === "}") {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(html.slice(start, i + 1));
+          } catch (_) {
+            return null;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchFullYouTubePlaylist(playlistId) {
+  const ctx = {
+    context: {
+      client: {
+        clientName: "WEB",
+        clientVersion: "2.20250201.01.00",
+        hl: "en",
+        gl: "US",
+      },
+    },
+  };
+  const all = [];
+  let body = { ...ctx, browseId: `VL${playlistId}` };
+  let endpoint = "https://www.youtube.com/youtubei/v1/browse?prettyPrint=false";
+
+  for (let page = 0; page < 20; page++) {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) break;
+    const data = await res.json();
+    const { videos, continuation } = parseYouTubePlaylistResponse(data);
+    all.push(...videos);
+    if (!continuation) break;
+    endpoint = "https://www.youtube.com/youtubei/v1/next?prettyPrint=false";
+    body = { ...ctx, continuation };
+  }
+
+  if (all.length === 0) {
+    const html = await fetch(`https://www.youtube.com/playlist?list=${playlistId}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; AI-Coach/1.0)" },
+    }).then((r) => (r.ok ? r.text() : ""));
+    const initial = html ? extractYtInitialDataFromHtml(html) : null;
+    if (initial) {
+      const { videos } = parseYouTubePlaylistResponse(initial);
+      all.push(...videos);
+    }
+  }
+
+  const seen = new Set();
+  return all.filter((v) => v.videoId && !seen.has(v.videoId) && seen.add(v.videoId));
+}
+
+exports.getYouTubePlaylist = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") {
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    return res.status(204).send("");
+  }
+
+  const playlistId = req.query.list || req.query.playlistId;
+  if (!playlistId || !/^PL[\w-]+$/.test(playlistId)) {
+    return res.status(400).json({ error: "Invalid playlistId" });
+  }
+
+  try {
+    const items = await fetchFullYouTubePlaylist(playlistId);
+    return res.json({ items, count: items.length });
+  } catch (err) {
+    console.error("getYouTubePlaylist failed:", err);
+    return res.status(500).json({ error: err.message || "Playlist fetch failed" });
+  }
+});

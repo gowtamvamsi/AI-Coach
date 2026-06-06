@@ -1,0 +1,54 @@
+# balajichippada.com — The Agent Engineer
+# Traditional search engines + AI agent crawlers welcome.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Google
+User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# OpenAI
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# Meta
+User-agent: meta-externalagent
+Allow: /
+
+# Common Crawl (used by many AI training pipelines)
+User-agent: CCBot
+Allow: /
+
+# Apple / Amazon / others
+User-agent: Applebot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+Sitemap: https://balajichippada.com/sitemap.xml
+
+# AI-readable site summary (llmstxt.org convention)
+# See: https://balajichippada.com/llms.txt

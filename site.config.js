@@ -19,6 +19,7 @@
 //      with a real image (popup + curriculum section both use it)
 // 4. Update `faqs` to change accordion items.
 // 5. Toggle `featureFlags` to show/hide sections.
+// 6. Update `seo.config.js` for search + AI-agent SEO (title, description, llms.txt content).
 //
 // EVERY field below is documented inline.
 // =====================================================================
@@ -39,9 +40,9 @@ window.SITE_CONFIG = {
     instagram: 'https://www.instagram.com/balajichippada',
     github: 'https://github.com/ch-balaji',
     stats: {
-      youtubeSubs: '17K+',
-      roadmapViews: '115K+',
-      studentsTrained: '50+',
+      youtubeSubs: '22K+',
+      roadmapViews: '150K+',
+      studentsTrained: '3000+',
     },
   },
 
@@ -50,11 +51,11 @@ window.SITE_CONFIG = {
   // ─────────────────────────────────────────────────────────────────
   instructor: {
     name: 'Balaji Chippada',
-    title: '8 years in AI/ML · Production agentic AI · 17K+ YouTube',
+    title: '8 years in AI/ML · Production agentic AI · 22K+ YouTube',
     photo: 'uploads/balaji-chippada.png', // leave empty for initials avatar
-    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (115K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
+    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (150K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
     quote: 'I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.',
-    chips: ['115K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
+    chips: ['150K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     youtube: 'https://www.youtube.com/@balajichippada',
   },
@@ -74,7 +75,7 @@ window.SITE_CONFIG = {
     subtitle: 'Demo-first build of a production-grade Claude agent — in 3 hours.',
 
     // ── Schedule ──
-    dateTime: '2026-05-31T18:30:00+05:30', // ISO with IST offset → countdown reads this
+    dateTime: '2026-06-27T18:30:00+05:30', // ISO with IST offset → countdown reads this
     duration: 180,                          // minutes (shown as "180 min session")
     timezone: 'IST',
 

@@ -56,40 +56,179 @@ const isMac = typeof navigator !== 'undefined'
 // HELPER COMPONENTS
 // ===============================================================
 
-function PhaseTabBox({ phase }) {
+function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoProgress }) {
   const [activeTab, setActiveTab] = useState(0);
   const section = phase.sections[activeTab];
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const embedVideos = H.getModuleEmbedVideos ? H.getModuleEmbedVideos(videoLinks, section.n) : [];
+  const isComplete = (completedModules || []).includes(section.n);
+  const phaseLabel = `Phase ${String(phase.id).padStart(2, '0')}`;
+
   return (
-    <div className="tabbox">
-      <div className="tabbox__tabs" role="tablist">
-        {phase.sections.map((s, i) => (
-          <button key={i} role="tab" aria-selected={i === activeTab}
-            className={`tabbox__tab ${i === activeTab ? 'active' : ''}`}
-            onClick={() => setActiveTab(i)}>
-            <span className="tabbox__tab-num">{s.n}</span>
-            <span className="tabbox__tab-title">{s.title}</span>
-          </button>
-        ))}
-      </div>
+    <div className="tabbox tabbox--theater">
+      <aside className="tabbox__nav" aria-label={`${phaseLabel} modules`}>
+        <div className="tabbox__nav-head">
+          {phase.capstone && (
+            <div className="tabbox__capstone-pill">Capstone {phase.capstone}</div>
+          )}
+        </div>
+        <div className="tabbox__tabs" role="tablist">
+          {phase.sections.map((s, i) => {
+            const done = (completedModules || []).includes(s.n);
+            const hasVideo = H.getModuleEmbedVideos
+              ? H.getModuleEmbedVideos(videoLinks, s.n).length > 0
+              : false;
+            return (
+            <button key={i} role="tab" aria-selected={i === activeTab}
+              className={`tabbox__tab ${i === activeTab ? 'active' : ''} ${done ? 'is-done' : ''} ${hasVideo ? 'has-video' : ''}`}
+              onClick={() => setActiveTab(i)}>
+              <span className="tabbox__tab-num">{s.n}</span>
+              <span className="tabbox__tab-title">{s.title}</span>
+              {hasVideo && <span className="tabbox__tab-video" aria-label="Has video">▶</span>}
+              {done && <span className="tabbox__tab-check" aria-label="Complete">✓</span>}
+            </button>
+          );})}
+        </div>
+      </aside>
+
       <div className="tabbox__panel" role="tabpanel">
         <div className="tabbox__panel-content" key={activeTab}>
-          <div className="tabbox__panel-num">Module {section.n}</div>
-          <h3 className="tabbox__panel-title">{section.title}</h3>
-          <ul className="tabbox__items">
-            {section.items.map((item, ii) => (
-              <li key={ii} className="tabbox__item">
-                <span className="tabbox__item-marker">{String(ii + 1).padStart(2, '0')}</span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="tabbox__module-head">
+            <span className="tabbox__panel-num">
+              Module {section.n}
+              {isComplete && <span className="tabbox__done-badge">Complete</span>}
+            </span>
+            <h3 className="tabbox__module-title">{section.title}</h3>
+          </div>
+
+          {embedVideos.length > 0 && (
+            <div className="tabbox__videos tabbox__videos--hero">
+              {embedVideos.map((link) => (
+                <div key={link.id} className="tabbox__video-embed">
+                  <div className="tabbox__video-head">
+                    <span className="tabbox__video-kind">{link.kind === 'playlist' ? 'Playlist' : 'Video'}</span>
+                    <h4 className="tabbox__video-title">{link.title}</h4>
+                  </div>
+                  <V2ClickToPlayVideo
+                    videoId={link.youtubeId}
+                    playlistId={link.playlistId}
+                    title={link.title}
+                    startSec={link.startSec}
+                    hideCaption
+                    trackable={tracking && !link.playlistId}
+                    mappingId={link.id}
+                    modules={link.modules}
+                    onVideoProgress={onVideoProgress}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="tabbox__topics">
+            <div className="tabbox__topics-label">Topics</div>
+            <table className="tabbox__topics-table">
+              <tbody>
+                {section.items.map((item, ii) => (
+                  <tr key={ii} className="tabbox__topics-row">
+                    <td className="tabbox__item-marker">{String(ii + 1).padStart(2, '0')}</td>
+                    <td className="tabbox__topics-cell">{item}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function CommandPalette({ open, onClose, onJumpPhase, onJumpCapstone }) {
+function PhaseProgressRing({ pct = 0, color }) {
+  const r = 15.9155;
+  const c = 2 * Math.PI * r;
+  const dash = Math.max(0, Math.min(100, pct)) / 100 * c;
+  return (
+    <div className="phase__progress-ring" role="img" aria-label={`${pct}% complete`}>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <circle className="phase__progress-ring-track" cx="18" cy="18" r={r} fill="none" strokeWidth="2.8" />
+        <circle
+          className="phase__progress-ring-fill"
+          cx="18"
+          cy="18"
+          r={r}
+          fill="none"
+          strokeWidth="2.8"
+          strokeDasharray={`${dash} ${c}`}
+          strokeLinecap="round"
+          transform="rotate(-90 18 18)"
+          data-color={color}
+        />
+      </svg>
+      <span className="phase__progress-ring-text">{pct}%</span>
+    </div>
+  );
+}
+
+function PhaseTheaterHeader({ phase, phaseStat, tracking }) {
+  const materials = phase.materials || {};
+  const hasMaterials = materials.driveZipUrl || materials.driveFolderUrl;
+  const phaseLabel = `Phase ${String(phase.id).padStart(2, '0')}`;
+  const pct = phaseStat?.pct ?? 0;
+
+  return (
+    <header className="phase__theater-header">
+      <div className="phase__theater-main">
+        <h2 className="phase__theater-title">
+          <span className="phase__theater-title-row">
+            <span className="phase__theater-title-text">{phase.title}</span>
+            <span className="phase__theater-badge" data-color={phase.color}>{phaseLabel}</span>
+          </span>
+        </h2>
+        <p className="phase__theater-summary">{phase.summary}</p>
+        {hasMaterials && (
+          <div className="phase__theater-downloads">
+            <a
+              className="phase__materials-btn tabbox__materials-btn"
+              href={materials.driveZipUrl || materials.driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={materials.driveZipUrl ? true : undefined}
+            >
+              Download materials
+            </a>
+            {materials.label && (
+              <span className="phase__materials-label tabbox__materials-label">{materials.label}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="phase__theater-right">
+        <div className="phase__theater-aside">
+          <div className="phase__theater-meta-line">
+            <span className="phase__theater-meta-label">Time Frame:</span>
+            <span className="phase__theater-meta-value">{phase.weeks}</span>
+          </div>
+          <div className="phase__theater-meta-line">
+            <span className="phase__theater-meta-label">Difficulty:</span>
+            <span className="phase__diff-dots" aria-label={`Difficulty ${phase.difficulty} out of 5`}>
+              {[1, 2, 3, 4, 5].map((d) => (
+                <span key={d} className={`phase__diff-dot ${d <= phase.difficulty ? 'on' : ''}`} />
+              ))}
+            </span>
+          </div>
+          {phase.weeksDetail && (
+            <span className="phase__theater-meta-detail">{phase.weeksDetail}</span>
+          )}
+        </div>
+        <PhaseProgressRing pct={tracking ? pct : 0} color={phase.color} />
+      </div>
+    </header>
+  );
+}
+
+function CommandPalette({ open, onClose, onJumpPhase, onJumpCapstone, videoLinks }) {
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef(null);
@@ -124,8 +263,22 @@ function CommandPalette({ open, onClose, onJumpPhase, onJumpCapstone }) {
         action: () => onJumpCapstone(ci)
       });
     });
+    const seenVideos = new Set();
+    (videoLinks || []).forEach((link) => {
+      const vk = `${link.youtubeId}-${link.title}`;
+      if (seenVideos.has(vk)) return;
+      seenVideos.add(vk);
+      const pi = link.phaseId ? link.phaseId - 1 : -1;
+      out.push({
+        kind: 'video',
+        label: link.title,
+        sub: link.phaseId ? `Video · Phase ${String(link.phaseId).padStart(2, '0')}` : 'Roadmap video',
+        haystack: `${link.title} ${link.kind} video youtube`.toLowerCase(),
+        action: () => { if (pi >= 0) onJumpPhase(pi); }
+      });
+    });
     return out;
-  }, []);
+  }, [videoLinks]);
 
   const q = query.trim().toLowerCase();
   const results = React.useMemo(() => {
@@ -239,7 +392,20 @@ function CommandPalette({ open, onClose, onJumpPhase, onJumpCapstone }) {
 // FULL INTERACTIVE ROADMAP TAB VIEW
 // ===============================================================
 
-function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapstone, scrollToAgenda, agendaRef, totalSections, capstoneTiles, phaseRefs, capstoneRefs }) {
+function RoadmapView({
+  searchOpen, setSearchOpen, scrollToPhase, scrollToCapstone, scrollToAgenda,
+  agendaRef, totalSections, capstoneTiles, phaseRefs, capstoneRefs,
+  videoLinks, user, roadmapProgress, onStartTracking, onVideoProgress, onOpenLogin,
+}) {
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const tracking = Boolean(user && !user.isAnonymous && roadmapProgress?.startedAt);
+  const progress = H.calcRoadmapProgress
+    ? H.calcRoadmapProgress(roadmapProgress?.completedModules || [])
+    : { phaseStats: [], overallPct: 0 };
+  const nextModule = H.findNextModule
+    ? H.findNextModule(roadmapProgress?.completedModules || [])
+    : null;
+
   return (
     <main id="main">
       {/* HERO — 2-column: copy left, walkthrough video right */}
@@ -251,7 +417,6 @@ function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapston
         <div className="hero__grid">
           <div className="hero__copy">
             <div className="hero__eyebrow">
-              <span className="hero__eyebrow-dot" />
               The 2026 Edition · 26 Weeks · 9 Phases
             </div>
             <h1 className="hero__title">
@@ -268,7 +433,32 @@ function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapston
                 Explore the roadmap
                 <span aria-hidden="true">↓</span>
               </button>
+              {!tracking && (
+                <button
+                  className="hero__cta hero__cta--ghost"
+                  type="button"
+                  onClick={() => {
+                    if (user && !user.isAnonymous) onStartTracking && onStartTracking();
+                    else onOpenLogin && onOpenLogin();
+                  }}
+                >
+                  Start tracking progress
+                </button>
+              )}
             </div>
+            {tracking && (
+              <div className="roadmap-progress-banner">
+                <div className="roadmap-progress-banner__bar">
+                  <div className="roadmap-progress-banner__fill" style={{ width: `${progress.overallPct}%` }} />
+                </div>
+                <span className="roadmap-progress-banner__label">{progress.overallPct}% complete</span>
+                {nextModule && (
+                  <button type="button" className="roadmap-progress-banner__continue" onClick={() => scrollToPhase(nextModule.phaseId - 1)}>
+                    Continue · {nextModule.moduleN}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="hero__video">
@@ -352,7 +542,7 @@ function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapston
       <section className="instructor reveal" data-screen-label="03 Instructor">
         <div className="instructor__card">
           <div className="instructor__photo">
-            <img src="uploads/balaji-chippada.png" alt="Balaji Chippada" />
+            <img src="uploads/balaji-chippada.png" alt="Balaji Chippada" loading="lazy" decoding="async" />
           </div>
           <div className="instructor__body">
             <div className="instructor__label">Your Instructor</div>
@@ -375,75 +565,37 @@ function RoadmapView({ searchOpen, setSearchOpen, scrollToPhase, scrollToCapston
           </div>
           <div className="instructor__cta">
             <div className="instructor__connect-label">Connect with me</div>
-            <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
-              Join WhatsApp community →
-            </a>
-            <div className="instructor__socials">
-              <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
-                </svg>
-              </a>
-              <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
-                </svg>
-              </a>
-              <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
-                </svg>
-              </a>
-            </div>
+            <InstructorSocialLinks />
           </div>
         </div>
       </section>
 
       {/* PHASES */}
       <section className="phases">
-        {window.ROADMAP.map((phase, i) => (
-          <article key={phase.id} className="phase"
+        {window.ROADMAP.map((phase, i) => {
+          const phaseStat = progress.phaseStats.find((ps) => ps.phaseId === phase.id);
+
+          return (
+          <article key={phase.id} className="phase phase--theater"
             ref={el => phaseRefs.current[i] = el}
             data-screen-label={`${String(phase.id).padStart(2, '0')} ${phase.title}`}>
-            <div className="phase__index">
-              <span className="phase__num-prefix" data-color={phase.color}>Phase {String(phase.id).padStart(2, '0')}</span>
-              <span className="phase__num">{String(phase.id).padStart(2, '0')}</span>
-              <div className="phase__num-bar" data-color={phase.color} />
-              <div className="phase__weeks-block" data-color={phase.color}>
-                <div className="phase__weeks-label">Time frame</div>
-                <div className="phase__weeks">{phase.weeks}</div>
-                <div className="phase__weeks-detail">{phase.weeksDetail}</div>
-                <div className="phase__diff">
-                  <span>Difficulty</span>
-                  <span className="phase__diff-score">{phase.difficulty}/5</span>
-                  <span className="phase__diff-dots" aria-label={`Difficulty ${phase.difficulty} out of 5`}>
-                    {[1,2,3,4,5].map(d => (
-                      <span key={d} className={`phase__diff-dot ${d <= phase.difficulty ? 'on' : ''}`} />
-                    ))}
-                  </span>
-                </div>
-                {phase.difficultyNote && (
-                  <div className="phase__diff-note">{phase.difficultyNote}</div>
-                )}
-              </div>
-              {phase.capstone && (
-                <div className="phase__capstone-pill">Capstone {phase.capstone}</div>
-              )}
-            </div>
-            <div className="phase__body">
-              <h2 className="phase__title">
-                <span className="phase__title-accent" data-color={phase.color} />
-                {phase.title}
-              </h2>
-              <p className="phase__summary">{phase.summary}</p>
-              <PhaseTabBox phase={phase} />
-              <div className="phase__endstate reveal">
-                <div className="phase__endstate-label">End state</div>
-                <div className="phase__endstate-text">{phase.endState}</div>
-              </div>
+            <PhaseTheaterHeader phase={phase} phaseStat={phaseStat} tracking={tracking} />
+            <PhaseTabBox
+              phase={phase}
+              videoLinks={videoLinks}
+              completedModules={roadmapProgress?.completedModules}
+              tracking={tracking}
+              onVideoProgress={onVideoProgress}
+            />
+            {phase.difficultyNote && (
+              <p className="phase__diff-note phase__diff-note--theater">{phase.difficultyNote}</p>
+            )}
+            <div className="phase__endstate reveal">
+              <div className="phase__endstate-label">End state</div>
+              <div className="phase__endstate-text">{phase.endState}</div>
             </div>
           </article>
-        ))}
+        );})}
       </section>
 
       {/* CAPSTONES */}
@@ -710,7 +862,6 @@ function MasterclassCard({ mc, idx, user, onBook }) {
             <div className="mc-card__header">
               <div className="mc-card__meta">
                 <div className="mc-card__eyebrow">
-                  <span className="live-dot" aria-hidden="true" />
                   Live Masterclass
                 </div>
                 <h2 className="mc-card__title">{mc.title}</h2>
@@ -824,7 +975,6 @@ function MasterclassCard({ mc, idx, user, onBook }) {
             <div className="mc-card__header">
               <div className="mc-card__meta">
                 <div className="mc-card__eyebrow">
-                  <span className="live-dot" aria-hidden="true" />
                   Live Masterclass
                 </div>
                 <h2 className="mc-card__title">{mc.title}</h2>
@@ -938,6 +1088,57 @@ function MasterclassCard({ mc, idx, user, onBook }) {
   );
 }
 
+function InstructorSocialLinks() {
+  return (
+    <div className="instructor__socials">
+      <a
+        className="instructor__social instructor__social--whatsapp"
+        href={V2_BRAND.whatsappCommunity}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Join WhatsApp community"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+        </svg>
+      </a>
+      <a
+        className="instructor__social instructor__social--linkedin"
+        href={V2_BRAND.linkedin}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Connect with Balaji Chippada on LinkedIn"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
+        </svg>
+      </a>
+      <a
+        className="instructor__social instructor__social--youtube"
+        href={V2_BRAND.youtubeChannel}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Open Balaji Chippada on YouTube"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
+        </svg>
+      </a>
+      <a
+        className="instructor__social instructor__social--instagram"
+        href={V2_BRAND.instagram}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Open Balaji Chippada on Instagram"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
+        </svg>
+      </a>
+    </div>
+  );
+}
+
 function InstructorBio() {
   const containerRef = useRef(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -984,7 +1185,7 @@ function InstructorBio() {
             }}
           >
             <div className="instructor__photo">
-              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} />
+              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>
@@ -1004,32 +1205,13 @@ function InstructorBio() {
             </div>
             <div className="instructor__cta">
               <div className="instructor__connect-label">Connect with me</div>
-              <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
-                Join WhatsApp community →
-              </a>
-              <div className="instructor__socials">
-                <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
-                  </svg>
-                </a>
-                <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
-                  </svg>
-                </a>
-                <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
-                  </svg>
-                </a>
-              </div>
+              <InstructorSocialLinks />
             </div>
           </motion.div>
         ) : (
           <div className="instructor__card">
             <div className="instructor__photo">
-              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} />
+              <img src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'} alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>
@@ -1049,26 +1231,7 @@ function InstructorBio() {
             </div>
             <div className="instructor__cta">
               <div className="instructor__connect-label">Connect with me</div>
-              <a className="instructor__community-link" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
-                Join WhatsApp community →
-              </a>
-              <div className="instructor__socials">
-                <a className="instructor__social" href={V2_BRAND.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Connect with Balaji Chippada on LinkedIn">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6.7 9.2H3.2v11.3h3.5V9.2ZM4.9 3.5C3.8 3.5 3 4.3 3 5.4s.8 1.9 1.9 1.9 1.9-.8 1.9-1.9-.8-1.9-1.9-1.9Zm15.6 10.6c0-3.3-1.8-5.2-4.4-5.2-1.8 0-2.8 1-3.2 1.7V9.2H9.5v11.3H13v-6.1c0-1.6.8-2.5 2-2.5s1.9.8 1.9 2.5v6.1h3.6v-6.4Z" />
-                  </svg>
-                </a>
-                <a className="instructor__social" href={V2_BRAND.youtubeChannel} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on YouTube">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1C2 9 2 12 2 12s0 3 .4 4.8a3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1C22 15 22 12 22 12s0-3-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
-                  </svg>
-                </a>
-                <a className="instructor__social" href={V2_BRAND.instagram} target="_blank" rel="noopener noreferrer" aria-label="Open Balaji Chippada on Instagram">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M7.5 2.8h9A4.7 4.7 0 0 1 21.2 7.5v9a4.7 4.7 0 0 1-4.7 4.7h-9a4.7 4.7 0 0 1-4.7-4.7v-9a4.7 4.7 0 0 1 4.7-4.7Zm0 2A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9Zm4.5 3.1a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Zm0 2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm4.4-2.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
-                  </svg>
-                </a>
-              </div>
+              <InstructorSocialLinks />
             </div>
           </div>
         )}
@@ -1769,6 +1932,8 @@ function TestimonialCard({ item, index, total, scrollYProgress }) {
             src={item.image}
             alt={item.name}
             className="testimonial-blast-card__avatar"
+            loading="lazy"
+            decoding="async"
           />
           <div className="testimonial-blast-card__meta">
             <div className="testimonial-blast-card__name">{item.name}</div>
@@ -1976,6 +2141,17 @@ function DashboardView({ user, role, onLogout }) {
   const [broadcastSuccess, setBroadcastSuccess] = useState("");
   const [broadcastCampaignId, setBroadcastCampaignId] = useState("");
   const [broadcastIsMock, setBroadcastIsMock] = useState(false);
+
+  // ── Roadmap Video Linker (Admin) ──
+  const [roadmapVideoDocs, setRoadmapVideoDocs] = useState([]);
+  const [rvPhaseId, setRvPhaseId] = useState(1);
+  const [rvModules, setRvModules] = useState([]);
+  const [rvUrl, setRvUrl] = useState("");
+  const [rvTitle, setRvTitle] = useState("");
+  const [rvStartTs, setRvStartTs] = useState("");
+  const [rvKind, setRvKind] = useState("deep-dive");
+  const [rvSaving, setRvSaving] = useState(false);
+  const [rvFilter, setRvFilter] = useState("");
 
   const CAMPAIGN_TEMPLATES = {
     general: {
@@ -2198,6 +2374,100 @@ function DashboardView({ user, role, onLogout }) {
       });
     return () => unsubscribe();
   }, []);
+
+  // Load admin-managed roadmap video links
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('roadmapVideos').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setRoadmapVideoDocs(list);
+    }, () => setRoadmapVideoDocs([]));
+    return () => unsub();
+  }, []);
+
+  const rvPhaseSections = (window.ROADMAP || []).find((p) => p.id === rvPhaseId)?.sections || [];
+
+  const handleRvPhaseChange = (pid) => {
+    setRvPhaseId(Number(pid));
+    setRvModules([]);
+  };
+
+  const toggleRvModule = (modN) => {
+    setRvModules((prev) => (
+      prev.includes(modN) ? prev.filter((m) => m !== modN) : [...prev, modN]
+    ));
+  };
+
+  const fetchYouTubeTitle = async (urlOrId, isPlaylist) => {
+    try {
+      const url = isPlaylist
+        ? (urlOrId.includes('list=') ? urlOrId : `https://www.youtube.com/playlist?list=${urlOrId}`)
+        : (urlOrId.includes('youtube') ? urlOrId : `https://www.youtube.com/watch?v=${urlOrId}`);
+      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.title || '';
+      }
+    } catch (_) {}
+    return '';
+  };
+
+  const handleLinkRoadmapVideo = async (e) => {
+    e.preventDefault();
+    const H = window.ROADMAP_VIDEO_HELPERS || {};
+    const playlistId = H.parseYouTubePlaylistId ? H.parseYouTubePlaylistId(rvUrl) : null;
+    const youtubeId = playlistId ? null : (H.parseYouTubeId ? H.parseYouTubeId(rvUrl) : null);
+    if (!youtubeId && !playlistId) {
+      setStatus({ type: 'error', message: 'Paste a valid YouTube video or playlist URL.' });
+      return;
+    }
+    if (!rvModules.length) {
+      setStatus({ type: 'error', message: 'Select at least one module.' });
+      return;
+    }
+    setRvSaving(true);
+    try {
+      let title = rvTitle.trim();
+      const kind = rvKind === 'playlist' || playlistId ? 'playlist' : rvKind;
+      if (!title) title = await fetchYouTubeTitle(rvUrl, Boolean(playlistId));
+      if (!title) title = playlistId ? `YouTube playlist ${playlistId}` : `YouTube video ${youtubeId}`;
+      const startSec = H.parseTimestamp ? H.parseTimestamp(rvStartTs) : 0;
+      await db.collection('roadmapVideos').add({
+        youtubeId: youtubeId || null,
+        playlistId: playlistId || null,
+        title,
+        kind,
+        phaseId: rvPhaseId,
+        capstoneId: null,
+        modules: rvModules.slice().sort(),
+        startSec,
+        endSec: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: user?.uid || '',
+      });
+      setRvUrl('');
+      setRvTitle('');
+      setRvStartTs('');
+      setRvModules([]);
+      setStatus({ type: 'success', message: 'Video linked to roadmap modules.' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to save video link.' });
+    } finally {
+      setRvSaving(false);
+    }
+  };
+
+  const handleDeleteRoadmapVideo = async (docId, title) => {
+    if (!window.confirm(`Remove video link "${title}"?`)) return;
+    try {
+      await db.collection('roadmapVideos').doc(docId).delete();
+      setStatus({ type: 'success', message: 'Video link removed.' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to delete.' });
+    }
+  };
 
   // Handle selected session for editing
   const handleSelectSessionToEdit = (id, isMcCollection = false) => {
@@ -2702,6 +2972,93 @@ ${mcRawSyllabus}`;
         </div>
       )}
 
+      {/* ── Roadmap Video Linker (Admin) ── */}
+      {isAdmin && (
+        <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+          <h2 className="dashboard__panel-title">Roadmap Videos</h2>
+          <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)' }}>
+            Link YouTube videos to phases and modules. Changes appear on the Full Roadmap tab immediately.
+          </p>
+          <form className="roadmap-admin-form" onSubmit={handleLinkRoadmapVideo}>
+            <div className="form-group">
+              <label className="form-label">Phase</label>
+              <select className="form-select" value={rvPhaseId} onChange={(e) => handleRvPhaseChange(e.target.value)}>
+                {(window.ROADMAP || []).map((p) => (
+                  <option key={p.id} value={p.id}>Phase {String(p.id).padStart(2, '0')} · {p.title}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Modules (select all covered in this video)</label>
+              <div className="roadmap-admin-modules">
+                {rvPhaseSections.map((s) => (
+                  <label key={s.n} className="roadmap-admin-module-check">
+                    <input
+                      type="checkbox"
+                      checked={rvModules.includes(s.n)}
+                      onChange={() => toggleRvModule(s.n)}
+                    />
+                    <span>{s.n} · {s.title}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">YouTube URL</label>
+                <input className="form-input" value={rvUrl} onChange={(e) => setRvUrl(e.target.value)} placeholder="Video or playlist URL" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Title (optional — auto-fetched)</label>
+                <input className="form-input" value={rvTitle} onChange={(e) => setRvTitle(e.target.value)} placeholder="Video title" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Start timestamp (MM:SS)</label>
+                <input className="form-input" value={rvStartTs} onChange={(e) => setRvStartTs(e.target.value)} placeholder="14:38" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Kind</label>
+                <select className="form-select" value={rvKind} onChange={(e) => setRvKind(e.target.value)}>
+                  <option value="deep-dive">Deep dive</option>
+                  <option value="playlist">Playlist</option>
+                  <option value="overview">Overview</option>
+                  <option value="capstone">Capstone</option>
+                  <option value="supplement">Supplement</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" className="form-btn" disabled={rvSaving}>{rvSaving ? 'Linking…' : 'Link video'}</button>
+          </form>
+
+          <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px' }}>Linked videos ({roadmapVideoDocs.length})</h3>
+              <input className="form-input" style={{ maxWidth: '220px' }} placeholder="Filter…" value={rvFilter} onChange={(e) => setRvFilter(e.target.value)} />
+            </div>
+            {roadmapVideoDocs.filter((d) => {
+              if (!rvFilter.trim()) return true;
+              const q = rvFilter.toLowerCase();
+              return (d.title || '').toLowerCase().includes(q) || (d.modules || []).join(' ').includes(q);
+            }).map((doc) => (
+              <div key={doc.id} className="roadmap-admin-list-item">
+                <div>
+                  <strong>{doc.title}</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px' }}>
+                    Phase {doc.phaseId} · {(doc.modules || []).join(', ')} · {doc.kind}
+                    {doc.playlistId ? ` · playlist ${doc.playlistId}` : ''}
+                    {doc.startSec ? ` · @ ${(window.ROADMAP_VIDEO_HELPERS || {}).formatTimestamp?.(doc.startSec) || doc.startSec}` : ''}
+                  </div>
+                </div>
+                <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteRoadmapVideo(doc.id, doc.title)}>Remove</button>
+              </div>
+            ))}
+            {roadmapVideoDocs.length === 0 && (
+              <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No admin-linked videos yet. Seed data from videos.js still shows on the roadmap.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Sessions Management Section (Admins only) ── */}
       {isAdmin && (
         <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
@@ -3068,7 +3425,7 @@ ${mcRawSyllabus}`;
             <div style={{ fontSize: "56px", marginBottom: "20px" }}>🔒</div>
             <h2 className="dashboard__panel-title" style={{ justifyContent: "center", margin: 0, borderBottom: "none" }}>Creation Locked</h2>
             <p className="hero__sub" style={{ fontSize: "14px", marginTop: "14px", maxWidth: "34ch" }}>
-              Only authorized administrator accounts (<b>gowtamsbh1234@gmail.com</b> or <b>Balajichippada.20@gmail.com</b>) have permission to publish or edit masterclasses.
+              Only authorized administrator accounts have permission to publish or edit masterclasses. Sign in with an admin account to continue.
             </p>
           </div>
         )}
@@ -3681,6 +4038,17 @@ function App() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null); // 'admin' | 'teacher' | 'support' | 'client'
 
+  // Roadmap videos + progress
+  const [firestoreVideoDocs, setFirestoreVideoDocs] = useState([]);
+  const [roadmapProgress, setRoadmapProgress] = useState(null);
+
+  const videoLinks = React.useMemo(() => {
+    const H = window.ROADMAP_VIDEO_HELPERS || {};
+    const seed = H.flattenSeedVideos ? H.flattenSeedVideos(window.ROADMAP_VIDEOS || []) : [];
+    const docs = (firestoreVideoDocs || []).map((d) => ({ ...d, id: d.id }));
+    return H.mergeVideoLinks ? H.mergeVideoLinks(seed, docs) : seed;
+  }, [firestoreVideoDocs]);
+
   // Masterclass sessions grid state
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -3815,6 +4183,67 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Roadmap video links from Firestore (merged with seed in videoLinks)
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('roadmapVideos').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setFirestoreVideoDocs(list);
+    }, () => setFirestoreVideoDocs([]));
+    return () => unsub();
+  }, []);
+
+  // User roadmap progress
+  useEffect(() => {
+    if (!db || !user || user.isAnonymous) {
+      setRoadmapProgress(null);
+      return;
+    }
+    const unsub = db.collection('users').doc(user.uid).collection('roadmapProgress').doc('default')
+      .onSnapshot((doc) => {
+        setRoadmapProgress(doc.exists ? { id: doc.id, ...doc.data() } : null);
+      }, () => setRoadmapProgress(null));
+    return () => unsub();
+  }, [user]);
+
+  const handleStartTracking = async () => {
+    if (!db || !user || user.isAnonymous) return;
+    const ref = db.collection('users').doc(user.uid).collection('roadmapProgress').doc('default');
+    const existing = await ref.get();
+    if (existing.exists && existing.data().startedAt) return;
+    await ref.set({
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      completedModules: [],
+      videoProgress: {},
+    }, { merge: true });
+  };
+
+  const handleVideoProgress = async ({ videoId, modules, watchedRatio }) => {
+    if (!db || !user || user.isAnonymous || !modules?.length) return;
+    const ref = db.collection('users').doc(user.uid).collection('roadmapProgress').doc('default');
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : { completedModules: [], videoProgress: {} };
+    const completed = new Set(data.completedModules || []);
+    modules.forEach((m) => completed.add(m));
+    const videoProgress = { ...(data.videoProgress || {}), [videoId]: { watchedRatio, completed: watchedRatio >= 0.8, updatedAt: Date.now() } };
+    await ref.set({
+      startedAt: data.startedAt || firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      completedModules: Array.from(completed),
+      videoProgress,
+    }, { merge: true });
+  };
+
+  const handleGoToRoadmap = (nextModule) => {
+    setActiveMainTab('roadmap');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (nextModule && nextModule.phaseId) {
+      setTimeout(() => scrollToPhase(nextModule.phaseId - 1), 400);
+    }
+  };
 
   // Fetch live masterclasses from Firestore
   useEffect(() => {
@@ -4564,7 +4993,6 @@ function App() {
                 else setActiveMainTab('mybookings');
               }}
             >
-              <span className="hero__eyebrow-dot" style={{ background: "var(--c-amber)", width: "5px", height: "5px" }} />
               {(user.email || '').substring(0, 10)}...
             </button>
           ) : (
@@ -4782,11 +5210,23 @@ function App() {
           capstoneTiles={capstoneTiles}
           phaseRefs={phaseRefs}
           capstoneRefs={capstoneRefs}
+          videoLinks={videoLinks}
+          user={user}
+          roadmapProgress={roadmapProgress}
+          onStartTracking={handleStartTracking}
+          onVideoProgress={handleVideoProgress}
+          onOpenLogin={() => { setLoginError(''); setStaffLoginOpen(true); }}
         />
       )}
 
       {activeMainTab === 'mybookings' && user && !user.isAnonymous && !isUserStaff && (
-        <V2StudentDashboard user={user} db={db} onReserve={() => { setActiveMainTab('home'); openBooking(nextMasterclass); }} />
+        <V2StudentDashboard
+          user={user}
+          db={db}
+          roadmapProgress={roadmapProgress}
+          onGoToRoadmap={handleGoToRoadmap}
+          onReserve={() => { setActiveMainTab('home'); openBooking(nextMasterclass); }}
+        />
       )}
 
       {activeMainTab === 'dashboard' && isUserStaff && (
@@ -4833,7 +5273,6 @@ function App() {
           <div className="modal-container" style={{ border: "1px solid var(--c-amber)" }}>
             <button className="modal-close" onClick={() => setMockCheckoutData(null)}>×</button>
             <div className="coaching-home__eyebrow" style={{ color: "var(--c-amber)", border: "1px solid var(--c-amber)" }}>
-              <span className="hero__eyebrow-dot" style={{ background: "var(--c-amber)" }} />
               Simulated Razorpay Gateway
             </div>
             <h2 className="modal-title">Razorpay <em>Sandbox</em></h2>
@@ -5134,7 +5573,9 @@ function App() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         onJumpPhase={scrollToPhase}
-        onJumpCapstone={scrollToCapstone} />
+        onJumpCapstone={scrollToCapstone}
+        videoLinks={videoLinks}
+      />
 
       {/* Dock component (Rendered only if Full Roadmap active) */}
       {activeMainTab === 'roadmap' && (

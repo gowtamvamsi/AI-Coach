@@ -283,21 +283,358 @@ function getMcOutcome(mc) {
 
 // Click-to-play YouTube thumbnail. No iframe loads until user clicks — faster, no ads on the page,
 // and we still capture the watch on YouTube once they click through.
-function V2ClickToPlayVideo({ videoId, title, caption }) {
+function V2PlaylistEmbed({ playlistId, title }) {
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const seedItems = React.useMemo(
+    () => (H.getPlaylistItemsSync ? H.getPlaylistItemsSync(playlistId) : []),
+    [playlistId]
+  );
+  const [items, setItems] = useState(seedItems);
+  const [loading, setLoading] = useState(seedItems.length === 0);
+  const [listFailed, setListFailed] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const thumbUrl = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
-  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const hasStaticSeed = seedItems.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!hasStaticSeed) setLoading(true);
+    setListFailed(false);
+    (H.fetchPlaylistItems ? H.fetchPlaylistItems(playlistId) : Promise.resolve(seedItems))
+      .then((list) => {
+        if (cancelled) return;
+        if (list.length > 0) {
+          setItems((prev) => (list.length >= prev.length ? list : prev));
+          setListFailed(false);
+          setActiveIdx((idx) => Math.min(idx, Math.max(list.length, seedItems.length) - 1));
+        } else if (!hasStaticSeed) {
+          setListFailed(true);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          if (!hasStaticSeed && items.length === 0) setListFailed(true);
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [playlistId, hasStaticSeed]);
+
+  useEffect(() => {
+    if (!items.length) return;
+    items.slice(0, 10).forEach((v) => {
+      if (!v.videoId) return;
+      const img = new Image();
+      img.src = H.youtubePoster ? H.youtubePoster(v.videoId) : (H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/sddefault.jpg`);
+    });
+  }, [items]);
+
+  const active = items[activeIdx];
+  const goPrev = () => setActiveIdx((i) => Math.max(0, i - 1));
+  const goNext = () => setActiveIdx((i) => Math.min(items.length - 1, i + 1));
+  const scrollListRef = React.useRef(null);
+
+  const scrollActiveTrackInList = React.useCallback((behavior = 'smooth') => {
+    const container = scrollListRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector('.v2-playlist-track.is-active');
+    if (!activeEl) return;
+    const pad = 8;
+    const elTop = activeEl.offsetTop;
+    const elBottom = elTop + activeEl.offsetHeight;
+    const viewTop = container.scrollTop;
+    const viewBottom = viewTop + container.clientHeight;
+    if (elTop < viewTop + pad) {
+      container.scrollTo({ top: elTop - pad, behavior });
+    } else if (elBottom > viewBottom - pad) {
+      container.scrollTo({ top: elBottom - container.clientHeight + pad, behavior });
+    }
+  }, []);
+
+  const selectTrack = (i) => {
+    setActiveIdx(i);
+    requestAnimationFrame(() => scrollActiveTrackInList());
+  };
+
+  const videoIndex = activeIdx + 1;
+
+  const embedSrc = active
+    ? (H.youtubeEmbedUrl
+      ? H.youtubeEmbedUrl({ youtubeId: active.videoId, playlistId, videoIndex })
+      : `https://www.youtube-nocookie.com/embed/${active.videoId}?list=${playlistId}&index=${videoIndex}&rel=0`)
+    : (H.youtubeEmbedUrl
+      ? H.youtubeEmbedUrl({ playlistId })
+      : `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}&rel=0`);
+
+  const posterUrl = active?.videoId
+    ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/sddefault.jpg`)
+    : '';
+
+  return (
+    <div className="v2-playlist-embed">
+      <div className="v2-video-frame v2-video-frame--playlist">
+        {!loading && items.length > 0 && (
+          playing ? (
+            <iframe
+              key={`${active.videoId}-${activeIdx}`}
+              src={`${embedSrc}${embedSrc.includes('?') ? '&' : '?'}autoplay=1`}
+              title={active?.title || title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <button
+              type="button"
+              className="v2-video-poster"
+              onClick={() => setPlaying(true)}
+              aria-label={`Play: ${active?.title || title}`}
+              style={posterUrl ? { backgroundImage: `url(${posterUrl})` } : undefined}
+            >
+              <span className="v2-video-play" aria-hidden="true">▶</span>
+            </button>
+          )
+        )}
+        {loading && (
+          <div className="v2-playlist-loading">Loading playlist…</div>
+        )}
+      </div>
+
+      {items.length > 0 && (
+        <div className="v2-playlist-nav" aria-label="Playlist navigation">
+          <button
+            type="button"
+            className="v2-playlist-nav-btn"
+            onClick={goPrev}
+            disabled={activeIdx <= 0}
+            aria-label="Previous video"
+          >
+            ← Previous
+          </button>
+          <span className="v2-playlist-nav-count">
+            {activeIdx + 1} / {items.length}
+          </span>
+          <button
+            type="button"
+            className="v2-playlist-nav-btn"
+            onClick={goNext}
+            disabled={activeIdx >= items.length - 1}
+            aria-label="Next video"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {items.length > 0 && active && (
+        <div className="v2-playlist-now" aria-live="polite">
+          <span className="v2-playlist-now-label">Now playing</span>
+          <span className="v2-playlist-now-title">{active.title}</span>
+        </div>
+      )}
+
+      {listFailed && !loading && items.length === 0 && !hasStaticSeed && (
+        <p className="v2-playlist-fallback">
+          Could not load the video list.{' '}
+          <a href={`https://www.youtube.com/playlist?list=${playlistId}`} target="_blank" rel="noopener noreferrer">
+            Open playlist on YouTube →
+          </a>
+        </p>
+      )}
+
+      {items.length > 0 && (
+        <div className="v2-playlist-tracks">
+          <div className="v2-playlist-tracks-head">{items.length} videos in this playlist</div>
+          <div className="v2-playlist-tracks-scroll" role="list" ref={scrollListRef}>
+            {items.map((v, i) => (
+              <button
+                key={`${v.videoId}-${i}`}
+                type="button"
+                role="listitem"
+                className={`v2-playlist-track ${i === activeIdx ? 'is-active' : ''}`}
+                aria-current={i === activeIdx ? 'true' : undefined}
+                onClick={() => selectTrack(i)}
+              >
+                <img
+                  className="v2-playlist-track-thumb"
+                  src={H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`}
+                  alt=""
+                  loading={i < 8 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  fetchPriority={i < 4 ? 'high' : 'auto'}
+                  onError={(e) => {
+                    if (e.currentTarget.dataset.fallback) return;
+                    e.currentTarget.dataset.fallback = '1';
+                    e.currentTarget.src = `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`;
+                  }}
+                />
+                <span className="v2-playlist-track-num">{i + 1}</span>
+                <span className="v2-playlist-track-title">{v.title}</span>
+                {i === activeIdx && <span className="v2-playlist-track-now">Now playing</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function V2ClickToPlayVideo({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption }) {
+  const isPlaylist = Boolean(playlistId);
+
+  if (isPlaylist) {
+    return <V2PlaylistEmbed playlistId={playlistId} title={title} />;
+  }
+
+  const canTrack = trackable && onVideoProgress && videoId;
+
+  if (canTrack) {
+    return (
+      <V2TrackableVideo
+        videoId={videoId}
+        title={title}
+        caption={hideCaption ? null : caption}
+        startSec={startSec}
+        onVideoProgress={onVideoProgress}
+        mappingId={mappingId}
+        modules={modules}
+      />
+    );
+  }
+
+  const [playing, setPlaying] = useState(false);
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const embedSrc = H.youtubeEmbedUrl
+    ? H.youtubeEmbedUrl({ youtubeId: videoId, startSec: startSec || 0 })
+    : `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&start=${startSec || 0}`;
+  const thumbUrl = H.youtubePoster
+    ? H.youtubePoster(videoId)
+    : `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`;
+  const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
+  const showCaption = !hideCaption && caption;
 
   return (
     <div className="v2-video-block">
       <div className="v2-video-frame">
         {playing ? (
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`}
+            src={`${embedSrc}${embedSrc.includes('?') ? '&' : '?'}autoplay=1`}
             title={title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
+        ) : (
+          <button
+            type="button"
+            className="v2-video-poster"
+            onClick={() => setPlaying(true)}
+            aria-label={`Play: ${title}`}
+            style={{ backgroundImage: `url(${thumbUrl})` }}
+          >
+            <span className="v2-video-play" aria-hidden="true">▶</span>
+          </button>
+        )}
+      </div>
+      {showCaption && (
+        <p className="v2-video-caption">
+          <a href={watchUrl} target="_blank" rel="noopener noreferrer">{caption}</a>
+        </p>
+      )}
+    </div>
+  );
+}
+
+let _ytApiReady = null;
+function ensureYouTubeIframeAPI() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (_ytApiReady) return _ytApiReady;
+  _ytApiReady = new Promise((resolve) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (prev) prev();
+      resolve();
+    };
+    if (window.YT && window.YT.Player) resolve();
+  });
+  return _ytApiReady;
+}
+
+function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, mappingId, modules }) {
+  const [playing, setPlaying] = useState(false);
+  const playerRef = React.useRef(null);
+  const containerRef = React.useRef(null);
+  const pollRef = React.useRef(null);
+  const reportedRef = React.useRef(false);
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const thumbUrl = H.youtubePoster
+    ? H.youtubePoster(videoId)
+    : `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`;
+  const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
+  const threshold = H.PROGRESS_THRESHOLD || 0.8;
+
+  useEffect(() => {
+    if (!playing || !videoId) return;
+    let destroyed = false;
+
+    const startPlayer = async () => {
+      await ensureYouTubeIframeAPI();
+      if (destroyed || !containerRef.current) return;
+
+      playerRef.current = new window.YT.Player(containerRef.current, {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          rel: 0,
+          start: startSec || 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
+          modestbranding: 1,
+        },
+        events: {
+          onStateChange: (e) => {
+            if (e.data === window.YT.PlayerState.ENDED && !reportedRef.current && onVideoProgress) {
+              reportedRef.current = true;
+              onVideoProgress({ videoId, mappingId, modules, watchedRatio: 1 });
+            }
+          },
+        },
+      });
+
+      pollRef.current = setInterval(() => {
+        const p = playerRef.current;
+        if (!p || !p.getCurrentTime || reportedRef.current) return;
+        try {
+          const cur = p.getCurrentTime();
+          const dur = p.getDuration();
+          if (dur > 0 && cur / dur >= threshold) {
+            reportedRef.current = true;
+            if (onVideoProgress) {
+              onVideoProgress({ videoId, mappingId, modules, watchedRatio: cur / dur });
+            }
+            clearInterval(pollRef.current);
+          }
+        } catch (_) { /* player not ready */ }
+      }, 5000);
+    };
+
+    startPlayer();
+
+    return () => {
+      destroyed = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (playerRef.current && playerRef.current.destroy) {
+        try { playerRef.current.destroy(); } catch (_) {}
+      }
+      playerRef.current = null;
+    };
+  }, [playing, videoId, startSec, mappingId, modules, onVideoProgress, threshold]);
+
+  return (
+    <div className="v2-video-block">
+      <div className="v2-video-frame">
+        {playing ? (
+          <div ref={containerRef} className="v2-video-yt-player" title={title} />
         ) : (
           <button
             type="button"
@@ -346,7 +683,6 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum }) {
         {/* LEFT: copy + CTAs */}
         <div className="v2-hero-left">
           <div className="v2-hero-eyebrow">
-            <span className="hero__eyebrow-dot" />
             {V2_BRAND.name} · {V2_SOCIAL.roadmapViews} watched on YouTube
           </div>
 
@@ -667,7 +1003,7 @@ function V2BookingWizard({
   );
 }
 
-function V2StudentDashboard({ user, db, onReserve }) {
+function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgress }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
@@ -675,6 +1011,17 @@ function V2StudentDashboard({ user, db, onReserve }) {
   const [saving, setSaving] = useState(false);
   const [inquiry, setInquiry] = useState('');
   const [inquirySent, setInquirySent] = useState(false);
+
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const progress = H.calcRoadmapProgress
+    ? H.calcRoadmapProgress(roadmapProgress?.completedModules || [])
+    : { phaseStats: [], overallPct: 0, totalDone: 0, totalModules: 0 };
+  const nextModule = H.findNextModule
+    ? H.findNextModule(roadmapProgress?.completedModules || [])
+    : null;
+  const updatedAt = roadmapProgress?.updatedAt?.toDate
+    ? roadmapProgress.updatedAt.toDate()
+    : (roadmapProgress?.updatedAt ? new Date(roadmapProgress.updatedAt) : null);
 
   useEffect(() => {
     if (!db || !user) { setLoading(false); return; }
@@ -737,7 +1084,52 @@ function V2StudentDashboard({ user, db, onReserve }) {
 
   return (
     <div className="v2-dashboard">
-      <h1 className="v2-dashboard-title">My Masterclasses</h1>
+      <h1 className="v2-dashboard-title">My Account</h1>
+
+      <section className="v2-dash-section v2-roadmap-dash">
+        <h2>My Roadmap Progress</h2>
+        {roadmapProgress?.startedAt ? (
+          <>
+            <div className="v2-roadmap-overall">
+              <div className="v2-roadmap-ring" style={{ '--pct': progress.overallPct }}>
+                <span className="v2-roadmap-ring-num">{progress.overallPct}%</span>
+              </div>
+              <div className="v2-roadmap-overall-meta">
+                <p>{progress.totalDone} of {progress.totalModules} modules complete</p>
+                {updatedAt && (
+                  <p className="v2-roadmap-updated">Last activity · {updatedAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                )}
+                {nextModule && onGoToRoadmap && (
+                  <button type="button" className="form-btn v2-roadmap-continue" onClick={() => onGoToRoadmap(nextModule)}>
+                    Continue · Phase {String(nextModule.phaseId).padStart(2, '0')} · Module {nextModule.moduleN}
+                  </button>
+                )}
+                {!nextModule && <p className="v2-success-msg">You&apos;ve completed every module. Ship a capstone!</p>}
+              </div>
+            </div>
+            <div className="v2-roadmap-phase-bars">
+              {progress.phaseStats.map((ps) => (
+                <div key={ps.phaseId} className="v2-roadmap-phase-row">
+                  <span className="v2-roadmap-phase-label">Ph {String(ps.phaseId).padStart(2, '0')}</span>
+                  <div className="v2-roadmap-phase-track">
+                    <div className="v2-roadmap-phase-fill" style={{ width: `${ps.pct}%` }} />
+                  </div>
+                  <span className="v2-roadmap-phase-pct">{ps.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="v2-empty">
+            You haven&apos;t started tracking yet.{' '}
+            {onGoToRoadmap && (
+              <button type="button" className="v2-link-btn" onClick={() => onGoToRoadmap(null)}>Start on the Full Roadmap →</button>
+            )}
+          </p>
+        )}
+      </section>
+
+      <h2 className="v2-dashboard-subtitle">My Masterclasses</h2>
       <section className="v2-dash-section">
         <h2>Upcoming Sessions</h2>
         {upcoming.length === 0 ? (
@@ -1091,11 +1483,11 @@ function V2WelcomePopup({ nextMc, onReserve }) {
   // Poster: real image when provided, else gradient block.
   const poster = merged.thumbnail ? (
     <div className="v2-welcome-poster v2-welcome-poster--image" style={{ backgroundImage: `url(${merged.thumbnail})` }}>
-      <span className="v2-welcome-live"><span className="v2-welcome-live-dot" /> LIVE · {livePill}</span>
+      <span className="v2-welcome-live">LIVE · {livePill}</span>
     </div>
   ) : (
     <div className="v2-welcome-poster">
-      <span className="v2-welcome-live"><span className="v2-welcome-live-dot" /> LIVE · {livePill}</span>
+      <span className="v2-welcome-live">LIVE · {livePill}</span>
       <div className="v2-welcome-poster-title">{(merged.title || 'Live Masterclass').toUpperCase()}</div>
       <div className="v2-welcome-poster-sub">Live with {V2_BRAND.name} · Demo first, then we build</div>
     </div>
@@ -1144,7 +1536,7 @@ function V2WelcomePopup({ nextMc, onReserve }) {
             <div className="v2-welcome-section-label">Instructor</div>
             <div className="v2-welcome-instructor">
               {instructor.photo ? (
-                <img className="v2-welcome-instructor-photo" src={instructor.photo} alt={instructor.name} />
+                <img className="v2-welcome-instructor-photo" src={instructor.photo} alt={instructor.name} loading="lazy" decoding="async" />
               ) : (
                 <div className="v2-welcome-instructor-photo v2-welcome-instructor-photo--initials">{initials}</div>
               )}
@@ -1268,7 +1660,7 @@ function V2Curriculum({ nextMc, onReserve }) {
       {/* Instructor strip */}
       <div className="v2-curriculum-instructor">
         {instructor.photo ? (
-          <img className="v2-curriculum-photo" src={instructor.photo} alt={instructor.name} />
+          <img className="v2-curriculum-photo" src={instructor.photo} alt={instructor.name} loading="lazy" decoding="async" />
         ) : (
           <div className="v2-curriculum-photo v2-curriculum-photo--initials">{initials}</div>
         )}
@@ -1503,8 +1895,20 @@ function V2MobileStickyBar({ nextMc, onReserve }) {
 
 function V2WhatsAppButton() {
   return (
-    <a className="v2-whatsapp-float" href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer">
-      💬 Join WhatsApp community
+    <a
+      className="v2-whatsapp-float"
+      href={V2_BRAND.whatsappCommunity}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Join WhatsApp community"
+      title="Join WhatsApp community"
+    >
+      <span className="v2-whatsapp-float__icon-wrap" aria-hidden="true">
+        <svg className="v2-whatsapp-float__icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+        </svg>
+      </span>
+      <span className="v2-whatsapp-float__label">Join</span>
     </a>
   );
 }
