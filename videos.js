@@ -217,9 +217,10 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
   }
 
   async function fetchPlaylistViaProxyApi(playlistId) {
+    const projectId = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.projectId) || 'balaji-chippada-agentic-ai';
     const bases = [
       '/api/youtube-playlist',
-      'https://us-central1-coaching-site-gowtam-2026.cloudfunctions.net/getYouTubePlaylist',
+      `https://us-central1-${projectId}.cloudfunctions.net/getYouTubePlaylist`,
     ];
     for (const base of bases) {
       try {

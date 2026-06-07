@@ -1,11 +1,16 @@
 {
   "auth": {
     "providers": {
-      "emailPassword": {
-        "enabled": true
-      },
-      "google": {
-        "enabled": true
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Balaji Chippada",
+        "supportEmail": "balajichippada.20@gmail.com",
+        "authorizedRedirectUris": [
+          "https://balajichippada.com",
+          "https://www.balajichippada.com",
+          "https://balaji-chippada-agentic-ai.firebaseapp.com",
+          "http://localhost"
+        ]
       }
     }
   },

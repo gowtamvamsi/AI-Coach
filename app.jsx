@@ -23,15 +23,18 @@ window.addEventListener('unhandledrejection', function(e) {
 
 // ===============================================================
 // Firebase Web Compat Configuration & Initialization
+// Config lives in firebase.config.js → window.FIREBASE_CONFIG
 // ===============================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyCtnlKe9bPzqbMcOJ4aRySyEPgK_7_VjBc",
-  authDomain: "coaching-site-gowtam-2026.firebaseapp.com",
-  projectId: "coaching-site-gowtam-2026",
-  storageBucket: "coaching-site-gowtam-2026.firebasestorage.app",
-  messagingSenderId: "133891754247",
-  appId: "1:133891754247:web:ceddd03771cbd3fcf1dda2"
+const firebaseConfig = window.FIREBASE_CONFIG || {
+  apiKey: 'AIzaSyAXE0--FXvV31_SWJ4RCxQIV3cAEg99sBI',
+  authDomain: 'balajichippada.com',
+  projectId: 'balaji-chippada-agentic-ai',
+  storageBucket: 'balaji-chippada-agentic-ai.firebasestorage.app',
+  messagingSenderId: '290086119185',
+  appId: '1:290086119185:web:34c21c5beae8bada71ceb0',
+  measurementId: 'G-JQVMXXW096',
 };
+const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
 
 // Global Firebase services variables
 let auth = null;
@@ -45,6 +48,32 @@ if (typeof firebase !== 'undefined') {
   auth = firebase.auth();
   db = firebase.firestore();
   functions = firebase.functions();
+  if (firebaseConfig.measurementId && typeof firebase.analytics === 'function') {
+    firebase.analytics();
+  }
+}
+
+const GOOGLE_AUTH_INTENT_KEY = 'googleAuthIntent';
+const PENDING_BOOKING_KEY = 'pendingBookingSession';
+const PENDING_BOOKING_TIER_KEY = 'pendingBookingTier';
+
+function saveGoogleAuthIntent(intent) {
+  try {
+    sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, JSON.stringify(intent));
+  } catch (err) {
+    console.warn('Could not save Google auth intent:', err);
+  }
+}
+
+function consumeGoogleAuthIntent() {
+  try {
+    const raw = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY);
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
 }
 
 // Helper: Check if platform is Mac/iOS
@@ -4634,6 +4663,56 @@ function App() {
     localStorage.setItem('roadmap-theme', theme);
   }, [theme]);
 
+  // Finish Google sign-in after full-page redirect (reliable with 2FA; popups often hang)
+  useEffect(() => {
+    if (!auth) return;
+    let mounted = true;
+    auth.getRedirectResult()
+      .then((result) => {
+        if (!mounted) return;
+        const intent = consumeGoogleAuthIntent();
+        if (!intent) return;
+
+        const signedIn = !!(result && result.user) || !!auth.currentUser;
+        if (!signedIn) return;
+
+        if (intent.type === 'staff') {
+          setStaffLoginOpen(false);
+        } else if (intent.type === 'booking') {
+          try {
+            const pendingSession = sessionStorage.getItem(PENDING_BOOKING_KEY);
+            if (pendingSession) {
+              setBookingSession(JSON.parse(pendingSession));
+              sessionStorage.removeItem(PENDING_BOOKING_KEY);
+            }
+            const pendingTier = sessionStorage.getItem(PENDING_BOOKING_TIER_KEY);
+            if (pendingTier) {
+              setSelectedTier(JSON.parse(pendingTier));
+              sessionStorage.removeItem(PENDING_BOOKING_TIER_KEY);
+            }
+          } catch (err) {
+            console.warn('Could not restore booking state after Google sign-in:', err);
+          }
+          setBookingStep(1);
+        }
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        const intent = consumeGoogleAuthIntent();
+        if (!intent) return;
+        const msg = err.message || 'Google sign-in failed.';
+        if (intent.type === 'booking') setBookingError(msg);
+        else setLoginError(msg);
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoginLoading(false);
+          setBookingLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, []);
+
   // Auth observer
   useEffect(() => {
     if (!auth) return;
@@ -5067,7 +5146,7 @@ function App() {
     }
   };
 
-  // Handle Google Sign-in popup
+  // Handle Google Sign-in via redirect (popup breaks when Google 2FA runs)
   const handleGoogleLogin = async () => {
     if (!auth) {
       setLoginError("Firebase Auth SDK was not initialized.");
@@ -5078,11 +5157,10 @@ function App() {
 
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
-      await auth.signInWithPopup(provider);
-      setStaffLoginOpen(false);
+      saveGoogleAuthIntent({ type: 'staff' });
+      await auth.signInWithRedirect(provider);
     } catch (err) {
-      setLoginError(err.message || "Failed to complete Google authentication.");
-    } finally {
+      setLoginError(err.message || "Failed to start Google authentication.");
       setLoginLoading(false);
     }
   };
@@ -5296,31 +5374,21 @@ function App() {
     setBookingLoading(true);
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
-      // If we already have an anonymous user (from guest checkout), upgrade it to Google
-      // so their booking history is preserved.
-      if (auth.currentUser && auth.currentUser.isAnonymous) {
-        try {
-          await auth.currentUser.linkWithPopup(provider);
-        } catch (linkErr) {
-          // If linking fails (e.g. credential already in use), fall back to sign-in.
-          if (linkErr?.code === 'auth/credential-already-in-use') {
-            await auth.signInWithPopup(provider);
-          } else {
-            throw linkErr;
-          }
-        }
-      } else {
-        await auth.signInWithPopup(provider);
+      if (bookingSession) {
+        sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify(bookingSession));
       }
-      if (bookingSuccess) {
-        closeBooking();
-        setActiveMainTab('mybookings');
+      if (selectedTier) {
+        sessionStorage.setItem(PENDING_BOOKING_TIER_KEY, JSON.stringify(selectedTier));
+      }
+      saveGoogleAuthIntent({ type: 'booking' });
+
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        await auth.currentUser.linkWithRedirect(provider);
       } else {
-        setBookingStep(1);
+        await auth.signInWithRedirect(provider);
       }
     } catch (err) {
       setBookingError(err.message || 'Google sign-in failed.');
-    } finally {
       setLoginLoading(false);
       setBookingLoading(false);
     }
@@ -5356,9 +5424,9 @@ function App() {
     try {
       // Direct integration test: Trigger the local or live razorpayWebhook function to verify signature and complete booking!
       const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-      const webhookUrl = isLocalHost 
-        ? `http://127.0.0.1:5001/coaching-site-gowtam-2026/us-central1/razorpayWebhook`
-        : `https://us-central1-coaching-site-gowtam-2026.cloudfunctions.net/razorpayWebhook`;
+      const webhookUrl = isLocalHost
+        ? `http://127.0.0.1:5001/${FIREBASE_PROJECT_ID}/us-central1/razorpayWebhook`
+        : `https://us-central1-${FIREBASE_PROJECT_ID}.cloudfunctions.net/razorpayWebhook`;
 
       const paymentId = `pay_mock_${Math.random().toString(36).substring(2, 10)}`;
 
