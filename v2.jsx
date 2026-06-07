@@ -5,6 +5,68 @@
 const V2_SITE_URL = 'https://balajichippada.com';
 const V2_ROADMAP_URL = 'https://ch-balaji.github.io/ai-engineer-roadmap/';
 
+// ===============================================================
+// UTM Tracking & Lead Persistence Utilities
+// ===============================================================
+const V2_UTM_HELPERS = {
+  captureFromUrl() {
+    if (typeof window === 'undefined') return;
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const utmParams = {};
+      const keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'source'];
+      let hasParams = false;
+
+      keys.forEach((key) => {
+        const value = searchParams.get(key);
+        if (value) {
+          utmParams[key] = value.trim();
+          hasParams = true;
+        }
+      });
+
+      if (hasParams) {
+        let existing = {};
+        try {
+          const stored = localStorage.getItem('lead_utm_params');
+          if (stored) {
+            existing = JSON.parse(stored);
+          }
+        } catch (_) {}
+        
+        const merged = Object.assign({}, existing, utmParams);
+        localStorage.setItem('lead_utm_params', JSON.stringify(merged));
+        console.log('[UTM] Saved parameters:', merged);
+      }
+    } catch (err) {
+      console.warn('[UTM] Capture failed:', err);
+    }
+  },
+
+  getStored() {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem('lead_utm_params');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (_) {}
+    return {};
+  },
+
+  clear() {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem('lead_utm_params');
+    } catch (_) {}
+  }
+};
+
+// Run UTM parsing immediately on load
+if (typeof window !== 'undefined') {
+  V2_UTM_HELPERS.captureFromUrl();
+}
+
 // All editable content/copy lives in site.config.js → window.SITE_CONFIG.
 // V2_CONFIG below is the legacy feature-flag object; it reads from SITE_CONFIG
 // when present (so flipping flags in site.config.js works without code edits).
@@ -1187,16 +1249,132 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
   );
 }
 
-function V2RoadmapTeaser({ onRoadmap, onEmailCapture }) {
+// ===============================================================
+// Lead Capture Persistence & UI Components
+// ===============================================================
+async function saveLead({ name, email, source }) {
+  if (typeof window === 'undefined' || !window.firebase) {
+    console.warn('[LEAD] Firebase SDK not loaded');
+    return false;
+  }
+  try {
+    const db = window.firebase.firestore();
+    const utm = V2_UTM_HELPERS.getStored();
+    const payload = Object.assign({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      source: source || 'unknown',
+      createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+    }, utm);
+
+    await db.collection('leads').add(payload);
+    console.log('[LEAD] Persisted successfully:', payload);
+    return true;
+  } catch (err) {
+    console.error('[LEAD] Persistence failed:', err);
+    throw err;
+  }
+}
+window.saveLead = saveLead;
+
+function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!open) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      await saveLead({ name, email, source: source || 'modal_download' });
+      
+      // Auto-trigger download/redirect if URL is passed
+      if (downloadUrl) {
+        window.open(downloadUrl, '_blank');
+      }
+
+      onSuccess && onSuccess({ name, email });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Submission failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-container" onClick={e => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="Close modal">×</button>
+        <h3 className="modal-title">Get the <em>26-Week AI Roadmap PDF</em></h3>
+        <p className="modal-desc">
+          Enter your name and email to download the high-resolution curriculum and receive weekly phase study guides.
+        </p>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Full Name</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="e.g. Balaji Chippada" 
+              value={name} 
+              onChange={e => setName(e.target.value)} 
+              required 
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Email Address</label>
+            <input 
+              type="email" 
+              className="form-input" 
+              placeholder="e.g. balaji@example.com" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              required 
+            />
+          </div>
+          {error && <p className="status-box status-box--error" style={{ margin: 0, padding: '10px 14px' }}>{error}</p>}
+          <button type="submit" className="form-btn" disabled={loading}>
+            {loading ? 'Submitting...' : 'Download Roadmap PDF'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+window.V2LeadCaptureModal = V2LeadCaptureModal;
+
+function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const phases = (window.ROADMAP || []).slice(0, 3);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    onEmailCapture(email.trim());
-    setSent(true);
+    if (!name.trim() || !email.trim()) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      await saveLead({ name, email, source: 'roadmap_teaser' });
+      setSent(true);
+      setName('');
+      setEmail('');
+      onLeadCapture && onLeadCapture({ name, email });
+    } catch (err) {
+      setError(err.message || 'Submission failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1218,12 +1396,40 @@ function V2RoadmapTeaser({ onRoadmap, onEmailCapture }) {
         <a className="hero__secondary-cta" href={V2_BRAND.roadmapVideoUrl} target="_blank" rel="noopener noreferrer">Watch on YouTube</a>
       </div>
       <form className="v2-email-capture" onSubmit={handleSubmit}>
-        <input type="email" placeholder="Get roadmap updates — enter email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <button type="submit" className="form-btn">{sent ? '✓ Sent!' : 'Notify me'}</button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', width: '100%', maxWidth: '600px', margin: '0 auto' }}>
+          <input 
+            type="text" 
+            placeholder="Your Name" 
+            value={name} 
+            onChange={(e) => setName(e.target.value)} 
+            required 
+            disabled={sent || loading} 
+            style={{ flex: '1 1 200px' }}
+          />
+          <input 
+            type="email" 
+            placeholder="Your Email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            required 
+            disabled={sent || loading} 
+            style={{ flex: '1 1 200px' }}
+          />
+          <button 
+            type="submit" 
+            className="form-btn" 
+            disabled={loading || sent} 
+            style={{ flex: '1 1 150px', margin: 0 }}
+          >
+            {sent ? '✓ Subscribed!' : loading ? 'Submitting...' : 'Notify me'}
+          </button>
+        </div>
       </form>
+      {error && <p className="v2-error-msg" style={{ marginTop: '12px' }}>{error}</p>}
     </section>
   );
 }
+window.V2RoadmapTeaser = V2RoadmapTeaser;
 
 function V2FAQSection({ onLegal }) {
   const [open, setOpen] = useState(0);

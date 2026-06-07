@@ -170,7 +170,7 @@ function PhaseProgressRing({ pct = 0, color }) {
   );
 }
 
-function PhaseTheaterHeader({ phase, phaseStat, tracking }) {
+function PhaseTheaterHeader({ phase, phaseStat, tracking, user, onGatedDownloadClick }) {
   const materials = phase.materials || {};
   const hasMaterials = materials.driveZipUrl || materials.driveFolderUrl;
   const phaseLabel = `Phase ${String(phase.id).padStart(2, '0')}`;
@@ -188,15 +188,21 @@ function PhaseTheaterHeader({ phase, phaseStat, tracking }) {
         <p className="phase__theater-summary">{phase.summary}</p>
         {hasMaterials && (
           <div className="phase__theater-downloads">
-            <a
+            <button
               className="phase__materials-btn tabbox__materials-btn"
-              href={materials.driveZipUrl || materials.driveFolderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download={materials.driveZipUrl ? true : undefined}
+              style={{ background: 'none', border: '1px solid var(--line-strong)', cursor: 'pointer', padding: '10px 18px', borderRadius: '6px' }}
+              onClick={(e) => {
+                const url = materials.driveZipUrl || materials.driveFolderUrl;
+                if (user && !user.isAnonymous) {
+                  window.open(url, '_blank');
+                } else {
+                  e.preventDefault();
+                  onGatedDownloadClick && onGatedDownloadClick(url, `phase_materials_${phase.id}`);
+                }
+              }}
             >
               Download materials
-            </a>
+            </button>
             {materials.label && (
               <span className="phase__materials-label tabbox__materials-label">{materials.label}</span>
             )}
@@ -396,6 +402,7 @@ function RoadmapView({
   searchOpen, setSearchOpen, scrollToPhase, scrollToCapstone, scrollToAgenda,
   agendaRef, totalSections, capstoneTiles, phaseRefs, capstoneRefs,
   videoLinks, user, roadmapProgress, onStartTracking, onVideoProgress, onOpenLogin,
+  onDownloadRoadmap, onGatedDownloadClick,
 }) {
   const H = window.ROADMAP_VIDEO_HELPERS || {};
   const tracking = Boolean(user && !user.isAnonymous && roadmapProgress?.startedAt);
@@ -428,10 +435,23 @@ function RoadmapView({
               Every module grounded in real enterprise AI engineering — from Python fundamentals
               all the way to multi-agent systems shipping in regulated domains.
             </p>
-            <div className="hero__actions">
+            <div className="hero__actions" style={{ gap: '12px', flexWrap: 'wrap' }}>
               <button className="hero__cta" type="button" onClick={scrollToAgenda}>
                 Explore the roadmap
                 <span aria-hidden="true">↓</span>
+              </button>
+              <button 
+                className="hero__cta" 
+                type="button" 
+                onClick={onDownloadRoadmap}
+                style={{ 
+                  background: 'var(--c-pink)', 
+                  borderColor: 'var(--c-pink)', 
+                  color: '#fff',
+                  boxShadow: '0 4px 20px rgba(224, 86, 126, 0.2)' 
+                }}
+              >
+                Download PDF Roadmap
               </button>
               {!tracking && (
                 <button
@@ -579,7 +599,7 @@ function RoadmapView({
           <article key={phase.id} className="phase phase--theater"
             ref={el => phaseRefs.current[i] = el}
             data-screen-label={`${String(phase.id).padStart(2, '0')} ${phase.title}`}>
-            <PhaseTheaterHeader phase={phase} phaseStat={phaseStat} tracking={tracking} />
+            <PhaseTheaterHeader phase={phase} phaseStat={phaseStat} tracking={tracking} user={user} onGatedDownloadClick={onGatedDownloadClick} />
             <PhaseTabBox
               phase={phase}
               videoLinks={videoLinks}
@@ -4074,6 +4094,17 @@ function App() {
 
   // Staff Login modal state
   const [staffLoginOpen, setStaffLoginOpen] = useState(false);
+  
+  // Lead Capture Modal states
+  const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const [leadModalSource, setLeadModalSource] = useState('roadmap_pdf');
+  const [leadModalDownloadUrl, setLeadModalDownloadUrl] = useState('');
+
+  const handleOpenLeadModal = (downloadUrl, source) => {
+    setLeadModalDownloadUrl(downloadUrl || '');
+    setLeadModalSource(source || 'roadmap_pdf');
+    setLeadModalOpen(true);
+  };
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -5187,6 +5218,13 @@ function App() {
           {/* ── Success Stories — disabled until we curate real YouTube reviews ── */}
           {V2_CONFIG.showSuccessStories && <V2SuccessStories />}
 
+          {window.V2RoadmapTeaser && (
+            <window.V2RoadmapTeaser 
+              onRoadmap={() => { setActiveMainTab('roadmap'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onLeadCapture={({ name, email }) => console.log('Lead captured:', name, email)}
+            />
+          )}
+
           <V2FAQSection onLegal={setLegalPage} />
 
           {/* ── Closing CTA Section ── */}
@@ -5216,6 +5254,8 @@ function App() {
           onStartTracking={handleStartTracking}
           onVideoProgress={handleVideoProgress}
           onOpenLogin={() => { setLoginError(''); setStaffLoginOpen(true); }}
+          onDownloadRoadmap={() => handleOpenLeadModal('https://github.com/ch-balaji/ai-engineer-roadmap/raw/main/AI-Engineer-Roadmap.pdf', 'roadmap_hero_cta')}
+          onGatedDownloadClick={(url, src) => handleOpenLeadModal(url, src)}
         />
       )}
 
@@ -5471,6 +5511,23 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* 3.5 Lead Capture Modal */}
+      {(() => {
+        const V2LeadCaptureModal = window.V2LeadCaptureModal;
+        if (!V2LeadCaptureModal) return null;
+        return (
+          <V2LeadCaptureModal
+            open={leadModalOpen}
+            onClose={() => setLeadModalOpen(false)}
+            source={leadModalSource}
+            downloadUrl={leadModalDownloadUrl}
+            onSuccess={({ name, email }) => {
+              console.log('Lead captured successfully:', name, email);
+            }}
+          />
+        );
+      })()}
 
       {/* 4. Forced Profile Completion Modal */}
       {showCompleteProfile && (

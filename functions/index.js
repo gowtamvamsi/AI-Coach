@@ -439,3 +439,300 @@ exports.getYouTubePlaylist = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({ error: err.message || "Playlist fetch failed" });
   }
 });
+
+exports.onLeadCreated = functions.firestore
+  .document("leads/{leadId}")
+  .onCreate(async (snap, context) => {
+    const leadId = context.params.leadId;
+    const leadData = snap.data();
+    const email = leadData.email;
+    const name = leadData.name || "";
+    const source = leadData.source || "general";
+
+    console.log(`[LEAD TRIGGER] New lead captured: ${email} (Name: ${name}, Source: ${source})`);
+
+    const utmParams = {
+      utm_source: leadData.utm_source || "",
+      utm_medium: leadData.utm_medium || "",
+      utm_campaign: leadData.utm_campaign || "",
+      utm_content: leadData.utm_content || "",
+      utm_term: leadData.utm_term || ""
+    };
+
+    const loopsApiKey = process.env.LOOPS_API_KEY;
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    if (loopsApiKey) {
+      try {
+        const firstName = name.split(" ")[0] || "";
+        const response = await fetch("https://app.loops.so/api/v1/contacts/create", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${loopsApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email: email,
+            firstName: firstName,
+            source: source,
+            userGroup: "Leads",
+            utmSource: utmParams.utm_source,
+            utmMedium: utmParams.utm_medium,
+            utmCampaign: utmParams.utm_campaign,
+            utmContent: utmParams.utm_content,
+            utmTerm: utmParams.utm_term
+          })
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          console.log(`[LOOPS SUCCESS] Synced lead ${leadId} to Loops. Result:`, resJson);
+          await snap.ref.update({ loopsSynced: true, welcomeEmailSent: true });
+          return;
+        } else {
+          const errMsg = await response.text();
+          console.warn(`[LOOPS WARNING] Loops sync failed with status ${response.status}: ${errMsg}`);
+        }
+      } catch (err) {
+        console.error("[LOOPS ERROR] Loops sync exception:", err);
+      }
+    }
+
+    const subject = "Welcome to The Agent Engineer + Your 26-Week Roadmap! 🚀";
+    const body = `Hi ${name || "there"},\n\n` +
+      `Welcome to The Agent Engineer community! I'm thrilled to have you here.\n\n` +
+      `As promised, here is the direct link to download/access the full 26-Week Agentic AI Engineer Roadmap:\n` +
+      `https://github.com/ch-balaji/ai-engineer-roadmap\n\n` +
+      `You can also bookmark your live interactive roadmap progress tracker on our website:\n` +
+      `https://balajichippada.com/\n\n` +
+      `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
+      `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
+      `https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t\n\n` +
+      `Let's build some amazing agentic systems together!\n\n` +
+      `Best,\n` +
+      `Balaji Chippada\n` +
+      `The Agent Engineer`;
+
+    if (resendApiKey) {
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: "The Agent Engineer <onboarding@resend.dev>",
+            to: email,
+            subject: subject,
+            text: body
+          })
+        });
+
+        if (response.ok) {
+          console.log(`[RESEND SUCCESS] Sent Welcome Email to ${email} via Resend.`);
+          await snap.ref.update({ welcomeEmailSent: true, emailEngine: "resend" });
+          return;
+        } else {
+          const errMsg = await response.text();
+          console.warn(`[RESEND WARNING] Resend email failed with status ${response.status}: ${errMsg}`);
+        }
+      } catch (err) {
+        console.error("[RESEND ERROR] Resend exception:", err);
+      }
+    }
+
+    const smtpEmail = process.env.SMTP_EMAIL;
+    const smtpPass = process.env.SMTP_PASSWORD;
+    if (smtpEmail && smtpPass) {
+      try {
+        const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpPort = parseInt(process.env.SMTP_PORT || "465");
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpEmail, pass: smtpPass }
+        });
+
+        await transporter.sendMail({
+          from: `"The Agent Engineer" <${smtpEmail}>`,
+          to: email,
+          subject: subject,
+          text: body
+        });
+
+        console.log(`[SMTP SUCCESS] Sent Welcome Email to ${email} via Nodemailer.`);
+        await snap.ref.update({ welcomeEmailSent: true, emailEngine: "smtp" });
+        return;
+      } catch (err) {
+        console.error("[SMTP ERROR] Nodemailer SMTP exception:", err);
+      }
+    }
+
+    console.log(`[SMTP MOCK WELCOME EMAIL] Logged simulated welcome email to ${email}.\nSubject: ${subject}\nBody:\n${body}`);
+    await snap.ref.update({ welcomeEmailSent: true, isMock: true });
+  });
+
+async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass }) {
+  if (resendApiKey) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "The Agent Engineer <onboarding@resend.dev>",
+        to: email,
+        subject: subject,
+        text: body
+      })
+    });
+    if (response.ok) return;
+    const errText = await response.text();
+    throw new Error(`Resend failed (${response.status}): ${errText}`);
+  }
+
+  if (smtpEmail && smtpPass) {
+    const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+    const smtpPort = parseInt(process.env.SMTP_PORT || "465");
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpEmail, pass: smtpPass }
+    });
+
+    await transporter.sendMail({
+      from: `"The Agent Engineer" <${smtpEmail}>`,
+      to: email,
+      subject: subject,
+      text: body
+    });
+    return;
+  }
+
+  console.log(`[DRIP MOCK EMAIL] To: ${email} | Subject: ${subject}\nBody:\n${body}`);
+}
+
+async function processDrips() {
+  const now = admin.firestore.Timestamp.now();
+  const oneDayAgo = new Date(now.toDate().getTime() - 24 * 60 * 60 * 1000);
+  const threeDaysAgo = new Date(now.toDate().getTime() - 3 * 24 * 60 * 60 * 1000);
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const smtpEmail = process.env.SMTP_EMAIL;
+  const smtpPass = process.env.SMTP_PASSWORD;
+
+  let stats = {
+    gettingStartedSent: 0,
+    inviteSent: 0,
+    errors: 0
+  };
+
+  const email2Snap = await db.collection("leads")
+    .where("createdAt", "<=", admin.firestore.Timestamp.fromDate(oneDayAgo))
+    .get();
+
+  for (const doc of email2Snap.docs) {
+    const lead = doc.data();
+    if (lead.gettingStartedEmailSent === true) continue;
+
+    const name = lead.name || "";
+    const email = lead.email;
+    const subject = "Phase 1: Getting Started with Python & LLM Mental Models";
+    const body = `Hi ${name || "there"},\n\n` +
+      `I hope you've had a chance to look over the 26-Week Agentic AI Engineer Roadmap!\n\n` +
+      `Phase 1 is all about building a solid foundation. If you want to build autonomous systems, you must write clean, asynchronous Python first. Here is your quick checklist to get started this week:\n\n` +
+      `1. Set up Python 3.10+ and virtual environments (venv/conda).\n` +
+      `2. Get comfortable with basic HTTP requests (using standard libraries or requests/httpx).\n` +
+      `3. Understand the basic mental model of an LLM: it is a next-token prediction engine, not a database.\n\n` +
+      `To track your progress and mark modules as completed, sign in to your dashboard on our website:\n` +
+      `https://balajichippada.com/\n\n` +
+      `Tomorrow, we'll dive into prompt caching and tool calling patterns.\n\n` +
+      `Best,\n` +
+      `Balaji Chippada\n` +
+      `The Agent Engineer`;
+
+    try {
+      await sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass });
+      await doc.ref.update({ gettingStartedEmailSent: true, gettingStartedEmailSentAt: admin.firestore.FieldValue.serverTimestamp() });
+      stats.gettingStartedSent++;
+    } catch (err) {
+      console.error(`[DRIP ERROR] Failed to send Email 2 to ${email}:`, err);
+      stats.errors++;
+    }
+  }
+
+  const email3Snap = await db.collection("leads")
+    .where("createdAt", "<=", admin.firestore.Timestamp.fromDate(threeDaysAgo))
+    .get();
+
+  for (const doc of email3Snap.docs) {
+    const lead = doc.data();
+    if (lead.inviteEmailSent === true) continue;
+
+    const name = lead.name || "";
+    const email = lead.email;
+    const subject = "Live Cohort: Build a production-grade Claude Code agent with me!";
+    const body = `Hi ${name || "there"},\n\n` +
+      `By now, you should have your local development environment ready.\n\n` +
+      `The best way to solidify your learning is to build in real time. I'm hosting an exclusive live masterclass where we will configure Claude Code, set up Model Context Protocol (MCP) servers, and build a self-correcting repository agent from scratch in 3 hours.\n\n` +
+      `Secure your seat here:\n` +
+      `https://balajichippada.com/\n\n` +
+      `Looking forward to seeing you there!\n\n` +
+      `Best,\n` +
+      `Balaji Chippada\n` +
+      `The Agent Engineer`;
+
+    try {
+      await sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass });
+      await doc.ref.update({ inviteEmailSent: true, inviteEmailSentAt: admin.firestore.FieldValue.serverTimestamp() });
+      stats.inviteSent++;
+    } catch (err) {
+      console.error(`[DRIP ERROR] Failed to send Email 3 to ${email}:`, err);
+      stats.errors++;
+    }
+  }
+
+  console.log(`[DRIP COMPLETED] Stats: Email 2 sent: ${stats.gettingStartedSent}, Email 3 sent: ${stats.inviteSent}, Errors: ${stats.errors}`);
+  return stats;
+}
+
+exports.processDripCampaign = functions.https.onCall(async (data, context) => {
+  const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isEmulator && !context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
+  }
+  
+  if (!isEmulator) {
+    const callerUid = context.auth.uid;
+    const callerDoc = await db.collection("users").doc(callerUid).get();
+    const role = callerDoc.exists ? callerDoc.data().role : "";
+    if (role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "Access denied. Only administrators can trigger drip runs.");
+    }
+  }
+
+  try {
+    const stats = await processDrips();
+    return { success: true, stats };
+  } catch (err) {
+    console.error("Manual processDripCampaign failed:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Drip processing failed.");
+  }
+});
+
+exports.processDripCampaignScheduled = functions.pubsub
+  .schedule("every 24 hours")
+  .onRun(async (context) => {
+    try {
+      await processDrips();
+      return null;
+    } catch (err) {
+      console.error("Scheduled drip campaign execution failed:", err);
+      return null;
+    }
+  });
+
