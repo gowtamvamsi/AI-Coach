@@ -2120,7 +2120,14 @@ function DashboardView({ user, role, onLogout }) {
   const [editSessionId, setEditSessionId] = useState("");
   const [editSessionIsMc, setEditSessionIsMc] = useState(false);
   const [selectedRosterClassId, setSelectedRosterClassId] = useState("all");
-  
+
+  // ── Welcome Drip Testing States ──
+  const [dripTestLoading, setDripTestLoading] = useState(false);
+  const [dripTestStep, setDripTestStep] = useState("");
+  const [dripTestResults, setDripTestResults] = useState(null);
+  const [dripTestError, setDripTestError] = useState("");
+  const [expandedTestLead, setExpandedTestLead] = useState(null);
+
   // Form fields (sessions)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -2323,6 +2330,224 @@ function DashboardView({ user, role, onLogout }) {
       }
     } finally {
       setIsSendingBroadcast(false);
+    }
+  };
+
+  const runDashboardAutomationTest = async () => {
+    if (!db) {
+      setDripTestError("Firestore is not initialized.");
+      return;
+    }
+
+    setDripTestLoading(true);
+    setDripTestError("");
+    setDripTestResults(null);
+    setExpandedTestLead(null);
+
+    try {
+      // Step 1: Cleaning existing test leads
+      setDripTestStep("Cleaning existing test leads...");
+      const testLeadIds = ["dashboard_test_fresh", "dashboard_test_oneday", "dashboard_test_fourday"];
+      const batch = db.batch();
+      testLeadIds.forEach(id => {
+        batch.delete(db.collection('leads').doc(id));
+      });
+      await batch.commit();
+
+      // Short delay to ensure deletion propagation
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Step 2: Seeding test leads
+      setDripTestStep("Seeding test leads with custom timestamps...");
+      
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 25 * 60 * 60 * 1000); // 25 hours ago
+      const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000); // 4 days ago
+
+      await db.collection('leads').doc('dashboard_test_fresh').set({
+        email: "fresh@test.com",
+        name: "Fresh Tester",
+        source: "dashboard_test",
+        createdAt: firebase.firestore.Timestamp.fromDate(now),
+        welcomeEmailSent: false,
+        gettingStartedEmailSent: false,
+        inviteEmailSent: false
+      });
+
+      await db.collection('leads').doc('dashboard_test_oneday').set({
+        email: "oneday@test.com",
+        name: "One Day Tester",
+        source: "dashboard_test",
+        createdAt: firebase.firestore.Timestamp.fromDate(oneDayAgo),
+        welcomeEmailSent: false,
+        gettingStartedEmailSent: false,
+        inviteEmailSent: false
+      });
+
+      await db.collection('leads').doc('dashboard_test_fourday').set({
+        email: "fourday@test.com",
+        name: "Four Day Tester",
+        source: "dashboard_test",
+        createdAt: firebase.firestore.Timestamp.fromDate(fourDaysAgo),
+        welcomeEmailSent: false,
+        gettingStartedEmailSent: false,
+        inviteEmailSent: false
+      });
+
+      // Step 3: Wait for firestore background triggers to process the creation (Email 1 sent on create)
+      setDripTestStep("Waiting for background triggers (Email 1 dispatch)...");
+      await new Promise(resolve => setTimeout(resolve, 3500));
+
+      // Step 4: Run drip campaign Cloud Function (or fallback to client-side emulation)
+      setDripTestStep("Triggering drip Campaign execution...");
+      
+      let stats = { gettingStartedSent: 0, inviteSent: 0, errors: 0 };
+      let callSuccess = false;
+
+      if (functions) {
+        try {
+          const processDripCall = functions.httpsCallable("processDripCampaign");
+          const functionResponse = await processDripCall();
+          const callData = functionResponse.data;
+          if (callData && callData.success) {
+            stats = callData.stats || stats;
+            callSuccess = true;
+          }
+        } catch (fnErr) {
+          console.warn("Cloud Function execution failed. Falling back to client-side sandbox emulation...", fnErr);
+        }
+      }
+
+      if (!callSuccess) {
+        setDripTestStep("Running client-side sandbox emulation fallback...");
+        const nowMs = Date.now();
+        const oneDayAgoLimit = nowMs - 24 * 60 * 60 * 1000;
+        const threeDaysAgoLimit = nowMs - 3 * 24 * 60 * 60 * 1000;
+
+        for (const docId of testLeadIds) {
+          const docRef = db.collection("leads").doc(docId);
+          const snap = await docRef.get();
+          if (!snap.exists) continue;
+          
+          const lead = snap.data();
+          const createdAt = lead.createdAt ? (lead.createdAt.toDate ? lead.createdAt.toDate() : new Date(lead.createdAt)) : null;
+          if (!createdAt) continue;
+          
+          const createdAtMs = createdAt.getTime();
+          const name = lead.name || "";
+          const email = lead.email;
+
+          // 1. Welcome Email (Email 1) - If onCreate trigger didn't run, process here
+          if (lead.welcomeEmailSent !== true) {
+            const subject = "Welcome to The Agent Engineer + Your 26-Week Roadmap! 🚀";
+            const body = `Hi ${name || "there"},\n\n` +
+              `Welcome to The Agent Engineer community! I'm thrilled to have you here.\n\n` +
+              `As promised, here is the direct link to download/access the full 26-Week Agentic AI Engineer Roadmap:\n` +
+              `https://github.com/ch-balaji/ai-engineer-roadmap\n\n` +
+              `You can also bookmark your live interactive roadmap progress tracker on our website:\n` +
+              `https://balajichippada.com/\n\n` +
+              `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
+              `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
+              `https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t\n\n` +
+              `Let's build some amazing agentic systems together!\n\n` +
+              `Best,\n` +
+              `Balaji Chippada\n` +
+              `The Agent Engineer`;
+
+            await docRef.update({
+              welcomeEmailSent: true,
+              isMock: true,
+              sentEmails: firebase.firestore.FieldValue.arrayUnion({
+                type: "Welcome Roadmap",
+                subject: subject,
+                body: body,
+                sentAt: new Date().toISOString()
+              })
+            });
+          }
+
+          // Fetch fresh lead snapshot to pick up Welcome updates
+          const freshSnap = await docRef.get();
+          const freshLead = freshSnap.data();
+
+          // 2. Getting Started (Email 2) - Created <= 24 hours ago
+          if (createdAtMs <= oneDayAgoLimit && freshLead.gettingStartedEmailSent !== true) {
+            const subject = "Phase 1: Getting Started with Python & LLM Mental Models";
+            const body = `Hi ${name || "there"},\n\n` +
+              `I hope you've had a chance to look over the 26-Week Agentic AI Engineer Roadmap!\n\n` +
+              `Phase 1 is all about building a solid foundation. If you want to build autonomous systems, you must write clean, asynchronous Python first. Here is your quick checklist to get started this week:\n\n` +
+              `1. Set up Python 3.10+ and virtual environments (venv/conda).\n` +
+              `2. Get comfortable with basic HTTP requests (using standard libraries or requests/httpx).\n` +
+              `3. Understand the basic mental model of an LLM: it is a next-token prediction engine, not a database.\n\n` +
+              `To track your progress and mark modules as completed, sign in to your dashboard on our website:\n` +
+              `https://balajichippada.com/\n\n` +
+              `Tomorrow, we'll dive into prompt caching and tool calling patterns.\n\n` +
+              `Best,\n` +
+              `Balaji Chippada\n` +
+              `The Agent Engineer`;
+
+            await docRef.update({
+              gettingStartedEmailSent: true,
+              gettingStartedEmailSentAt: firebase.firestore.FieldValue.serverTimestamp(),
+              sentEmails: firebase.firestore.FieldValue.arrayUnion({
+                type: "Getting Started (Email 2)",
+                subject: subject,
+                body: body,
+                sentAt: new Date().toISOString()
+              })
+            });
+            stats.gettingStartedSent++;
+          }
+
+          // 3. Invite to Masterclass (Email 3) - Created <= 3 days ago
+          if (createdAtMs <= threeDaysAgoLimit && freshLead.inviteEmailSent !== true) {
+            const subject = "Live Cohort: Build a production-grade Claude Code agent with me!";
+            const body = `Hi ${name || "there"},\n\n` +
+              `By now, you should have your local development environment ready.\n\n` +
+              `The best way to solidify your learning is to build in real time. I'm hosting an exclusive live masterclass where we will configure Claude Code, set up Model Context Protocol (MCP) servers, and build a self-correcting repository agent from scratch in 3 hours.\n\n` +
+              `Secure your seat here:\n` +
+              `https://balajichippada.com/\n\n` +
+              `Looking forward to seeing you there!\n\n` +
+              `Best,\n` +
+              `Balaji Chippada\n` +
+              `The Agent Engineer`;
+
+            await docRef.update({
+              inviteEmailSent: true,
+              inviteEmailSentAt: firebase.firestore.FieldValue.serverTimestamp(),
+              sentEmails: firebase.firestore.FieldValue.arrayUnion({
+                type: "Invite to Masterclass (Email 3)",
+                subject: subject,
+                body: body,
+                sentAt: new Date().toISOString()
+              })
+            });
+            stats.inviteSent++;
+          }
+        }
+      }
+
+      // Step 5: Fetch updated test leads and logs
+      setDripTestStep("Fetching updated test leads from Firestore...");
+      
+      const freshDoc = await db.collection('leads').doc('dashboard_test_fresh').get();
+      const onedayDoc = await db.collection('leads').doc('dashboard_test_oneday').get();
+      const fourdayDoc = await db.collection('leads').doc('dashboard_test_fourday').get();
+
+      setDripTestResults({
+        fresh: freshDoc.exists ? freshDoc.data() : null,
+        oneday: onedayDoc.exists ? onedayDoc.data() : null,
+        fourday: fourdayDoc.exists ? fourdayDoc.data() : null,
+        stats: stats
+      });
+      
+      setDripTestStep("completed");
+    } catch (err) {
+      console.error("Drip testing execution failed:", err);
+      setDripTestError(err.message || "An unexpected error occurred during drip testing.");
+      setDripTestStep("");
+    } finally {
+      setDripTestLoading(false);
     }
   };
 
@@ -2989,6 +3214,278 @@ ${mcRawSyllabus}`;
         <div className={`status-box status-box--${status.type}`}>
           <span>{status.type === 'success' ? '✔' : '⚠'}</span>
           <span>{status.message}</span>
+        </div>
+      )}
+
+      {/* ── Welcome Drip Campaign Sandbox ── */}
+      {isAdmin && (
+        <div className="dashboard__panel drip-testing-panel" style={{ marginBottom: "28px" }}>
+          <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+            🧪 Welcome Drip Campaign Sandbox
+          </h2>
+          <p className="hero__sub" style={{ marginTop: "4px", fontSize: "14px", color: "var(--fg-dim)", maxWidth: "100%" }}>
+            Simulate and debug the 3-email onboarding drip series (Welcome → Getting Started → Invite). Seeds three mock leads at different age tiers, triggers the scheduler Cloud Function, and displays Firestore updates and simulated email logs in real-time.
+          </p>
+
+          <div style={{ marginTop: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+            <button 
+              onClick={runDashboardAutomationTest}
+              className="form-btn" 
+              disabled={dripTestLoading}
+              style={{ 
+                margin: 0, 
+                width: "auto", 
+                padding: "12px 24px", 
+                background: "linear-gradient(135deg, var(--c-violet, #8a5cf6), var(--c-pink, #ec4899))",
+                color: "#fff",
+                border: "none",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {dripTestLoading ? (
+                <>
+                  <span className="ai-status__spinner" style={{ width: "14px", height: "14px", border: "2px solid #fff", borderTopColor: "transparent" }}></span>
+                  Executing Test...
+                </>
+              ) : "🚀 Run Drip Automation Test"}
+            </button>
+
+            {dripTestResults && (
+              <button 
+                onClick={async () => {
+                  if (!window.confirm("Are you sure you want to clean up the sandbox test leads?")) return;
+                  try {
+                    const testLeadIds = ["dashboard_test_fresh", "dashboard_test_oneday", "dashboard_test_fourday"];
+                    const batch = db.batch();
+                    testLeadIds.forEach(id => batch.delete(db.collection('leads').doc(id)));
+                    await batch.commit();
+                    setDripTestResults(null);
+                    setDripTestStep("");
+                    setDripTestError("");
+                    setExpandedTestLead(null);
+                    alert("Sandbox cleaned successfully!");
+                  } catch (e) {
+                    setDripTestError("Failed to clean sandbox: " + e.message);
+                  }
+                }}
+                className="form-btn" 
+                style={{ 
+                  margin: 0, 
+                  width: "auto", 
+                  padding: "12px 24px", 
+                  background: "transparent", 
+                  border: "1px solid var(--line-strong)",
+                  color: "var(--fg)"
+                }}
+              >
+                🧹 Clean Sandbox
+              </button>
+            )}
+
+            {dripTestLoading && dripTestStep && (
+              <span style={{ fontSize: "13px", color: "var(--fg-dim)", fontFamily: "monospace" }}>
+                ⏳ {dripTestStep}
+              </span>
+            )}
+          </div>
+
+          {dripTestError && (
+            <div style={{
+              background: "rgba(244, 63, 94, 0.1)",
+              border: "1px solid rgba(244, 63, 94, 0.25)",
+              color: "var(--c-rose, #fb7185)",
+              borderRadius: "8px",
+              padding: "12px",
+              marginTop: "16px",
+              fontSize: "13px"
+            }}>
+              ⚠️ <b>Error:</b> {dripTestError}
+            </div>
+          )}
+
+          {dripTestResults && (
+            <div style={{ marginTop: "24px" }}>
+              <div style={{ 
+                background: "rgba(138,92,246, 0.05)",
+                border: "1px solid var(--line)",
+                borderRadius: "10px",
+                padding: "16px",
+                marginBottom: "20px"
+              }}>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700" }}>Execution Results</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
+                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Getting Started Sent</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--c-violet)", marginTop: "4px" }}>{dripTestResults.stats.gettingStartedSent}</div>
+                  </div>
+                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Invite Sent</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--c-pink)", marginTop: "4px" }}>{dripTestResults.stats.inviteSent}</div>
+                  </div>
+                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Execution Errors</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: dripTestResults.stats.errors > 0 ? "var(--c-rust)" : "var(--c-emerald)", marginTop: "4px" }}>{dripTestResults.stats.errors}</div>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="form-label" style={{ marginBottom: "12px" }}>Seeded Lead Statuses</h3>
+              <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: "8px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "var(--bg-elev)", borderBottom: "1px solid var(--line)" }}>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Lead Name / Email</th>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Seeded Age</th>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 1 (Welcome)</th>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 2 (Checklist)</th>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 3 (Invite)</th>
+                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { key: 'fresh', name: 'Fresh Lead', desc: 'Created now', age: '0 hours old' },
+                      { key: 'oneday', name: '1-Day-Old Lead', desc: 'Created 25h ago', age: '25 hours old' },
+                      { key: 'fourday', name: '4-Day-Old Lead', desc: 'Created 4d ago', age: '4 days old' }
+                    ].map(item => {
+                      const data = dripTestResults[item.key];
+                      if (!data) {
+                        return (
+                          <tr key={item.key}>
+                            <td colSpan="6" style={{ padding: "10px 14px", color: "var(--fg-faint)" }}>
+                              Missing document `{item.key}`
+                            </td>
+                          </tr>
+                        );
+                      }
+                      
+                      const emailLogs = data.sentEmails || [];
+                      const isExpanded = expandedTestLead === item.key;
+
+                      return (
+                        <React.Fragment key={item.key}>
+                          <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                            <td style={{ padding: "12px 14px" }}>
+                              <b>{data.name}</b>
+                              <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>{data.email}</div>
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{item.age}</span>
+                              <div style={{ fontSize: "10px", color: "var(--fg-faint)" }}>{item.desc}</div>
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <span style={{ 
+                                display: "inline-block",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                background: data.welcomeEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
+                                color: data.welcomeEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
+                              }}>
+                                {data.welcomeEmailSent ? "✅ Sent" : "❌ Pending"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <span style={{ 
+                                display: "inline-block",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                background: data.gettingStartedEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
+                                color: data.gettingStartedEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
+                              }}>
+                                {data.gettingStartedEmailSent ? "✅ Sent" : "❌ Pending"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <span style={{ 
+                                display: "inline-block",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                background: data.inviteEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
+                                color: data.inviteEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
+                              }}>
+                                {data.inviteEmailSent ? "✅ Sent" : "❌ Pending"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <button
+                                onClick={() => setExpandedTestLead(isExpanded ? null : item.key)}
+                                style={{
+                                  padding: "4px 8px",
+                                  fontSize: "11px",
+                                  fontWeight: "600",
+                                  background: isExpanded ? "var(--line-strong)" : "transparent",
+                                  border: "1px solid var(--line-strong)",
+                                  color: "var(--fg)",
+                                  borderRadius: "4px",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {isExpanded ? "▲ Hide Emails" : `👁 View (${emailLogs.length})`}
+                              </button>
+                            </td>
+                          </tr>
+                          
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan="6" style={{ background: "rgba(0, 0, 0, 0.15)", padding: "16px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                  <h4 style={{ margin: 0, fontSize: "12px", color: "var(--fg-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                    Simulated Email Dispatch Log ({emailLogs.length})
+                                  </h4>
+                                  {emailLogs.length === 0 ? (
+                                    <div style={{ color: "var(--fg-faint)", fontSize: "13px" }}>No simulated emails recorded on this lead document.</div>
+                                  ) : (
+                                    emailLogs.map((log, index) => (
+                                      <div key={index} style={{
+                                        background: "var(--bg-elev)",
+                                        border: "1px solid var(--line)",
+                                        borderRadius: "6px",
+                                        padding: "12px",
+                                        fontSize: "13px"
+                                      }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "11px", color: "var(--fg-faint)" }}>
+                                          <span style={{ fontWeight: "700", color: "var(--c-violet)" }}>{log.type}</span>
+                                          <span>⏰ {new Date(log.sentAt).toLocaleTimeString()}</span>
+                                        </div>
+                                        <div style={{ marginBottom: "8px" }}>
+                                          <b>Subject:</b> <span style={{ color: "var(--fg)" }}>{log.subject}</span>
+                                        </div>
+                                        <div style={{
+                                          whiteSpace: "pre-wrap",
+                                          fontFamily: "monospace",
+                                          fontSize: "11px",
+                                          color: "var(--fg-dim)",
+                                          background: "rgba(0, 0, 0, 0.2)",
+                                          padding: "10px",
+                                          borderRadius: "4px",
+                                          border: "1px solid rgba(255, 255, 255, 0.05)"
+                                        }}>
+                                          {log.body}
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

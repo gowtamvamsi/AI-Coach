@@ -531,7 +531,16 @@ exports.onLeadCreated = functions.firestore
 
         if (response.ok) {
           console.log(`[RESEND SUCCESS] Sent Welcome Email to ${email} via Resend.`);
-          await snap.ref.update({ welcomeEmailSent: true, emailEngine: "resend" });
+          await snap.ref.update({ 
+            welcomeEmailSent: true, 
+            emailEngine: "resend",
+            sentEmails: admin.firestore.FieldValue.arrayUnion({
+              type: "Welcome Roadmap",
+              subject: subject,
+              body: body,
+              sentAt: new Date().toISOString()
+            })
+          });
           return;
         } else {
           const errMsg = await response.text();
@@ -563,7 +572,16 @@ exports.onLeadCreated = functions.firestore
         });
 
         console.log(`[SMTP SUCCESS] Sent Welcome Email to ${email} via Nodemailer.`);
-        await snap.ref.update({ welcomeEmailSent: true, emailEngine: "smtp" });
+        await snap.ref.update({ 
+          welcomeEmailSent: true, 
+          emailEngine: "smtp",
+          sentEmails: admin.firestore.FieldValue.arrayUnion({
+            type: "Welcome Roadmap",
+            subject: subject,
+            body: body,
+            sentAt: new Date().toISOString()
+          })
+        });
         return;
       } catch (err) {
         console.error("[SMTP ERROR] Nodemailer SMTP exception:", err);
@@ -571,7 +589,16 @@ exports.onLeadCreated = functions.firestore
     }
 
     console.log(`[SMTP MOCK WELCOME EMAIL] Logged simulated welcome email to ${email}.\nSubject: ${subject}\nBody:\n${body}`);
-    await snap.ref.update({ welcomeEmailSent: true, isMock: true });
+    await snap.ref.update({ 
+      welcomeEmailSent: true, 
+      isMock: true,
+      sentEmails: admin.firestore.FieldValue.arrayUnion({
+        type: "Welcome Roadmap",
+        subject: subject,
+        body: body,
+        sentAt: new Date().toISOString()
+      })
+    });
   });
 
 async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass }) {
@@ -657,7 +684,16 @@ async function processDrips() {
 
     try {
       await sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass });
-      await doc.ref.update({ gettingStartedEmailSent: true, gettingStartedEmailSentAt: admin.firestore.FieldValue.serverTimestamp() });
+      await doc.ref.update({ 
+        gettingStartedEmailSent: true, 
+        gettingStartedEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentEmails: admin.firestore.FieldValue.arrayUnion({
+          type: "Getting Started (Email 2)",
+          subject: subject,
+          body: body,
+          sentAt: new Date().toISOString()
+        })
+      });
       stats.gettingStartedSent++;
     } catch (err) {
       console.error(`[DRIP ERROR] Failed to send Email 2 to ${email}:`, err);
@@ -688,7 +724,16 @@ async function processDrips() {
 
     try {
       await sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass });
-      await doc.ref.update({ inviteEmailSent: true, inviteEmailSentAt: admin.firestore.FieldValue.serverTimestamp() });
+      await doc.ref.update({ 
+        inviteEmailSent: true, 
+        inviteEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentEmails: admin.firestore.FieldValue.arrayUnion({
+          type: "Invite to Masterclass (Email 3)",
+          subject: subject,
+          body: body,
+          sentAt: new Date().toISOString()
+        })
+      });
       stats.inviteSent++;
     } catch (err) {
       console.error(`[DRIP ERROR] Failed to send Email 3 to ${email}:`, err);

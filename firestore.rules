@@ -185,9 +185,9 @@ service cloud.firestore {
     }
 
     match /leads/{leadId} {
-      allow create: if request.resource.data.keys().hasAll(['email', 'source']) &&
-        isValidEmail(request.resource.data.email);
-      allow read: if isStaff();
+      allow create: if (request.resource.data.keys().hasAll(['email', 'source']) &&
+        isValidEmail(request.resource.data.email)) || isStaff();
+      allow read, update, delete: if isStaff();
     }
 
     match /inquiries/{inquiryId} {
