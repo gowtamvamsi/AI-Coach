@@ -1,0 +1,31 @@
+version: "3.7"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: plunk_postgres
+    environment:
+      POSTGRES_USER: plunk
+      POSTGRES_PASSWORD: plunk_password
+      POSTGRES_DB: plunk
+    ports:
+      - "5432:5432"
+    volumes:
+      - plunk-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  plunk:
+    image: plunkdev/plunk:latest
+    container_name: plunk_app
+    ports:
+      - "8080:8080" # Web UI / REST API
+      - "2525:2525" # SMTP server
+    environment:
+      DATABASE_URL: postgres://plunk:plunk_password@postgres:5432/plunk
+      JWT_SECRET: plunk_local_secret_key_98765
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  plunk-db-data:
