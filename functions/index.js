@@ -286,10 +286,13 @@ exports.sendAudienceEmail = functions.https.onCall(async (data, context) => {
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
-      auth: {
-        user: smtpEmail,
-        pass: smtpPass
-      }
+      ignoreTLS: true,
+      ...(smtpPass !== "none" && {
+        auth: {
+          user: smtpEmail,
+          pass: smtpPass
+        }
+      })
     });
 
     // To protect recipient privacy, we send to SMTP_EMAIL and add leads to BCC!
@@ -522,7 +525,7 @@ exports.onLeadCreated = functions.firestore
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            from: "The Agent Engineer <onboarding@resend.dev>",
+            from: "The Agent Engineer <team@balajichippada.com>",
             to: email,
             subject: subject,
             text: body
@@ -561,7 +564,10 @@ exports.onLeadCreated = functions.firestore
           host: smtpHost,
           port: smtpPort,
           secure: smtpPort === 465,
-          auth: { user: smtpEmail, pass: smtpPass }
+          ignoreTLS: true,
+          ...(smtpPass !== "none" && {
+            auth: { user: smtpEmail, pass: smtpPass }
+          })
         });
 
         await transporter.sendMail({
@@ -601,7 +607,9 @@ exports.onLeadCreated = functions.firestore
     });
   });
 
-async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass }) {
+async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass, from }) {
+  const defaultFrom = from || (smtpEmail ? `"The Agent Engineer" <${smtpEmail}>` : "The Agent Engineer <team@balajichippada.com>");
+
   if (resendApiKey) {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -610,7 +618,7 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "The Agent Engineer <onboarding@resend.dev>",
+        from: defaultFrom,
         to: email,
         subject: subject,
         text: body
@@ -628,11 +636,14 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
-      auth: { user: smtpEmail, pass: smtpPass }
+      ignoreTLS: true,
+      ...(smtpPass !== "none" && {
+        auth: { user: smtpEmail, pass: smtpPass }
+      })
     });
 
     await transporter.sendMail({
-      from: `"The Agent Engineer" <${smtpEmail}>`,
+      from: defaultFrom,
       to: email,
       subject: subject,
       text: body
@@ -640,7 +651,7 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
     return;
   }
 
-  console.log(`[DRIP MOCK EMAIL] To: ${email} | Subject: ${subject}\nBody:\n${body}`);
+  console.log(`[DRIP MOCK EMAIL] From: ${defaultFrom} | To: ${email} | Subject: ${subject}\nBody:\n${body}`);
 }
 
 async function processDrips() {
@@ -777,6 +788,118 @@ exports.processDripCampaignScheduled = functions.pubsub
       return null;
     } catch (err) {
       console.error("Scheduled drip campaign execution failed:", err);
+      return null;
+    }
+  });
+
+exports.onRegistrationCompleted = functions.firestore
+  .document("registrations/{registrationId}")
+  .onWrite(async (change, context) => {
+    try {
+      const beforeData = change.before ? change.before.data() : null;
+      const afterData = change.after ? change.after.data() : null;
+
+      // If document was deleted, do nothing
+      if (!afterData) return null;
+
+      // Check transition to "completed" status
+      const wasCompleted = beforeData && beforeData.status === "completed";
+      const isCompleted = afterData.status === "completed";
+
+      // If it is completed now and wasn't before
+      if (isCompleted && !wasCompleted) {
+        const registrationId = context.params.registrationId;
+        const studentEmail = afterData.studentEmail;
+        const studentName = afterData.studentName || "";
+        const sessionTitle = afterData.sessionTitle || "Masterclass";
+        const sessionId = afterData.sessionId;
+        const collection = afterData.collection || "masterclasses";
+        const tier = afterData.tier || "Standard";
+
+        console.log(`[REGISTRATION COMPLETED] Sending course details email to ${studentEmail} for ${sessionTitle} (Reg ID: ${registrationId})`);
+
+        // Look up session details from Firestore for dates, zoom links, instructors, and description
+        const session = await lookupSession(sessionId, collection);
+        const sessionData = session ? session.data : {};
+        
+        const instructor = sessionData.instructor || "Balaji Chippada";
+        const zoomLink = sessionData.zoomLink || "";
+        const prepPdfUrl = sessionData.prepPdfUrl || "";
+        const description = sessionData.description || sessionData.rawSyllabus || "";
+
+        let formattedDate = "TBA";
+        if (sessionData.dateTime) {
+          try {
+            const date = new Date(sessionData.dateTime);
+            formattedDate = date.toLocaleDateString("en-IN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true
+            }) + " (IST)";
+          } catch (e) {
+            formattedDate = sessionData.dateTime;
+          }
+        }
+
+        const subject = `Confirmed: Your seat is reserved for ${sessionTitle}! 🚀`;
+        
+        let body = `Hi ${studentName || "there"},\n\n` +
+          `Your registration is confirmed! Here are the details of the session/cohort you have reserved:\n\n` +
+          `Class: ${sessionTitle}\n` +
+          `Instructor: ${instructor}\n` +
+          `Date & Time: ${formattedDate}\n` +
+          `Tier: ${tier}\n\n`;
+
+        if (description) {
+          body += `--- Course Details & Syllabus ---\n${description}\n\n`;
+        }
+
+        body += `--- Preparation & Zoom Link ---\n`;
+        if (zoomLink) {
+          body += `Zoom Meeting Link: ${zoomLink}\n`;
+        } else {
+          body += `Zoom Meeting Link: Will be shared closer to the session date.\n`;
+        }
+
+        if (prepPdfUrl) {
+          body += `Preparation/Study Guide: ${prepPdfUrl}\n\n`;
+        } else {
+          body += `Preparation/Study Guide: No prep guides required for this session.\n\n`;
+        }
+
+        body += `We are super excited to have you join us! If you have any questions, feel free to reply directly to this email.\n\n` +
+          `Best regards,\n` +
+          `The Agent Engineer Team\n` +
+          `team@balajichippada.com`;
+
+        const resendApiKey = process.env.RESEND_API_KEY;
+        const smtpEmail = process.env.SMTP_EMAIL;
+        const smtpPass = process.env.SMTP_PASSWORD;
+
+        await sendEmailHelper({
+          email: studentEmail,
+          name: studentName,
+          subject,
+          body,
+          resendApiKey,
+          smtpEmail,
+          smtpPass,
+          from: "The Agent Engineer <team@balajichippada.com>"
+        });
+
+        // Update the registration document to show that the details email has been sent
+        await change.after.ref.update({
+          detailsEmailSent: true,
+          detailsEmailSentAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      return null;
+    } catch (err) {
+      console.error("[REGISTRATION ERROR] Failed to process registration email trigger:", err);
       return null;
     }
   });
