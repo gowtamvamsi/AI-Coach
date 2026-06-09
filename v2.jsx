@@ -271,6 +271,8 @@ function getMcPrice(mc) {
 }
 
 function isMcFree(mc) {
+  // No masterclass = not "free" (avoids null mislabeling CTAs as "Reserve free seat").
+  if (!mc) return false;
   return getMcPrice(mc) === 0;
 }
 
@@ -287,17 +289,40 @@ function formatMcPriceShort(mc) {
 
 function padIcs(n) { return String(n).padStart(2, '0'); }
 
-function toIcsDate(date) {
+// UTC stamp (used for DTSTAMP only).
+function toIcsDateUTC(date) {
   const d = new Date(date);
   return `${d.getUTCFullYear()}${padIcs(d.getUTCMonth() + 1)}${padIcs(d.getUTCDate())}T${padIcs(d.getUTCHours())}${padIcs(d.getUTCMinutes())}${padIcs(d.getUTCSeconds())}Z`;
+}
+
+// Wall-clock components AS SEEN IN Asia/Kolkata. The page always shows event
+// times in IST, so the calendar entry must match that exact wall clock (tagged
+// with TZID below) instead of a raw UTC instant that can drift for the viewer.
+function toIcsDateIST(date) {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+  const p = {};
+  for (const part of fmt.formatToParts(new Date(date))) p[part.type] = part.value;
+  const hour = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}${p.month}${p.day}T${hour}${p.minute}${p.second}`;
 }
 
 function generateICS({ title, startDate, endDate, description, location, organizerEmail }) {
   const uid = `${Date.now()}@agentengineer.in`;
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//The Agent Engineer//EN', 'BEGIN:VEVENT',
-    `UID:${uid}`, `DTSTAMP:${toIcsDate(new Date())}`, `DTSTART:${toIcsDate(startDate)}`,
-    `DTEND:${toIcsDate(endDate)}`, `SUMMARY:${title}`, `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//The Agent Engineer//EN', 'CALSCALE:GREGORIAN',
+    // India has no DST, so a single fixed +0530 offset is correct year-round.
+    'BEGIN:VTIMEZONE', 'TZID:Asia/Kolkata',
+    'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0530', 'TZOFFSETTO:+0530', 'TZNAME:IST', 'END:STANDARD',
+    'END:VTIMEZONE',
+    'BEGIN:VEVENT',
+    `UID:${uid}`, `DTSTAMP:${toIcsDateUTC(new Date())}`,
+    `DTSTART;TZID=Asia/Kolkata:${toIcsDateIST(startDate)}`,
+    `DTEND;TZID=Asia/Kolkata:${toIcsDateIST(endDate)}`,
+    `SUMMARY:${title}`, `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
     `LOCATION:${location || 'Online'}`, `ORGANIZER:mailto:${organizerEmail || 'balajichippada.20@gmail.com'}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
@@ -430,7 +455,7 @@ function V2PlaylistEmbed({ playlistId, title }) {
       : `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}&rel=0`);
 
   const posterUrl = active?.videoId
-    ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/sddefault.jpg`)
+    ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/hqdefault.jpg`)
     : '';
 
   return (
@@ -572,7 +597,7 @@ function V2ClickToPlayVideo({ videoId, playlistId, title, caption, startSec, tra
     : `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&start=${startSec || 0}`;
   const thumbUrl = H.youtubePoster
     ? H.youtubePoster(videoId)
-    : `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`;
+    : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
   const showCaption = !hideCaption && caption;
 
@@ -631,7 +656,7 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
   const H = window.ROADMAP_VIDEO_HELPERS || {};
   const thumbUrl = H.youtubePoster
     ? H.youtubePoster(videoId)
-    : `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`;
+    : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
   const threshold = H.PROGRESS_THRESHOLD || 0.8;
 
@@ -891,6 +916,7 @@ function V2BookingWizard({
   bookingLoading, bookingError, onClose, onGoogleLogin, onSubmitPayment, onSuccess,
   successData, setActiveMainTab,
 }) {
+  const [stepError, setStepError] = useState('');
   if (!session) return null;
   const tiers = getMcTiers(session);
   const tier = selectedTier || tiers[0];
@@ -903,7 +929,8 @@ function V2BookingWizard({
     const end = new Date(start.getTime() + (session.duration || 180) * 60000);
     return (
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-container v2-booking-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-container v2-booking-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Booking confirmed">
+          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
           <div className="v2-booking-success">
             <div className="v2-success-icon">✅</div>
             <h2 className="modal-title">You&apos;re in!</h2>
@@ -926,7 +953,7 @@ function V2BookingWizard({
                 </button>
               ) : (
                 <button type="button" className="form-btn v2-btn-secondary" onClick={() => { onClose(); setActiveMainTab('mybookings'); }}>
-                  Go to My Dashboard →
+                  Go to My Account →
                 </button>
               )}
             </div>
@@ -938,7 +965,7 @@ function V2BookingWizard({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container v2-booking-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-container v2-booking-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reserve your seat">
         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
 
         {!free && (
@@ -970,9 +997,15 @@ function V2BookingWizard({
         {step === 1 && (
           <form className="v2-booking-step" onSubmit={(e) => {
             e.preventDefault();
-            if (!bookingName.trim() || !bookingEmail.trim()) {
+            if (!bookingName.trim()) {
+              setStepError('Please enter your name.');
               return;
             }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail.trim())) {
+              setStepError('Please enter a valid email address.');
+              return;
+            }
+            setStepError('');
             // FREE → submit straight from this form. PAID → continue to payment step.
             if (free) {
               onSubmitPayment();
@@ -988,6 +1021,7 @@ function V2BookingWizard({
                 value={bookingName}
                 onChange={(e) => setBookingName(e.target.value)}
                 placeholder="Your name on the certificate"
+                autoComplete="name"
                 required
                 autoFocus
               />
@@ -1000,8 +1034,11 @@ function V2BookingWizard({
                 value={bookingEmail}
                 onChange={(e) => setBookingEmail(e.target.value)}
                 placeholder="you@example.com"
+                autoComplete="email"
+                inputMode="email"
                 required
                 readOnly={!!(user && !user.isAnonymous && bookingEmail)}
+                aria-readonly={!!(user && !user.isAnonymous && bookingEmail)}
               />
             </div>
             <div className="form-group">
@@ -1012,6 +1049,10 @@ function V2BookingWizard({
                 placeholder="+91 98765 43210"
                 value={bookingPhone}
                 onChange={(e) => setBookingPhone(e.target.value)}
+                autoComplete="tel"
+                inputMode="tel"
+                pattern="[0-9+\-\s()]{7,}"
+                title="Enter a valid phone number"
               />
             </div>
 
@@ -1022,6 +1063,11 @@ function V2BookingWizard({
               </div>
             </div>
 
+            {(stepError || bookingError) && (
+              <p className="v2-booking-error" role="alert" style={{ color: 'var(--c-rust)', fontSize: '13px', margin: '4px 0 0' }}>
+                {stepError || bookingError}
+              </p>
+            )}
             <button type="submit" className="form-btn v2-pay-btn" disabled={bookingLoading}>
               {free
                 ? (bookingLoading ? 'Reserving…' : 'Confirm my free seat →')
@@ -1306,7 +1352,7 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={e => e.stopPropagation()}>
+      <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Download the AI roadmap PDF">
         <button type="button" className="modal-close" onClick={onClose} aria-label="Close modal">×</button>
         <h3 className="modal-title">Get the <em>26-Week AI Roadmap PDF</em></h3>
         <p className="modal-desc">
@@ -1321,6 +1367,7 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
               placeholder="e.g. Balaji Chippada" 
               value={name} 
               onChange={e => setName(e.target.value)} 
+              autoComplete="name"
               required 
             />
           </div>
@@ -1332,6 +1379,8 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
               placeholder="e.g. balaji@example.com" 
               value={email} 
               onChange={e => setEmail(e.target.value)} 
+              autoComplete="email"
+              inputMode="email"
               required 
             />
           </div>
@@ -1398,6 +1447,7 @@ function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
             placeholder="Your Name" 
             value={name} 
             onChange={(e) => setName(e.target.value)} 
+            autoComplete="name"
             required 
             disabled={sent || loading} 
             style={{ flex: '1 1 200px' }}
@@ -1407,6 +1457,8 @@ function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
             placeholder="Your Email" 
             value={email} 
             onChange={(e) => setEmail(e.target.value)} 
+            autoComplete="email"
+            inputMode="email"
             required 
             disabled={sent || loading} 
             style={{ flex: '1 1 200px' }}
@@ -1479,7 +1531,7 @@ function V2FAQSection({ onLegal }) {
 
 // Top promo banner — ByteByteGo style, dismissible.
 // Dismissal is keyed to the masterclass id, so a new masterclass shows a fresh banner.
-function V2TopBanner({ nextMc, onReserve }) {
+function V2TopBanner({ nextMc, onReserve, canShow = true }) {
   const bannerKey = nextMc ? `v2_top_banner_dismissed:${nextMc.id || 'default'}` : null;
   const [dismissed, setDismissed] = useState(true);
 
@@ -1493,16 +1545,18 @@ function V2TopBanner({ nextMc, onReserve }) {
   }, [bannerKey]);
 
   useEffect(() => {
-    if (!dismissed && nextMc) {
+    if (canShow && !dismissed && nextMc) {
       document.body.classList.add('has-promo-banner');
     } else {
       document.body.classList.remove('has-promo-banner');
     }
     return () => document.body.classList.remove('has-promo-banner');
-  }, [dismissed, nextMc]);
+  }, [canShow, dismissed, nextMc]);
 
   // Dev escape hatch: window.resetPromoBanner() un-dismisses the current banner.
   useEffect(() => {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') return undefined;
     window.resetPromoBanner = () => {
       try {
         Object.keys(localStorage).forEach((k) => {
@@ -1520,7 +1574,7 @@ function V2TopBanner({ nextMc, onReserve }) {
     try { if (bannerKey) localStorage.setItem(bannerKey, '1'); } catch (e) {}
   };
 
-  if (dismissed || !nextMc) return null;
+  if (!canShow || dismissed || !nextMc) return null;
   const dateStr = formatMcShortDate(nextMc.dateTime);
   const free = isMcFree(nextMc);
   const titleShort = (nextMc.title || 'Live Masterclass').split(' ').slice(0, 3).join(' ');
@@ -1530,10 +1584,13 @@ function V2TopBanner({ nextMc, onReserve }) {
       <div className="v2-top-banner-inner">
         <span className="v2-top-banner-badge">{free ? 'FREE WEBINAR' : 'NOW ENROLLING'}</span>
         <span className="v2-top-banner-text">
-          Learn by doing — <strong>{titleShort}</strong> · {dateStr} · {formatMcPriceShort(nextMc)}
+          <span className="v2-top-banner-lead">Learn by doing — </span>
+          <strong>{titleShort}</strong> · {dateStr}
+          <span className="v2-top-banner-price"> · {formatMcPriceShort(nextMc)}</span>
         </span>
         <button type="button" className="v2-top-banner-cta" onClick={() => onReserve(nextMc)}>
-          {free ? 'Reserve free seat →' : 'Enroll now →'}
+          <span className="v2-top-banner-cta-full">{free ? 'Reserve free seat →' : 'Enroll now →'}</span>
+          <span className="v2-top-banner-cta-short">{free ? 'Reserve →' : 'Enroll →'}</span>
         </button>
       </div>
       <button type="button" className="v2-top-banner-close" onClick={handleDismiss} aria-label="Dismiss banner">×</button>
@@ -1618,12 +1675,19 @@ function V2Countdown({ dateTime }) {
 
 // Auto-show modal on first visit per masterclass. Two-view: summary → details.
 // Inspired by Krish Naik's webinar popup. Per-mc storage key.
-function V2WelcomePopup({ nextMc, onReserve }) {
-  if (!nextMc) return null;
-  const merged = mergeMcWithConfig(nextMc);
+function V2WelcomePopup({ nextMc, onReserve, onResolve }) {
+  // NOTE: all hooks must run on every render — never early-return above them.
+  // `nextMc` arrives async (null → object), so a conditional return here would
+  // change the hook count and crash React ("rendered more hooks than previous").
+  const merged = nextMc ? mergeMcWithConfig(nextMc) : null;
   const popupKey = merged ? `v2_welcome_popup_dismissed:${merged.id || 'default'}` : null;
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('summary'); // 'summary' | 'details'
+
+  // Keep the latest onResolve without re-triggering effects.
+  const resolveRef = React.useRef(onResolve);
+  resolveRef.current = onResolve;
+  const resolve = () => { try { resolveRef.current && resolveRef.current(); } catch (e) {} };
 
   // IMPORTANT: depend only on the STABLE popupKey (a string), NOT on `merged`.
   // `merged` is a fresh object on every render — including it would clear/reset
@@ -1631,16 +1695,20 @@ function V2WelcomePopup({ nextMc, onReserve }) {
   // get to open. The popupKey is derived from merged.id which only changes when
   // the actual masterclass changes.
   useEffect(() => {
-    if (!V2_CONFIG.showWelcomePopup || !popupKey) return undefined;
+    // Nothing to show (disabled / no masterclass) → hand off to the banner now.
+    if (!V2_CONFIG.showWelcomePopup || !popupKey) { resolve(); return undefined; }
     let dismissed = false;
     try { dismissed = localStorage.getItem(popupKey) === '1'; } catch (e) {}
-    if (dismissed) return undefined;
+    // Already closed on a prior visit → skip straight to the banner.
+    if (dismissed) { resolve(); return undefined; }
     const id = setTimeout(() => setOpen(true), V2_CONFIG.welcomePopupDelayMs);
     return () => clearTimeout(id);
   }, [popupKey]);
 
   // Dev escape hatch — same pattern as the banner reset.
   useEffect(() => {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') return undefined;
     window.resetWelcomePopup = () => {
       try {
         Object.keys(localStorage).forEach((k) => {
@@ -1662,15 +1730,31 @@ function V2WelcomePopup({ nextMc, onReserve }) {
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
+  // Escape closes the welcome popup (and hands off to the banner).
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      setView('summary');
+      try { if (popupKey) localStorage.setItem(popupKey, '1'); } catch (err) {}
+      resolve();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, popupKey]);
+
   const dismiss = () => {
     setOpen(false);
     setView('summary');
     try { if (popupKey) localStorage.setItem(popupKey, '1'); } catch (e) {}
+    resolve(); // let the promo banner take over
   };
 
   const register = () => {
     setOpen(false);
     try { if (popupKey) localStorage.setItem(popupKey, '1'); } catch (e) {}
+    resolve(); // banner can show after the booking flow opens
     onReserve(nextMc); // pass the original mc so booking flow gets the live state
   };
 
@@ -2069,7 +2153,7 @@ function V2ClosingCTA({ nextMc, onReserve }) {
   );
 }
 
-function V2MobileStickyBar({ nextMc, onReserve }) {
+function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 400);
@@ -2080,6 +2164,20 @@ function V2MobileStickyBar({ nextMc, onReserve }) {
   if (!nextMc) return null;
   const seats = getSeatsRemaining(nextMc);
   const free = isMcFree(nextMc);
+  // Already reserved → stop nudging; show a quiet "registered" confirmation.
+  if (reserved) {
+    return (
+      <div className={`v2-mobile-sticky v2-mobile-sticky--reserved ${visible ? 'is-visible' : ''}`}>
+        <div className="v2-mobile-sticky-meta">
+          <span className="v2-mobile-sticky-date">✓ You&apos;re registered</span>
+          <span className="v2-mobile-sticky-seats">{formatMcShortDate(nextMc.dateTime)}</span>
+        </div>
+        <button type="button" className="hero__primary-cta v2-mobile-sticky-btn" onClick={() => onManage && onManage()}>
+          View
+        </button>
+      </div>
+    );
+  }
   return (
     <div className={`v2-mobile-sticky ${visible ? 'is-visible' : ''}`}>
       <div className="v2-mobile-sticky-meta">
@@ -2126,8 +2224,8 @@ function V2LegalModal({ page, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>×</button>
+      <div className="modal-container" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={content.title}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         <h2 className="modal-title">{content.title}</h2>
         <p className="modal-desc">{content.body}</p>
       </div>

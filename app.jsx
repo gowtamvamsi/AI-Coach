@@ -129,6 +129,9 @@ function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoPro
               : false;
             return (
             <button key={i} role="tab" aria-selected={i === activeTab}
+              id={`phase-${phase.id}-tab-${i}`}
+              aria-controls={`phase-${phase.id}-panel`}
+              tabIndex={i === activeTab ? 0 : -1}
               className={`tabbox__tab ${i === activeTab ? 'active' : ''} ${done ? 'is-done' : ''} ${hasVideo ? 'has-video' : ''}`}
               onClick={() => setActiveTab(i)}>
               <span className="tabbox__tab-num">{s.n}</span>
@@ -140,7 +143,10 @@ function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoPro
         </div>
       </aside>
 
-      <div className="tabbox__panel" role="tabpanel">
+      <div className="tabbox__panel" role="tabpanel"
+        id={`phase-${phase.id}-panel`}
+        aria-labelledby={`phase-${phase.id}-tab-${activeTab}`}
+        tabIndex={0}>
         <div className="tabbox__panel-content" key={activeTab}>
           <div className="tabbox__module-head">
             <span className="tabbox__panel-num">
@@ -873,7 +879,7 @@ function TestimonialMarquee() {
 // Symmetrically grows in size (peaks at 1.12x in center) and fades gracefully on scroll.
 // ===============================================================
 
-function MasterclassCard({ mc, idx, user, onBook }) {
+function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
   const cardRef = useRef(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
@@ -905,12 +911,24 @@ function MasterclassCard({ mc, idx, user, onBook }) {
   // Symmetrical grow-and-shrink card effect:
   // Starts at scale 0.90 entering from bottom, peaks at scale 1.12 in viewport center (very dramatic and big!), shrinks back to 0.90 exiting top.
   const cardScale = useTransform ? useTransform(activeProgress, [0, 0.5, 1], [scaleMin, scaleMax, scaleMin]) : 1;
-  const cardOpacity = useTransform ? useTransform(activeProgress, [0, 0.15, 0.85, 1], [0.65, 1, 1, 0.65]) : 1;
+  // Don't fade cards on mobile — it hurts readability while scrolling.
+  const cardOpacity = useTransform
+    ? useTransform(activeProgress, [0, 0.15, 0.85, 1], isMobileViewport ? [1, 1, 1, 1] : [0.65, 1, 1, 0.65])
+    : 1;
 
   const mcDate = mc.dateTime ? new Date(mc.dateTime) : null;
   const isMostPopular = mc.title.toLowerCase().includes('rag') || idx === 0;
   const seatsLeft = getSeatsRemaining(mc);
   const outcome = getMcOutcome(mc);
+
+  // Pricing / availability — keep consistent with nav + booking wizard.
+  const free = isMcFree(mc);
+  const hasSeatData = typeof mc.seatsBooked === 'number';
+  const soldOut = hasSeatData && seatsLeft <= 0;
+  const showUrgency = hasSeatData && seatsLeft > 0 && seatsLeft <= 15;
+  const priceText = free ? 'Free' : `₹${(mc.price || 0).toLocaleString()}`;
+  const ctaText = soldOut ? 'Sold out' : (free ? 'Reserve free seat' : `Book my seat — ${priceText}`);
+  const subcopyText = free ? 'Instant Zoom link · No sign-up needed' : 'Instant Zoom link · No account needed';
 
   return (
     <div ref={cardRef} style={{ margin: isMobileViewport ? '40px 0' : '140px 0', padding: '0', overflow: 'visible' }}>
@@ -971,7 +989,7 @@ function MasterclassCard({ mc, idx, user, onBook }) {
                   )}
                   <div className="mc-card__price-label" style={{ margin: 0 }}>Registration</div>
                 </div>
-                <div className="mc-card__price">₹{(mc.price || 0).toLocaleString()}</div>
+                <div className="mc-card__price">{priceText}</div>
               </div>
             </div>
 
@@ -989,7 +1007,7 @@ function MasterclassCard({ mc, idx, user, onBook }) {
                     : <strong>Date TBA</strong>
                   }
                 </div>
-                {seatsLeft > 0 && (
+                {showUrgency && (
                 <div className="mc-card__urgency" style={{
                   fontSize: '12px',
                   fontWeight: 500,
@@ -1011,29 +1029,48 @@ function MasterclassCard({ mc, idx, user, onBook }) {
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                <ShimmerButton
-                  variant="dark"
-                  style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
-                  onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
-                      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                      <path d="M13 5v2" />
-                      <path d="M13 17v2" />
-                      <path d="M13 11v2" />
-                    </svg>
-                    <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
-                  </div>
-                </ShimmerButton>
+                {reserved ? (
+                  <button
+                    type="button"
+                    className="form-btn"
+                    onClick={() => onManage && onManage()}
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto', margin: 0, background: 'var(--c-emerald)', color: '#fff', border: 'none' }}
+                  >
+                    ✓ Reserved · View
+                  </button>
+                ) : soldOut ? (
+                  <button
+                    type="button"
+                    className="form-btn"
+                    disabled
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto', opacity: 0.55, cursor: 'not-allowed', margin: 0 }}
+                  >
+                    Sold out
+                  </button>
+                ) : (
+                  <ShimmerButton
+                    variant="dark"
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
+                    onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
+                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                        <path d="M13 5v2" />
+                        <path d="M13 17v2" />
+                        <path d="M13 11v2" />
+                      </svg>
+                      <span>{ctaText}</span>
+                    </div>
+                  </ShimmerButton>
+                )}
                 <div style={{
                   fontSize: '11px',
                   color: 'var(--fg-faint)',
                   textAlign: 'right',
-                  marginTop: '4px',
-                  whiteSpace: 'nowrap'
+                  marginTop: '4px'
                 }}>
-                  Instant Zoom link · No account needed
+                  {reserved ? 'You\u2019re registered — check your email for the Zoom link' : subcopyText}
                 </div>
               </div>
             </div>
@@ -1084,7 +1121,7 @@ function MasterclassCard({ mc, idx, user, onBook }) {
                   )}
                   <div className="mc-card__price-label" style={{ margin: 0 }}>Registration</div>
                 </div>
-                <div className="mc-card__price">₹{(mc.price || 0).toLocaleString()}</div>
+                <div className="mc-card__price">{priceText}</div>
               </div>
             </div>
 
@@ -1102,7 +1139,7 @@ function MasterclassCard({ mc, idx, user, onBook }) {
                     : <strong>Date TBA</strong>
                   }
                 </div>
-                {seatsLeft > 0 && (
+                {showUrgency && (
                 <div className="mc-card__urgency" style={{
                   fontSize: '12px',
                   fontWeight: 500,
@@ -1124,29 +1161,48 @@ function MasterclassCard({ mc, idx, user, onBook }) {
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                <ShimmerButton
-                  variant="dark"
-                  style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
-                  onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
-                      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-                      <path d="M13 5v2" />
-                      <path d="M13 17v2" />
-                      <path d="M13 11v2" />
-                    </svg>
-                    <span>Book my seat — ₹{(mc.price || 0).toLocaleString()}</span>
-                  </div>
-                </ShimmerButton>
+                {reserved ? (
+                  <button
+                    type="button"
+                    className="form-btn"
+                    onClick={() => onManage && onManage()}
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto', margin: 0, background: 'var(--c-emerald)', color: '#fff', border: 'none' }}
+                  >
+                    ✓ Reserved · View
+                  </button>
+                ) : soldOut ? (
+                  <button
+                    type="button"
+                    className="form-btn"
+                    disabled
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto', opacity: 0.55, cursor: 'not-allowed', margin: 0 }}
+                  >
+                    Sold out
+                  </button>
+                ) : (
+                  <ShimmerButton
+                    variant="dark"
+                    style={{ padding: '10px 20px', borderRadius: '8px', width: 'auto' }}
+                    onClick={() => onBook({ ...mc, description: mc.rawSyllabus || '' })}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}>
+                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                        <path d="M13 5v2" />
+                        <path d="M13 17v2" />
+                        <path d="M13 11v2" />
+                      </svg>
+                      <span>{ctaText}</span>
+                    </div>
+                  </ShimmerButton>
+                )}
                 <div style={{
                   fontSize: '11px',
                   color: 'var(--fg-faint)',
                   textAlign: 'right',
-                  marginTop: '4px',
-                  whiteSpace: 'nowrap'
+                  marginTop: '4px'
                 }}>
-                  Instant Zoom link · No account needed
+                  {reserved ? 'You\u2019re registered — check your email for the Zoom link' : subcopyText}
                 </div>
               </div>
             </div>
@@ -2097,9 +2153,20 @@ function TestimonialsSection() {
           </p>
           <button
             className="hero__primary-cta"
-            onClick={() => openBooking(nextMasterclass)}
+            onClick={() => {
+              if (nextMcReserved) {
+                goToAccount();
+              } else if (nextMasterclass) {
+                openBooking(nextMasterclass);
+              } else {
+                const el = document.getElementById('masterclasses');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
           >
-            Book my seat →
+            {nextMcReserved
+              ? 'You\u2019re registered ✓ · View'
+              : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve my free seat →' : 'Book my seat →') : 'See upcoming classes →')}
           </button>
         </div>
       </RevealOnScroll>
@@ -4084,7 +4151,8 @@ ${mcRawSyllabus}`;
         </div>
       </div>
 
-      {/* ── Marketing & Audience Management Panel (Full Width) ── */}
+      {/* ── Marketing & Audience Management Panel (Full Width) — admin only ── */}
+      {isAdmin && (
       <div className="dashboard__panel" style={{ marginTop: "28px" }}>
         <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           📈 Marketing & Audience Management
@@ -4370,9 +4438,10 @@ ${mcRawSyllabus}`;
           )}
         </div>
       </div>
+      )}
 
-      {/* 5. Marketing Email Broadcast Modal */}
-      {showBroadcastModal && (
+      {/* 5. Marketing Email Broadcast Modal — admin only */}
+      {isAdmin && showBroadcastModal && (
         <div className="modal-overlay" style={{ zIndex: 300 }}>
           <div className="modal-container" onClick={e => e.stopPropagation()} style={{ width: "min(640px, 100%)" }}>
             <button className="modal-close" onClick={() => setShowBroadcastModal(false)} disabled={isSendingBroadcast}>×</button>
@@ -4547,6 +4616,11 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false); // for nav blur
   const [navMenuOpen, setNavMenuOpen] = useState(false);
+
+  // Welcome popup → promo banner handoff. Banner stays hidden until the popup
+  // resolves (closed, already-dismissed, or disabled), so they never stack.
+  const [welcomeResolved, setWelcomeResolved] = useState(false);
+  const handleWelcomeResolved = React.useCallback(() => setWelcomeResolved(true), []);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
     const stored = localStorage.getItem('roadmap-theme');
@@ -4635,6 +4709,22 @@ function App() {
   const [bookingError, setBookingError] = useState("");
   const [selectedTier, setSelectedTier] = useState(null);
   const [legalPage, setLegalPage] = useState(null);
+
+  // Track which masterclasses this visitor has already reserved, so we stop
+  // prompting them (sticky bar, banner, CTAs) and show a "registered" state.
+  const [reservedMcIds, setReservedMcIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('reserved_mc_ids') || '[]'); }
+    catch (e) { return []; }
+  });
+  const markReserved = React.useCallback((mcId) => {
+    if (!mcId) return;
+    setReservedMcIds((prev) => {
+      if (prev.includes(mcId)) return prev;
+      const next = [...prev, mcId];
+      try { localStorage.setItem('reserved_mc_ids', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }, []);
   
   // Checkout mock sandbox screen state
   const [mockCheckoutData, setMockCheckoutData] = useState(null);
@@ -4927,10 +5017,14 @@ function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      // Don't hijack the shortcut while another dialog owns the screen.
+      const otherModalOpen = modalOpenRef.current && !searchOpen;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (otherModalOpen) return;
         e.preventDefault();
         setSearchOpen(o => !o);
       } else if (e.key === '/' && !searchOpen) {
+        if (otherModalOpen) return;
         const tag = (e.target && e.target.tagName) || '';
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         e.preventDefault();
@@ -4943,9 +5037,13 @@ function App() {
 
   useEffect(() => {
     if (user && bookingSession && bookingStep === 1) {
-      setBookingStep(2);
+      // Always prefill from the account.
       setBookingName(user.displayName || bookingName);
       setBookingEmail(user.email || bookingEmail);
+      // Only skip to the payment step for PAID sessions. Free sessions have no
+      // step 2 — keep them on step 1 (which holds the form + "Confirm free seat"),
+      // otherwise logged-in users get an empty modal.
+      if (!isMcFree(bookingSession)) setBookingStep(2);
     }
   }, [user, bookingSession, bookingStep]);
 
@@ -5038,6 +5136,69 @@ function App() {
     document.body.classList.toggle('nav-menu-open', navMenuOpen);
     return () => document.body.classList.remove('nav-menu-open');
   }, [navMenuOpen]);
+
+  // Hide floating CTAs + lock background scroll while any dialog is open.
+  const anyModalOpen = !!(
+    bookingSession || bookingSuccess || staffLoginOpen || mockCheckoutData ||
+    showCompleteProfile || leadModalOpen || legalPage || searchOpen
+  );
+  // Kept current so keyboard handlers registered earlier can read live state.
+  const modalOpenRef = useRef(false);
+  modalOpenRef.current = anyModalOpen;
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', anyModalOpen);
+    return () => document.body.classList.remove('modal-open');
+  }, [anyModalOpen]);
+
+  // Minimal focus trap: keep Tab focus inside the top-most open dialog and move
+  // focus into it on open. Covers all overlays (.modal-overlay, .cmdk, welcome).
+  useEffect(() => {
+    if (!anyModalOpen) return undefined;
+    const SEL = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    const getContainer = () => {
+      const overlays = document.querySelectorAll('.modal-overlay, .cmdk, .v2-welcome-overlay');
+      return overlays.length ? overlays[overlays.length - 1] : null;
+    };
+    const container = getContainer();
+    if (container) {
+      const first = container.querySelector(SEL);
+      if (first && !container.contains(document.activeElement)) {
+        try { first.focus({ preventScroll: true }); } catch (e) {}
+      }
+    }
+    const onKeyDown = (e) => {
+      if (e.key !== 'Tab') return;
+      const c = getContainer();
+      if (!c) return;
+      const items = Array.from(c.querySelectorAll(SEL)).filter(el => el.offsetParent !== null || el === document.activeElement);
+      if (!items.length) return;
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault(); lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault(); firstEl.focus();
+      } else if (!c.contains(document.activeElement)) {
+        e.preventDefault(); firstEl.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [anyModalOpen]);
+
+  // Escape closes dismissible dialogs (profile completion is intentionally forced)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (bookingSession || bookingSuccess) { closeBooking(); return; }
+      if (mockCheckoutData) { setMockCheckoutData(null); return; }
+      if (staffLoginOpen) { setStaffLoginOpen(false); return; }
+      if (leadModalOpen) { setLeadModalOpen(false); return; }
+      if (legalPage) { setLegalPage(null); return; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [bookingSession, bookingSuccess, mockCheckoutData, staffLoginOpen, leadModalOpen, legalPage]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setNavMenuOpen(false); };
@@ -5222,6 +5383,7 @@ function App() {
     });
     setMockCheckoutData(null);
     setBookingStep('success');
+    if (session && session.id) markReserved(session.id);
     if (user && !user.isAnonymous && db && session) {
       try {
         await db.collection('users').doc(user.uid).collection('bookings').add({
@@ -5543,6 +5705,8 @@ function App() {
   // mergeMcWithConfig makes site.config.js win for content; Firestore only
   // contributes runtime state (seatsBooked, zoomLink, etc).
   const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions), masterclasses, sessions);
+  const nextMcReserved = !!(nextMasterclass && reservedMcIds.includes(nextMasterclass.id));
+  const goToAccount = () => { if (isUserStaff) switchMainTab('dashboard'); else switchMainTab('mybookings'); };
   const bookingCtx = {
     setBookingSession, setBookingStep, setBookingSuccess, setSelectedTier,
     setBookingName, setBookingEmail, setBookingPhone, setBookingError, user,
@@ -5580,7 +5744,7 @@ function App() {
           className={`nav__tab-btn ${activeMainTab === 'mybookings' ? 'active' : ''}`}
           onClick={() => switchMainTab('mybookings')}
         >
-          My Masterclasses
+          My Account
         </button>
       )}
       {isUserStaff && (
@@ -5603,22 +5767,33 @@ function App() {
         className="nav__drawer-cta"
         onClick={() => {
           setNavMenuOpen(false);
-          openBooking(nextMasterclass);
+          if (nextMasterclass) {
+            openBooking(nextMasterclass);
+          } else {
+            const el = document.getElementById('masterclasses');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }
         }}
       >
-        {isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat'}
+        {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
       </button>
       {user && !user.isAnonymous ? (
-        <button
-          type="button"
-          className="nav__drawer-auth"
-          onClick={() => {
-            if (isUserStaff) switchMainTab('dashboard');
-            else switchMainTab('mybookings');
-          }}
-        >
-          {(user.email || 'My account').substring(0, 28)}{(user.email || '').length > 28 ? '…' : ''}
-        </button>
+        <React.Fragment>
+          <button
+            type="button"
+            className="nav__drawer-auth"
+            onClick={() => { setNavMenuOpen(false); goToAccount(); }}
+          >
+            {isUserStaff ? 'Dashboard' : 'My Account'}
+          </button>
+          <button
+            type="button"
+            className="nav__drawer-auth nav__drawer-logout"
+            onClick={() => { setNavMenuOpen(false); handleLogout(); }}
+          >
+            Log out
+          </button>
+        </React.Fragment>
       ) : (
         <button
           type="button"
@@ -5667,9 +5842,11 @@ function App() {
 
   return (
     <React.Fragment>
-      {/* Top promo banner — dismissible, persistent across the app */}
-      <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} />
-      <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} />
+      {/* Interruption ladder: welcome popup first → (on close) promo banner → (on close) nothing.
+          The banner only appears once the popup has been resolved (shown+closed, already
+          dismissed on a prior visit, or disabled). */}
+      <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} onResolve={handleWelcomeResolved} />
+      <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} canShow={welcomeResolved && !nextMcReserved} />
 
       {motion ? (
         <motion.nav
@@ -5705,7 +5882,7 @@ function App() {
                 else switchMainTab('mybookings');
               }}
             >
-              {(user.email || '').substring(0, 10)}...
+              {user.displayName ? user.displayName.split(' ')[0] : 'My account'}
             </button>
           ) : (
             <button
@@ -5721,9 +5898,16 @@ function App() {
 
           <button
             className="nav__book-seat-btn"
-            onClick={() => openBooking(nextMasterclass)}
+            onClick={() => {
+              if (nextMasterclass) {
+                openBooking(nextMasterclass);
+              } else {
+                const el = document.getElementById('masterclasses');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
           >
-            Book a seat
+            {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
           </button>
 
           <button
@@ -5750,6 +5934,27 @@ function App() {
             {mainNavTabs}
           </div>
           <div className="nav__right">
+            {user && !user.isAnonymous ? (
+              <button
+                className="nav__auth-btn is-active"
+                onClick={() => {
+                  if (isUserStaff) switchMainTab('dashboard');
+                  else switchMainTab('mybookings');
+                }}
+              >
+                {user.displayName ? user.displayName.split(' ')[0] : 'My account'}
+              </button>
+            ) : (
+              <button
+                className="nav__auth-btn"
+                onClick={() => {
+                  setLoginError("");
+                  setStaffLoginOpen(true);
+                }}
+              >
+                Sign In / Register
+              </button>
+            )}
             <button
               className="nav__book-seat-btn"
               onClick={() => {
@@ -5761,9 +5966,15 @@ function App() {
                 }
               }}
             >
-              {isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat'}
+              {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
             </button>
-            <button type="button" className="theme-toggle" onClick={toggleTheme}>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+              aria-pressed={theme === 'dark'}
+            >
               <span className="theme-toggle__track">
                 <span className="theme-toggle__thumb" aria-hidden="true">
                   {theme === 'light' ? '☀' : '☾'}
@@ -5783,22 +5994,42 @@ function App() {
         id="mobile-nav-drawer"
         className={`nav__drawer${navMenuOpen ? ' is-open' : ''}`}
         aria-hidden={!navMenuOpen}
+        role="dialog"
+        aria-modal={navMenuOpen ? 'true' : undefined}
         aria-label="Site menu"
       >
         <div className="nav__drawer-head">
-          <button
-            type="button"
-            className="nav__drawer-brand"
-            onClick={() => switchMainTab('home')}
-          >
-            <img
-              className="nav__drawer-photo"
-              src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
-              alt=""
-              aria-hidden="true"
-            />
-            <span className="nav__drawer-title">{V2_BRAND.name}</span>
-          </button>
+          {user && !user.isAnonymous ? (
+            <button
+              type="button"
+              className="nav__drawer-user"
+              onClick={() => { setNavMenuOpen(false); goToAccount(); }}
+              aria-label="Open my account"
+            >
+              <span className="nav__drawer-user-avatar" aria-hidden="true">
+                {(user.displayName || user.email || '?').trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="nav__drawer-user-text">
+                <span className="nav__drawer-user-name">{user.displayName || 'Your account'}</span>
+                <span className="nav__drawer-user-email">{user.email}</span>
+              </span>
+              <span className="nav__drawer-user-chevron" aria-hidden="true">›</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="nav__drawer-brand"
+              onClick={() => switchMainTab('home')}
+            >
+              <img
+                className="nav__drawer-photo"
+                src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
+                alt=""
+                aria-hidden="true"
+              />
+              <span className="nav__drawer-title">{V2_BRAND.name}</span>
+            </button>
+          )}
           <button
             type="button"
             className="nav__drawer-close"
@@ -5867,6 +6098,8 @@ function App() {
                         idx={idx}
                         user={user}
                         onBook={openBooking}
+                        reserved={reservedMcIds.includes(mc.id)}
+                        onManage={goToAccount}
                       />
                     ))}
                   </div>
@@ -5875,9 +6108,9 @@ function App() {
                 {/* ── Legacy Session Cards (shown when no masterclasses yet, or as secondary) ── */}
                 {(loadingSessions || loadingMasterclasses) && activeMasterclasses.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "60px", color: "var(--fg-faint)" }}>
-                    <div style={{ fontSize: "14px", fontFamily: "JetBrains Mono" }}>Loading active classes...</div>
+                    <div style={{ fontSize: "14px", fontFamily: "JetBrains Mono" }}>Loading classes…</div>
                   </div>
-                ) : activeMasterclasses.length === 0 && activeSessions.length === 0 ? (
+                ) : activeMasterclasses.length === 0 && activeSessions.length === 0 && !nextMasterclass ? (
                   <div className="coaching-empty">
                     <div className="coaching-empty__icon">📅</div>
                     <h2 className="coaching-empty__title">Classes schedule pending</h2>
@@ -5904,7 +6137,7 @@ function App() {
                               <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                               </svg>
-                              <span>{new Date(s.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                              <span>{(() => { const d = s.dateTime ? new Date(s.dateTime) : null; return d && !isNaN(d) ? d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Date TBA'; })()}</span>
                             </div>
                             <div className="session-card__badge">
                               <svg className="session-card__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -5916,14 +6149,14 @@ function App() {
 
                           <div className="session-card__price-row">
                             <span className="session-card__price-label">Registration Ticket</span>
-                            <span className="session-card__price">₹{(s.price || 0).toLocaleString()}</span>
+                            <span className="session-card__price">{isMcFree(s) ? 'Free' : `₹${(s.price || 0).toLocaleString()}`}</span>
                           </div>
 
                           <ShimmerButton
                             variant="dark"
                             onClick={() => openBooking(s)}
                           >
-                            Book Seat
+                            {isMcFree(s) ? 'Reserve free seat' : 'Book Seat'}
                           </ShimmerButton>
                         </article>
                       ))}
@@ -5944,7 +6177,7 @@ function App() {
           {window.V2RoadmapTeaser && (
             <window.V2RoadmapTeaser 
               onRoadmap={() => { setActiveMainTab('roadmap'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              onLeadCapture={({ name, email }) => console.log('Lead captured:', name, email)}
+              onLeadCapture={() => {}}
             />
           )}
 
@@ -6033,8 +6266,8 @@ function App() {
       {/* 2. Simulated Razorpay Checkout Gateway Sandbox (dev only) */}
       {mockCheckoutData && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
         <div className="modal-overlay">
-          <div className="modal-container" style={{ border: "1px solid var(--c-amber)" }}>
-            <button className="modal-close" onClick={() => setMockCheckoutData(null)}>×</button>
+          <div className="modal-container" style={{ border: "1px solid var(--c-amber)" }} role="dialog" aria-modal="true" aria-label="Simulated payment gateway">
+            <button className="modal-close" onClick={() => setMockCheckoutData(null)} aria-label="Close">×</button>
             <div className="coaching-home__eyebrow" style={{ color: "var(--c-amber)", border: "1px solid var(--c-amber)" }}>
               Simulated Razorpay Gateway
             </div>
@@ -6083,8 +6316,8 @@ function App() {
       {/* 3. Staff/Client Registration & Login Modal */}
       {staffLoginOpen && (
         <div className="modal-overlay" onClick={() => setStaffLoginOpen(false)}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setStaffLoginOpen(false)}>×</button>
+          <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={isRegistering ? 'Create an account' : 'Sign in'}>
+            <button className="modal-close" onClick={() => setStaffLoginOpen(false)} aria-label="Close">×</button>
             <h2 className="modal-title">
               {isRegistering ? "Create an account" : <>Sign in to <em>Account</em></>}
             </h2>
@@ -6111,6 +6344,7 @@ function App() {
                     placeholder="Enter your full name" 
                     value={regName}
                     onChange={e => setRegName(e.target.value)}
+                    autoComplete="name"
                     required
                   />
                 </div>
@@ -6124,6 +6358,8 @@ function App() {
                   placeholder="Enter your full email address" 
                   value={loginEmail}
                   onChange={e => setLoginEmail(e.target.value)}
+                  autoComplete="email"
+                  inputMode="email"
                   required
                 />
               </div>
@@ -6136,6 +6372,7 @@ function App() {
                   placeholder="Enter password"
                   value={loginPassword}
                   onChange={e => setLoginPassword(e.target.value)}
+                  autoComplete={isRegistering ? "new-password" : "current-password"}
                   required
                 />
               </div>
@@ -6150,6 +6387,10 @@ function App() {
                       placeholder="Enter your phone number" 
                       value={regPhone}
                       onChange={e => setRegPhone(e.target.value)}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      pattern="[0-9+\-\s()]{7,}"
+                      title="Enter a valid phone number"
                       required
                     />
                   </div>
@@ -6245,17 +6486,15 @@ function App() {
             onClose={() => setLeadModalOpen(false)}
             source={leadModalSource}
             downloadUrl={leadModalDownloadUrl}
-            onSuccess={({ name, email }) => {
-              console.log('Lead captured successfully:', name, email);
-            }}
+            onSuccess={() => {}}
           />
         );
       })()}
 
       {/* 4. Forced Profile Completion Modal */}
       {showCompleteProfile && (
-        <div className="modal-overlay" style={{ zIndex: 200 }}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Complete your profile">
             <h2 className="modal-title">Complete <em>Profile</em></h2>
             <p className="modal-desc" style={{ marginBottom: "24px" }}>
               Just a few more details to set up your account and start learning.
@@ -6277,6 +6516,7 @@ function App() {
                   placeholder="Enter your full name" 
                   value={regName}
                   onChange={e => setRegName(e.target.value)}
+                  autoComplete="name"
                   required
                 />
               </div>
@@ -6288,6 +6528,7 @@ function App() {
                   className="form-input" 
                   style={{ opacity: 0.7, cursor: "not-allowed" }}
                   value={user ? user.email : ""}
+                  autoComplete="email"
                   disabled
                   readOnly
                 />
@@ -6301,6 +6542,10 @@ function App() {
                   placeholder="Enter your phone number" 
                   value={regPhone}
                   onChange={e => setRegPhone(e.target.value)}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  pattern="[0-9+\-\s()]{7,}"
+                  title="Enter a valid phone number"
                   required
                 />
               </div>
@@ -6343,6 +6588,15 @@ function App() {
               >
                 {loginLoading ? "Saving Profile..." : "Complete Account Setup"}
               </button>
+              <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px", color: "var(--fg-dim)" }}>
+                <button
+                  type="button"
+                  style={{ background: "none", border: "none", color: "var(--fg-faint)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}
+                  onClick={() => { setShowCompleteProfile(false); handleLogout(); }}
+                >
+                  Not now — sign out
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -6379,7 +6633,7 @@ function App() {
         </div>
       )}
 
-      <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} />
+      <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
       <V2WhatsAppButton />
       <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
