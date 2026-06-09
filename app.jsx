@@ -48,9 +48,29 @@ if (typeof firebase !== 'undefined') {
   auth = firebase.auth();
   db = firebase.firestore();
   functions = firebase.functions();
-  if (firebaseConfig.measurementId && typeof firebase.analytics === 'function') {
+  const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocalHost && firebaseConfig.measurementId && typeof firebase.analytics === 'function') {
     firebase.analytics();
   }
+}
+
+function loadRazorpaySdk() {
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-razorpay-checkout]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.dataset.razorpayCheckout = 'true';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay Checkout SDK.'));
+    document.head.appendChild(script);
+  });
 }
 
 const GOOGLE_AUTH_INTENT_KEY = 'googleAuthIntent';
@@ -4526,6 +4546,7 @@ function App() {
   const [dockVisible, setDockVisible] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false); // for nav blur
+  const [navMenuOpen, setNavMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
     const stored = localStorage.getItem('roadmap-theme');
@@ -5013,10 +5034,27 @@ function App() {
     return () => io.disconnect();
   }, [activeMainTab]);
 
+  useEffect(() => {
+    document.body.classList.toggle('nav-menu-open', navMenuOpen);
+    return () => document.body.classList.remove('nav-menu-open');
+  }, [navMenuOpen]);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setNavMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth > 768) setNavMenuOpen(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   // Scroll action helpers for Roadmap
-  const scrollToElement = (el, mobileOffset = 24, desktopOffset = 72, includePadding = false) => {
+  const scrollToElement = (el, mobileOffset = 72, desktopOffset = 72, includePadding = false) => {
     if (!el) return;
-    const navOffset = window.innerWidth <= 700 ? mobileOffset : desktopOffset;
+    const navOffset = window.innerWidth <= 768 ? mobileOffset : desktopOffset;
     const pt = includePadding
       ? parseFloat(window.getComputedStyle(el).paddingTop) || 0
       : 0;
@@ -5337,9 +5375,8 @@ function App() {
               orderId: orderData.orderId,
             });
           }
-        } else if (typeof window.Razorpay === 'undefined') {
-          throw new Error('Razorpay Checkout SDK is not loaded in browser.');
         } else {
+          await loadRazorpaySdk();
           const options = {
             key: orderData.keyId,
             amount: orderData.amount,
@@ -5512,6 +5549,122 @@ function App() {
   };
   const openBooking = (mc) => openBookingForSession(mc || nextMasterclass, bookingCtx);
 
+  const switchMainTab = (tab) => {
+    setActiveMainTab(tab);
+    setNavMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const mainNavTabs = (
+    <React.Fragment>
+      <button
+        role="tab"
+        aria-selected={activeMainTab === 'home'}
+        className={`nav__tab-btn ${activeMainTab === 'home' ? 'active' : ''}`}
+        onClick={() => switchMainTab('home')}
+      >
+        Home
+      </button>
+      <button
+        role="tab"
+        aria-selected={activeMainTab === 'roadmap'}
+        className={`nav__tab-btn ${activeMainTab === 'roadmap' ? 'active' : ''}`}
+        onClick={() => switchMainTab('roadmap')}
+      >
+        Full Roadmap
+      </button>
+      {user && !user.isAnonymous && !isUserStaff && (
+        <button
+          role="tab"
+          aria-selected={activeMainTab === 'mybookings'}
+          className={`nav__tab-btn ${activeMainTab === 'mybookings' ? 'active' : ''}`}
+          onClick={() => switchMainTab('mybookings')}
+        >
+          My Masterclasses
+        </button>
+      )}
+      {isUserStaff && (
+        <button
+          role="tab"
+          aria-selected={activeMainTab === 'dashboard'}
+          className={`nav__tab-btn ${activeMainTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => switchMainTab('dashboard')}
+        >
+          Dashboard
+        </button>
+      )}
+    </React.Fragment>
+  );
+
+  const navDrawerActions = (
+    <React.Fragment>
+      <button
+        type="button"
+        className="nav__drawer-cta"
+        onClick={() => {
+          setNavMenuOpen(false);
+          openBooking(nextMasterclass);
+        }}
+      >
+        {isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat'}
+      </button>
+      {user && !user.isAnonymous ? (
+        <button
+          type="button"
+          className="nav__drawer-auth"
+          onClick={() => {
+            if (isUserStaff) switchMainTab('dashboard');
+            else switchMainTab('mybookings');
+          }}
+        >
+          {(user.email || 'My account').substring(0, 28)}{(user.email || '').length > 28 ? '…' : ''}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="nav__drawer-auth"
+          onClick={() => {
+            setLoginError("");
+            setStaffLoginOpen(true);
+            setNavMenuOpen(false);
+          }}
+        >
+          Sign In / Register
+        </button>
+      )}
+    </React.Fragment>
+  );
+
+  const navBrand = (
+    <button
+      type="button"
+      className="nav__brand"
+      onClick={() => switchMainTab('home')}
+      aria-label="Go to home"
+    >
+      <img
+        className="nav__brand-photo"
+        src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
+        alt=""
+        aria-hidden="true"
+      />
+      <span className="nav__brand-name">{V2_BRAND.name}</span>
+    </button>
+  );
+
+  const navMenuButton = (
+    <button
+      type="button"
+      className={`nav__menu-btn ${navMenuOpen ? 'is-open' : ''}`}
+      aria-label={navMenuOpen ? 'Close menu' : 'Open menu'}
+      aria-expanded={navMenuOpen}
+      aria-controls="mobile-nav-drawer"
+      onClick={() => setNavMenuOpen((open) => !open)}
+    >
+      <span className="nav__menu-icon" aria-hidden="true" />
+    </button>
+  );
+
   return (
     <React.Fragment>
       {/* Top promo banner — dismissible, persistent across the app */}
@@ -5534,66 +5687,29 @@ function App() {
           }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
         >
-        <div className="nav__brand">
-          <span className="nav__brand-mark" aria-hidden="true">A</span>
-          <span><b>Agent Engineer</b> · Coaching</span>
+        <div className="nav__start">
+          {navMenuButton}
+          <div className="nav__brand-wrap">{navBrand}</div>
         </div>
 
-        {/* Tabbed Navigation header in the navbar */}
         <div className="nav__tabs" role="tablist">
-          <button 
-            role="tab" 
-            aria-selected={activeMainTab === 'home'}
-            className={`nav__tab-btn ${activeMainTab === 'home' ? 'active' : ''}`}
-            onClick={() => setActiveMainTab('home')}
-          >
-            Home
-          </button>
-          <button 
-            role="tab" 
-            aria-selected={activeMainTab === 'roadmap'}
-            className={`nav__tab-btn ${activeMainTab === 'roadmap' ? 'active' : ''}`}
-            onClick={() => setActiveMainTab('roadmap')}
-          >
-            Full Roadmap
-          </button>
-          {user && !user.isAnonymous && !isUserStaff && (
-            <button
-              role="tab"
-              aria-selected={activeMainTab === 'mybookings'}
-              className={`nav__tab-btn ${activeMainTab === 'mybookings' ? 'active' : ''}`}
-              onClick={() => setActiveMainTab('mybookings')}
-            >
-              My Masterclasses
-            </button>
-          )}
-          {isUserStaff && (
-            <button 
-              role="tab" 
-              aria-selected={activeMainTab === 'dashboard'}
-              className={`nav__tab-btn ${activeMainTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveMainTab('dashboard')}
-            >
-              Dashboard
-            </button>
-          )}
+          {mainNavTabs}
         </div>
 
         <div className="nav__right">
-          {/* Sign In / Sign Out button inside right section */}
           {user && !user.isAnonymous ? (
-            <button 
-              className={`nav__auth-btn is-active`} 
+            <button
+              className="nav__auth-btn is-active"
               onClick={() => {
-                if (isUserStaff) setActiveMainTab('dashboard');
-                else setActiveMainTab('mybookings');
+                if (isUserStaff) switchMainTab('dashboard');
+                else switchMainTab('mybookings');
               }}
             >
               {(user.email || '').substring(0, 10)}...
             </button>
           ) : (
-            <button 
-              className="nav__auth-btn" 
+            <button
+              className="nav__auth-btn"
               onClick={() => {
                 setLoginError("");
                 setStaffLoginOpen(true);
@@ -5603,7 +5719,6 @@ function App() {
             </button>
           )}
 
-          {/* Book a seat persistent CTA button */}
           <button
             className="nav__book-seat-btn"
             onClick={() => openBooking(nextMasterclass)}
@@ -5627,13 +5742,12 @@ function App() {
         </motion.nav>
       ) : (
         <nav className="nav" aria-label="Primary" style={{ background: 'transparent' }}>
-          <div className="nav__brand">
-            <span className="nav__brand-mark" aria-hidden="true">A</span>
-            <span><b>Agent Engineer</b> · Coaching</span>
+          <div className="nav__start">
+            {navMenuButton}
+            <div className="nav__brand-wrap">{navBrand}</div>
           </div>
           <div className="nav__tabs" role="tablist">
-            <button className={`nav__tab-btn ${activeMainTab === 'home' ? 'active' : ''}`} onClick={() => setActiveMainTab('home')}>Home</button>
-            <button className={`nav__tab-btn ${activeMainTab === 'roadmap' ? 'active' : ''}`} onClick={() => setActiveMainTab('roadmap')}>Full Roadmap</button>
+            {mainNavTabs}
           </div>
           <div className="nav__right">
             <button
@@ -5659,6 +5773,50 @@ function App() {
           </div>
         </nav>
       )}
+
+      <div
+        className={`nav__drawer-overlay${navMenuOpen ? ' is-open' : ''}`}
+        onClick={() => setNavMenuOpen(false)}
+        aria-hidden={!navMenuOpen}
+      />
+      <aside
+        id="mobile-nav-drawer"
+        className={`nav__drawer${navMenuOpen ? ' is-open' : ''}`}
+        aria-hidden={!navMenuOpen}
+        aria-label="Site menu"
+      >
+        <div className="nav__drawer-head">
+          <button
+            type="button"
+            className="nav__drawer-brand"
+            onClick={() => switchMainTab('home')}
+          >
+            <img
+              className="nav__drawer-photo"
+              src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
+              alt=""
+              aria-hidden="true"
+            />
+            <span className="nav__drawer-title">{V2_BRAND.name}</span>
+          </button>
+          <button
+            type="button"
+            className="nav__drawer-close"
+            onClick={() => setNavMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            ×
+          </button>
+        </div>
+        <p className="nav__drawer-label">Navigate</p>
+        <div className="nav__drawer-tabs" role="tablist">
+          {mainNavTabs}
+        </div>
+        <div className="nav__drawer-divider" aria-hidden="true" />
+        <div className="nav__drawer-actions">
+          {navDrawerActions}
+        </div>
+      </aside>
 
       {/* Render Main Views based on active tab state */}
       {activeMainTab === 'home' && (

@@ -286,7 +286,6 @@ exports.sendAudienceEmail = functions.https.onCall(async (data, context) => {
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
-      ignoreTLS: true,
       ...(smtpPass !== "none" && {
         auth: {
           user: smtpEmail,
@@ -564,7 +563,6 @@ exports.onLeadCreated = functions.firestore
           host: smtpHost,
           port: smtpPort,
           secure: smtpPort === 465,
-          ignoreTLS: true,
           ...(smtpPass !== "none" && {
             auth: { user: smtpEmail, pass: smtpPass }
           })
@@ -636,7 +634,6 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
-      ignoreTLS: true,
       ...(smtpPass !== "none" && {
         auth: { user: smtpEmail, pass: smtpPass }
       })

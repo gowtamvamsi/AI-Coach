@@ -2,6 +2,11 @@
 // Firestore `roadmapVideos` entries merge on top at runtime.
 
 window.ROADMAP_VIDEO_HELPERS = (function () {
+  function isLocalDev() {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
   // Built-in full playlist (YouTube RSS caps at 15). Update when playlist changes.
   const PLAYLIST_STATIC_BUILTIN = {
     'PL8qeqP57-QAZz8wi1x7toEWzPC_mW5NfO': [
@@ -83,6 +88,8 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
   }
 
   async function fetchText(url) {
+    // Browser cannot fetch YouTube directly (CORS). Skip noisy failures on localhost.
+    if (isLocalDev()) return '';
     try {
       const res = await fetch(url);
       if (res.ok) return await res.text();
@@ -217,6 +224,7 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
   }
 
   async function fetchPlaylistViaProxyApi(playlistId) {
+    if (isLocalDev()) return [];
     const projectId = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.projectId) || 'balaji-chippada-agentic-ai';
     const bases = [
       '/api/youtube-playlist',
@@ -260,6 +268,9 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
   }
 
   async function fetchPlaylistItemsRemote(playlistId) {
+    if (isLocalDev()) {
+      return normalizePlaylistItems(fetchPlaylistStatic(playlistId));
+    }
     const results = await Promise.all([
       fetchPlaylistViaProxyApi(playlistId),
       fetchPlaylistViaInnertube(playlistId),

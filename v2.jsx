@@ -744,10 +744,6 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum }) {
       <div className="v2-hero-grid">
         {/* LEFT: copy + CTAs */}
         <div className="v2-hero-left">
-          <div className="v2-hero-eyebrow">
-            {V2_BRAND.name} · {V2_SOCIAL.roadmapViews} watched on YouTube
-          </div>
-
           <h1 className="v2-hero-title">
             <span className="v2-hero-title-line">Learn from a builder.</span>
             <em className="v2-hero-title-em">Become one.</em>
