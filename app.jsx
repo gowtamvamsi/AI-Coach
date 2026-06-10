@@ -1442,10 +1442,10 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
     {
       label: 'Product',
       links: [
-        { title: 'Claude Code Masterclass', href: '#masterclasses', isScroll: true },
-        { title: 'Live Cohorts', href: '#masterclasses', isScroll: true },
-        { title: '2026 Roadmap', href: '#', onClickTab: 'roadmap' },
-        { title: 'Full Syllabus', href: '#', onClickTab: 'roadmap' }
+        { title: 'Claude Code Masterclass', href: '/masterclasses' },
+        { title: 'Live Cohorts', href: '/masterclasses' },
+        { title: '2026 Roadmap', href: '/roadmap', onClickTab: 'roadmap' },
+        { title: 'Full Syllabus', href: '/roadmap', onClickTab: 'roadmap' }
       ]
     },
     {
@@ -1459,7 +1459,7 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
     {
       label: 'Company',
       links: [
-        { title: 'About Balaji', href: '#instructor', isScroll: true },
+        { title: 'About Balaji', href: '/about' },
         { title: 'Privacy Policy', href: '#', legal: 'privacy' },
         { title: 'Terms of Service', href: '#', legal: 'terms' },
         { title: 'Refund Policy', href: '#', legal: 'refund' },

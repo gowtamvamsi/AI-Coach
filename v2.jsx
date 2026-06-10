@@ -98,9 +98,9 @@ const V2_BRAND = Object.assign({
 }, (_SC.brand || {}));
 
 const V2_SOCIAL = Object.assign({
-  youtubeSubs: '17K+',
-  roadmapViews: '115K+',
-  studentsTrained: '50+',
+  youtubeSubs: '22K+',
+  roadmapViews: '150K+',
+  studentsTrained: '3000+',
 }, ((_SC.brand && _SC.brand.stats) || {}));
 
 const V2_INSTRUCTOR = Object.assign({
@@ -1425,7 +1425,7 @@ function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
   return (
     <section className="v2-roadmap-teaser">
       <h2>The roadmap {V2_SOCIAL.roadmapViews} engineers watched</h2>
-      <p>26 weeks · 9 phases · 62 modules · 3 production capstones · free &amp; open source</p>
+      <p>26 weeks · 9 phases · 60+ modules · 3 production capstones · free &amp; open source</p>
       <div className="v2-phase-previews">
         {phases.map((p) => (
           <div key={p.id} className="v2-phase-preview">
@@ -1507,16 +1507,17 @@ function V2FAQSection({ onLegal }) {
                 <span className="v2-faq-q-text">{f.q}</span>
                 <span className="v2-faq-chevron" aria-hidden="true">{isOpen ? '−' : '+'}</span>
               </button>
-              {isOpen && (
-                <div className="v2-faq-a">
-                  <p>{f.a}</p>
-                  {f.link && (
-                    <button type="button" className="v2-link-btn" onClick={() => onLegal(f.link)}>
-                      Read full policy →
-                    </button>
-                  )}
-                </div>
-              )}
+              {/* Answer stays in the DOM always (hidden via CSS when closed) so
+                  search engines and AI crawlers extract every Q&A, not just the
+                  open one. */}
+              <div className="v2-faq-a" hidden={!isOpen}>
+                <p>{f.a}</p>
+                {f.link && (
+                  <button type="button" className="v2-link-btn" onClick={() => onLegal(f.link)}>
+                    Read full policy →
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

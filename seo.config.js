@@ -184,7 +184,7 @@ window.SEO_CONFIG = {
         hasCourseInstance: {
           '@type': 'CourseInstance',
           courseMode: 'online',
-          courseWorkload: 'PT26H',
+          courseWorkload: 'PT156H', // ~6 hours/week over the 26-week curriculum
         },
       },
       {
@@ -253,7 +253,10 @@ window.SEO_CONFIG = {
         })),
       });
 
-      const seedVideos = (window.ROADMAP_VIDEOS || []).filter((v) => v.youtubeId);
+      // Skip the overview walkthrough (Eze6D8jAMjI) — it already has a dedicated
+      // #roadmap-video node above, so we avoid emitting a duplicate VideoObject.
+      const overviewId = 'Eze6D8jAMjI';
+      const seedVideos = (window.ROADMAP_VIDEOS || []).filter((v) => v.youtubeId && v.youtubeId !== overviewId);
       seedVideos.forEach((v) => {
         graph.push({
           '@type': 'VideoObject',

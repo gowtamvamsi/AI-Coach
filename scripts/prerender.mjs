@@ -20,11 +20,13 @@ import puppeteer from 'puppeteer';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 8788;
 
+// NOTE: /masterclasses and /about are hand-authored static pages (like
+// /glossary and /guides/*) so crawlers/AI agents get rich, route-specific
+// content instead of a near-duplicate of the home page. Do NOT add them here
+// or the prerender would overwrite those static files with the home render.
 const ROUTES = [
   { urlPath: '/', out: 'index.html', inPlace: true },
   { urlPath: '/roadmap', out: 'roadmap.html' },
-  { urlPath: '/masterclasses', out: 'masterclasses.html' },
-  { urlPath: '/about', out: 'about.html' },
 ];
 
 const MIME = {

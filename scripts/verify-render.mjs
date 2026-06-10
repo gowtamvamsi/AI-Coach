@@ -10,11 +10,12 @@ import puppeteer from 'puppeteer';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 8799;
 
+// Only the React-rendered routes are verified here. /masterclasses, /about,
+// /glossary, /guides/* are hand-authored static HTML (no React #root), so they
+// aren't part of this prerender-parity check.
 const ROUTES = [
   { urlPath: '/', file: 'index.html', expectTitleIncludes: 'Live Masterclasses' },
   { urlPath: '/roadmap', file: 'roadmap.html', expectTitleIncludes: 'Roadmap (2026)' },
-  { urlPath: '/masterclasses', file: 'masterclasses.html', expectTitleIncludes: 'Masterclasses — Demo-First' },
-  { urlPath: '/about', file: 'about.html', expectTitleIncludes: 'About Balaji Chippada' },
 ];
 
 const MIME = {
