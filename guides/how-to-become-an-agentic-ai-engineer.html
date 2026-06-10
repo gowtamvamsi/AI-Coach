@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>How to Become an Agentic AI Engineer in 2026 (Complete Roadmap) · Balaji Chippada</title>
+  <meta name="description" content="A step-by-step 2026 guide to becoming a production agentic AI engineer: the skills, the 9-phase / 26-week path (Python → LLMs → RAG → tools/MCP → multi-agent → deployment), the projects to build, and how to start for free." />
+  <meta name="keywords" content="how to become an AI engineer, agentic AI engineer 2026, AI engineer roadmap, learn RAG, LangGraph, MCP, production AI agents, AI engineer skills" />
+  <meta name="author" content="Balaji Chippada" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+  <meta name="theme-color" content="#14131a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)" />
+  <link rel="canonical" href="https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer" />
+  <meta property="og:site_name" content="The Agent Engineer" />
+  <meta property="og:title" content="How to Become an Agentic AI Engineer in 2026 (Complete Roadmap)" />
+  <meta property="og:description" content="The skills, the 26-week path, the projects to build, and how to start for free — from Balaji Chippada (150K+ roadmap views)." />
+  <meta property="og:image" content="https://balajichippada.com/uploads/balaji-chippada.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@balajichippada" />
+  <meta name="twitter:title" content="How to Become an Agentic AI Engineer in 2026 (Complete Roadmap)" />
+  <meta name="twitter:description" content="The skills, the 26-week path, and the projects to build — start free." />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23c2533c'/%3E%3Cstop offset='0.5' stop-color='%23d18a2a'/%3E%3Cstop offset='1' stop-color='%236b4d80'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='-apple-system,system-ui,sans-serif' font-size='18' font-weight='700' fill='white'%3EA%3C/text%3E%3C/svg%3E" />
+
+  <script>
+    (() => {
+      let t = localStorage.getItem('roadmap-theme');
+      if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css?v=68" />
+  <style>
+    .doc { max-width: 760px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+    .doc-nav { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: space-between;
+      max-width: 760px; margin: 0 auto; padding: 1.25rem; }
+    .doc-nav a { color: var(--fg-dim); text-decoration: none; font-size: 0.92rem; }
+    .doc-nav a:hover { color: var(--c-rust); }
+    .doc-brand { font-family: 'Instrument Serif', serif; font-size: 1.3rem; color: var(--fg); }
+    .doc-nav-links { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+    .doc .crumb { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--fg-faint); letter-spacing: 0.04em; }
+    .doc .crumb a { color: var(--fg-faint); }
+    .doc h1 { font-family: 'Instrument Serif', serif; font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.08; margin: 1.25rem 0 0.75rem; }
+    .doc h2 { font-size: 1.5rem; margin: 2.5rem 0 0.75rem; color: var(--fg); }
+    .doc h3 { font-size: 1.12rem; margin: 1.5rem 0 0.4rem; color: var(--fg); }
+    .doc p, .doc li { color: var(--fg-dim); line-height: 1.7; }
+    .doc p { margin: 0.75rem 0; }
+    .doc ul, .doc ol { margin: 0.5rem 0 0.5rem 1.25rem; }
+    .doc li { margin: 0.35rem 0; }
+    .doc a { color: var(--c-rust); }
+    .doc .meta { color: var(--fg-faint); font-size: 0.9rem; font-family: 'JetBrains Mono', monospace; }
+    .doc .lede { font-size: 1.18rem; color: var(--fg-dim); }
+    .phase { border-top: 1px solid var(--line); padding: 1rem 0; }
+    .phase b { color: var(--fg); }
+    .doc-cta { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-subtle); }
+    .doc-cta a { color: var(--c-rust); font-weight: 600; }
+    .doc-foot { border-top: 1px solid var(--line); margin-top: 3rem; padding-top: 1.5rem; color: var(--fg-faint); font-size: 0.88rem; }
+    .doc-foot a { color: var(--fg-dim); }
+  </style>
+</head>
+<body>
+  <nav class="doc-nav">
+    <a class="doc-brand" href="/">Balaji Chippada</a>
+    <span class="doc-nav-links">
+      <a href="/roadmap">Roadmap</a>
+      <a href="/masterclasses">Masterclasses</a>
+      <a href="/glossary">Glossary</a>
+      <a href="/about">About</a>
+    </span>
+  </nav>
+
+  <main class="doc">
+    <div class="crumb"><a href="/">Home</a> / <a href="/guides/how-to-become-an-agentic-ai-engineer">Guides</a> / How to become an agentic AI engineer</div>
+    <h1>How to Become an Agentic AI Engineer in 2026</h1>
+    <p class="meta">By Balaji Chippada · The Agent Engineer · ~10 min read</p>
+    <p class="lede">"Agentic AI engineer" is the role companies are actually hiring for in 2026 — engineers who can ship systems that <em>act</em>: retrieve knowledge, call tools, and complete multi-step tasks reliably in production. This guide lays out exactly what to learn, in what order, and what to build to get there — the same path as the free <a href="/roadmap">26-week roadmap</a>.</p>
+
+    <h2>What is an agentic AI engineer?</h2>
+    <p>A traditional ML engineer trains models. An <strong>agentic AI engineer</strong> builds systems <em>around</em> models — wiring an LLM to data, tools, memory, and guardrails so it can reliably complete real tasks. You don't need a PhD or to train models from scratch. You need solid software engineering plus a specific stack: retrieval, tool use, orchestration, evaluation, and deployment.</p>
+    <p>The difference that matters: a chatbot answers; an <a href="/glossary">agent</a> decides which actions to take, executes them, checks the results, and loops until the job is done.</p>
+
+    <h2>The skills that actually matter</h2>
+    <ul>
+      <li><b>Strong Python</b> — clean code, typing, async, and HTTP/API work. This is the foundation everything else sits on.</li>
+      <li><b>LLM fundamentals</b> — how models tokenize, reason, and fail; the difference between base and reasoning models.</li>
+      <li><b>Prompt &amp; context engineering</b> — getting reliable output and managing the context window.</li>
+      <li><b>RAG with evaluation</b> — embeddings, chunking, vector databases, and measuring retrieval quality.</li>
+      <li><b>Tools, function calling &amp; MCP</b> — turning a model into an agent that can act on the world.</li>
+      <li><b>Multi-agent orchestration</b> — coordinating specialized agents with frameworks like LangGraph.</li>
+      <li><b>Guardrails &amp; LLMOps</b> — safety, observability, tracing, and cost control.</li>
+      <li><b>Cloud deployment</b> — shipping agents to production (e.g. AWS) with reliability and sane economics.</li>
+    </ul>
+
+    <h2>The 9-phase, 26-week path</h2>
+    <p>This is the structure of the free <a href="/roadmap">interactive roadmap</a> — each phase has modules with embedded video lessons and progress tracking.</p>
+    <div class="phase"><b>Phase 1 — Python Foundations (weeks 1–3).</b> Core Python, OOP, HTTP APIs, FastAPI, async. The bedrock.</div>
+    <div class="phase"><b>Phase 2 — The Mental Model of an LLM (week 4).</b> Tokenization, context windows, reasoning vs. base models, benchmarks.</div>
+    <div class="phase"><b>Phase 3 — Prompt Engineering &amp; API Access (weeks 5–7).</b> Provider APIs, chain-of-thought, prompt caching, structured output.</div>
+    <div class="phase"><b>Phase 4 — RAG + Evaluation (weeks 8–12).</b> Embeddings, chunking, vector DBs, and evaluating retrieval quality. <em>Capstone: a document ingestion + RAG pipeline.</em></div>
+    <div class="phase"><b>Phase 5 — Tools, MCP &amp; Single Agents (weeks 13–16).</b> Function calling, the Model Context Protocol, and the ReAct loop.</div>
+    <div class="phase"><b>Phase 6 — Memory &amp; Context Engineering (weeks 17–19).</b> Short/long-term memory, semantic recall, compression.</div>
+    <div class="phase"><b>Phase 7 — Multi-Agent Orchestration (weeks 20–22).</b> LangGraph, supervisor patterns, agent-to-agent coordination. <em>Capstone: a multi-agent system.</em></div>
+    <div class="phase"><b>Phase 8 — Guardrails &amp; LLMOps (weeks 23–24).</b> Input/output/action guardrails, observability, tracing.</div>
+    <div class="phase"><b>Phase 9 — Cloud Infrastructure &amp; Deployment (weeks 25–26).</b> Deploying on AWS, API gateways, cost control. <em>Capstone: a production agent on AWS.</em></div>
+
+    <h2>Build these three projects</h2>
+    <p>Hiring managers trust demonstrated work over certificates. The roadmap's three capstones are designed to be portfolio-grade:</p>
+    <ol>
+      <li><b>A distributed RAG pipeline</b> — ingest documents, embed, retrieve, and answer with measured quality.</li>
+      <li><b>A multi-agent system</b> — specialized agents that plan, research, and execute a real task.</li>
+      <li><b>A production deployment</b> — your agent running on AWS with observability and cost controls.</li>
+    </ol>
+
+    <h2>How to start (for free, this week)</h2>
+    <ol>
+      <li>Open the free <a href="/roadmap">26-week roadmap</a> and start Phase 1.</li>
+      <li>Watch the <a href="https://www.youtube.com/watch?v=Eze6D8jAMjI">full roadmap walkthrough on YouTube</a> for the mental model.</li>
+      <li>Skim the <a href="/glossary">glossary</a> so the vocabulary sticks.</li>
+      <li>When you want to build live with feedback, reserve a seat in the next <a href="/masterclasses">demo-first masterclass</a> — the first one is free.</li>
+    </ol>
+
+    <h2>Frequently asked questions</h2>
+    <h3>Do I need a machine learning background?</h3>
+    <p>No. If you can write Python and use a terminal, you can start. You'll be building <em>with</em> models, not training them from scratch.</p>
+    <h3>How long does it take?</h3>
+    <p>The roadmap is structured as 26 weeks at a steady pace, but it's self-paced — go faster or slower based on your time.</p>
+    <h3>Is it really free?</h3>
+    <p>The entire roadmap is free, with embedded video lessons. Live masterclasses include a free first session; later ones are paid.</p>
+
+    <div class="doc-cta">
+      Start now: open the free <a href="/roadmap">Agentic AI Engineer roadmap</a>, or reserve your seat in the next <a href="/masterclasses">live masterclass</a>.
+    </div>
+
+    <div class="doc-foot">
+      By <a href="/about">Balaji Chippada</a> — The Agent Engineer ·
+      <a href="https://www.youtube.com/@balajichippada">YouTube (22K+)</a> ·
+      <a href="/">balajichippada.com</a>
+    </div>
+  </main>
+
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@graph":[
+    {"@type":"BreadcrumbList","@id":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer#breadcrumb","itemListElement":[
+      {"@type":"ListItem","position":1,"name":"Home","item":"https://balajichippada.com/"},
+      {"@type":"ListItem","position":2,"name":"Guides","item":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer"},
+      {"@type":"ListItem","position":3,"name":"How to become an agentic AI engineer","item":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer"}
+    ]},
+    {"@type":"TechArticle","@id":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer#article","headline":"How to Become an Agentic AI Engineer in 2026 (Complete Roadmap)","description":"A step-by-step 2026 guide to becoming a production agentic AI engineer: skills, the 9-phase / 26-week path, projects to build, and how to start for free.","author":{"@type":"Person","name":"Balaji Chippada","url":"https://balajichippada.com/about"},"publisher":{"@type":"Organization","name":"The Agent Engineer","logo":{"@type":"ImageObject","url":"https://balajichippada.com/uploads/balaji-chippada.png"}},"datePublished":"2026-06-10","dateModified":"2026-06-10","image":"https://balajichippada.com/uploads/balaji-chippada.png","mainEntityOfPage":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer"},
+    {"@type":"FAQPage","@id":"https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer#faq","mainEntity":[
+      {"@type":"Question","name":"Do I need a machine learning background?","acceptedAnswer":{"@type":"Answer","text":"No. If you can write Python and use a terminal, you can start. You'll be building with models, not training them from scratch."}},
+      {"@type":"Question","name":"How long does it take to become an agentic AI engineer?","acceptedAnswer":{"@type":"Answer","text":"The roadmap is structured as 26 weeks at a steady pace, but it is self-paced — go faster or slower based on your available time."}},
+      {"@type":"Question","name":"Is the roadmap really free?","acceptedAnswer":{"@type":"Answer","text":"Yes, the entire roadmap is free with embedded video lessons. Live masterclasses include a free first session; later ones are paid."}}
+    ]}
+  ]}
+  </script>
+</body>
+</html>

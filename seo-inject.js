@@ -6,9 +6,28 @@
   const brand = (window.SITE_CONFIG && window.SITE_CONFIG.brand) || {};
   const stats = brand.stats || {};
   const url = cfg.siteUrl || 'https://balajichippada.com';
-  const desc = cfg.description.replace('150K+', stats.roadmapViews || '150K+');
 
-  document.title = cfg.title;
+  // Resolve per-route metadata (falls back to site defaults for unknown paths).
+  const route = (typeof cfg.getRouteMeta === 'function')
+    ? cfg.getRouteMeta(location.pathname)
+    : { title: cfg.title, description: cfg.description, canonical: url + '/' };
+
+  const title = route.title || cfg.title;
+  const desc = (route.description || cfg.description).replace('150K+', stats.roadmapViews || '150K+');
+  const canonical = route.canonical || (url + '/');
+
+  document.title = title;
+
+  // Keep <link rel="canonical"> aligned with the current route.
+  (function () {
+    let link = document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
+    }
+    link.setAttribute('href', canonical);
+  })();
 
   function upsertMeta(key, content, isProperty) {
     if (!content) return;
@@ -31,16 +50,16 @@
   upsertMeta('author', brand.name || 'Balaji Chippada');
 
   upsertMeta('og:type', 'website', true);
-  upsertMeta('og:url', url + '/', true);
+  upsertMeta('og:url', canonical, true);
   upsertMeta('og:site_name', cfg.siteName, true);
-  upsertMeta('og:title', cfg.title, true);
+  upsertMeta('og:title', title, true);
   upsertMeta('og:description', desc, true);
   upsertMeta('og:image', cfg.ogImage, true);
   upsertMeta('og:image:alt', cfg.ogImageAlt, true);
   upsertMeta('og:locale', cfg.locale, true);
 
   upsertMeta('twitter:card', 'summary_large_image');
-  upsertMeta('twitter:title', cfg.title);
+  upsertMeta('twitter:title', title);
   upsertMeta('twitter:description', desc);
   upsertMeta('twitter:image', cfg.ogImage);
   if (cfg.twitterHandle) upsertMeta('twitter:site', cfg.twitterHandle);
@@ -49,14 +68,28 @@
   upsertMeta('llms-txt', url + '/llms.txt');
   upsertMeta('llms-full-txt', url + '/llms-full.txt');
 
-  try {
-    const jsonLd = cfg.buildJsonLd();
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.id = 'seo-jsonld';
-    script.textContent = JSON.stringify(jsonLd);
-    document.head.appendChild(script);
-  } catch (e) {
-    console.warn('SEO JSON-LD injection failed:', e);
+  // Inject JSON-LD after DOMContentLoaded so body-loaded data (videos.js →
+  // window.ROADMAP_VIDEOS) is available for per-video VideoObject schema.
+  // The prerender step captures the result, so no-JS crawlers still get it.
+  function injectJsonLd() {
+    try {
+      // Skip if a prerendered/static JSON-LD block is already present (avoids
+      // duplicate structured data once the prerender step inlines it).
+      if (document.getElementById('seo-jsonld')) return;
+      const jsonLd = cfg.buildJsonLd(route);
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.id = 'seo-jsonld';
+      script.textContent = JSON.stringify(jsonLd);
+      document.head.appendChild(script);
+    } catch (e) {
+      console.warn('SEO JSON-LD injection failed:', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectJsonLd);
+  } else {
+    injectJsonLd();
   }
 })();

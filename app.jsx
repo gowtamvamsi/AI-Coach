@@ -1449,6 +1449,14 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
       ]
     },
     {
+      label: 'Resources',
+      links: [
+        { title: 'How to Become an AI Engineer', href: '/guides/how-to-become-an-agentic-ai-engineer' },
+        { title: 'Agentic AI Glossary', href: '/glossary' },
+        { title: 'Roadmap Walkthrough (YouTube)', href: 'https://www.youtube.com/watch?v=Eze6D8jAMjI' },
+      ]
+    },
+    {
       label: 'Company',
       links: [
         { title: 'About Balaji', href: '#instructor', isScroll: true },
@@ -1488,10 +1496,9 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
                   <rect width="32" height="32" rx="8" fill="url(#footer-logo-grad)"/>
                   <text x="16" y="22" textAnchor="middle" fontFamily="-apple-system,system-ui,sans-serif" fontSize="18" fontWeight="700" fill="white">A</text>
                 </svg>
-                <span className="site-footer__brand-name">The Agent Engineer</span>
               </div>
               <p className="site-footer__copyright">
-                © {new Date().getFullYear()} The Agent Engineer. All rights reserved.
+                © {new Date().getFullYear()} Balaji Chippada. All rights reserved.
               </p>
             </div>
           </RevealOnScroll>
@@ -4656,7 +4663,15 @@ function App() {
   }, []);
 
   // Main navigation tabs routing state: 'home' | 'roadmap' | 'dashboard'
-  const [activeMainTab, setActiveMainTab] = useState('home');
+  const [activeMainTab, setActiveMainTab] = useState(() => {
+    try {
+      const meta = window.SEO_CONFIG && window.SEO_CONFIG.getRouteMeta
+        ? window.SEO_CONFIG.getRouteMeta(window.location.pathname)
+        : null;
+      if (window.location.pathname.replace(/\/+$/, '') === '/account') return 'mybookings';
+      return (meta && meta.tab) || 'home';
+    } catch (e) { return 'home'; }
+  });
 
   // ── Scroll-driven Hero animations ──
   let scrollY;
@@ -5718,6 +5733,60 @@ function App() {
     setNavMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // ── Path-based routing (crawlable URLs for /roadmap, /masterclasses, /about) ──
+  const tabToPath = (tab) => {
+    if (tab === 'roadmap') return '/roadmap';
+    if (tab === 'mybookings' || tab === 'dashboard') return '/account';
+    return '/';
+  };
+
+  // Keep the URL + document title in sync whenever the active tab changes
+  // (covers every setActiveMainTab call site, not just switchMainTab).
+  useEffect(() => {
+    const sectionRoutes = ['/masterclasses', '/about'];
+    const current = window.location.pathname.replace(/\/+$/, '') || '/';
+    const target = tabToPath(activeMainTab);
+    // Don't clobber a section landing route while still on the home tab.
+    const onSectionLanding = activeMainTab === 'home' && sectionRoutes.includes(current);
+    if (!onSectionLanding && current !== target) {
+      try { window.history.pushState({ tab: activeMainTab }, '', target); } catch (e) {}
+    }
+    try {
+      const meta = window.SEO_CONFIG && window.SEO_CONFIG.getRouteMeta
+        ? window.SEO_CONFIG.getRouteMeta(window.location.pathname) : null;
+      if (meta && meta.title) document.title = meta.title;
+    } catch (e) {}
+  }, [activeMainTab]);
+
+  // Back/forward button → re-sync the tab from the URL.
+  useEffect(() => {
+    const onPop = () => {
+      try {
+        const path = window.location.pathname.replace(/\/+$/, '') || '/';
+        if (path === '/account') { setActiveMainTab('mybookings'); return; }
+        const meta = window.SEO_CONFIG.getRouteMeta(path);
+        setActiveMainTab(meta.tab || 'home');
+        if (meta.title) document.title = meta.title;
+      } catch (e) {}
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // On first load of a section landing route, scroll to the relevant section.
+  useEffect(() => {
+    try {
+      const meta = window.SEO_CONFIG && window.SEO_CONFIG.getRouteMeta
+        ? window.SEO_CONFIG.getRouteMeta(window.location.pathname) : null;
+      if (meta && meta.scrollTo) {
+        setTimeout(() => {
+          const el = document.getElementById(meta.scrollTo);
+          if (el) el.scrollIntoView({ block: 'start' });
+        }, 350);
+      }
+    } catch (e) {}
+  }, []);
 
   const mainNavTabs = (
     <React.Fragment>

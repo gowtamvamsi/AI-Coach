@@ -53,6 +53,49 @@ window.SEO_CONFIG = {
     '3 capstone projects: distributed RAG pipeline, multi-agent system, production deployment on AWS.',
   ].join(' '),
 
+  // ── Per-route metadata (single source of truth for routing + SEO) ──
+  // tab      → which main app tab this URL maps to
+  // scrollTo → element id to scroll to after the home tab renders
+  routes: {
+    '/': {
+      tab: 'home',
+    },
+    '/roadmap': {
+      tab: 'roadmap',
+      title: 'Agentic AI Engineer Roadmap (2026) — 26 Weeks, 9 Phases · Balaji Chippada',
+      description:
+        'The complete free 26-week agentic AI engineer roadmap: Python foundations, LLM mental models, prompt engineering, RAG with evaluation, MCP & tools, memory, LangGraph multi-agent systems, guardrails, LLMOps, and AWS deployment — interactive, with embedded YouTube lessons and progress tracking.',
+    },
+    '/masterclasses': {
+      tab: 'home',
+      scrollTo: 'masterclasses',
+      title: 'Live Agentic AI Masterclasses — Demo-First Builds · Balaji Chippada',
+      description:
+        'Live, demo-first masterclasses where you ship a production-grade AI agent on the call: RAG, Claude Code, LangGraph, multi-agent systems, guardrails, and deployment. First class free, recording + certificate included, 100% refund within 24 hours.',
+    },
+    '/about': {
+      tab: 'home',
+      scrollTo: 'instructor',
+      title: 'About Balaji Chippada — The Agent Engineer (150K+ roadmap views)',
+      description:
+        'Balaji Chippada is an AI engineer and educator behind the 150K+-view 2026 Agentic AI Engineer roadmap. He teaches production RAG, LangGraph, MCP, and multi-agent systems — demo-first on YouTube (22K+ subscribers) and in live masterclasses.',
+    },
+  },
+
+  // Normalizes a pathname → resolved route meta (title/description/canonical/tab).
+  getRouteMeta(pathname) {
+    const p = (pathname || '/').replace(/\/+$/, '') || '/';
+    const r = (this.routes && this.routes[p]) || this.routes['/'] || {};
+    return {
+      path: p,
+      tab: r.tab || 'home',
+      scrollTo: r.scrollTo || null,
+      title: r.title || this.title,
+      description: r.description || this.description,
+      canonical: this.siteUrl + (p === '/' ? '/' : p),
+    };
+  },
+
   curriculumPhases: [
     { id: 1, title: 'Python Foundations', weeks: '1–3', modules: 6 },
     { id: 2, title: 'The Mental Model of an LLM', weeks: '4', modules: 5 },
@@ -65,12 +108,13 @@ window.SEO_CONFIG = {
     { id: 9, title: 'Cloud Infrastructure & Deployment', weeks: '25–26', modules: 6 },
   ],
 
-  buildJsonLd() {
+  buildJsonLd(route) {
     const brand = (window.SITE_CONFIG && window.SITE_CONFIG.brand) || {};
     const stats = brand.stats || {};
     const faqs = (window.SITE_CONFIG && window.SITE_CONFIG.faqs) || [];
     const mc = (window.SITE_CONFIG && window.SITE_CONFIG.nextMasterclass) || {};
     const url = this.siteUrl;
+    const routePath = (route && route.path) || '/';
     const views = stats.roadmapViews || '150K+';
     const subs = stats.youtubeSubs || '22K+';
 
@@ -178,6 +222,50 @@ window.SEO_CONFIG = {
           availability: 'https://schema.org/InStock',
           url,
         },
+      });
+    }
+
+    // ── Breadcrumbs for sub-pages ──
+    if (routePath !== '/') {
+      const labels = { '/roadmap': 'Roadmap', '/masterclasses': 'Masterclasses', '/about': 'About' };
+      graph.push({
+        '@type': 'BreadcrumbList',
+        '@id': `${url}${routePath}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${url}/` },
+          { '@type': 'ListItem', position: 2, name: labels[routePath] || routePath, item: `${url}${routePath}` },
+        ],
+      });
+    }
+
+    // ── Roadmap page: phase ItemList + per-video VideoObjects ──
+    if (routePath === '/roadmap') {
+      graph.push({
+        '@type': 'ItemList',
+        '@id': `${url}/roadmap#phases`,
+        name: '2026 Agentic AI Engineer Roadmap — 9 Phases',
+        itemListOrder: 'https://schema.org/ItemListOrderAscending',
+        numberOfItems: this.curriculumPhases.length,
+        itemListElement: this.curriculumPhases.map((ph, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: `Phase ${ph.id}: ${ph.title} (weeks ${ph.weeks}, ${ph.modules} modules)`,
+        })),
+      });
+
+      const seedVideos = (window.ROADMAP_VIDEOS || []).filter((v) => v.youtubeId);
+      seedVideos.forEach((v) => {
+        graph.push({
+          '@type': 'VideoObject',
+          '@id': `${url}/roadmap#video-${v.youtubeId}`,
+          name: v.title,
+          description: `${v.title} — part of the 2026 Agentic AI Engineer roadmap by Balaji Chippada.`,
+          thumbnailUrl: `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`,
+          uploadDate: '2025-01-01',
+          contentUrl: `https://www.youtube.com/watch?v=${v.youtubeId}`,
+          embedUrl: `https://www.youtube.com/embed/${v.youtubeId}`,
+          publisher: { '@id': `${url}/#person` },
+        });
       });
     }
 

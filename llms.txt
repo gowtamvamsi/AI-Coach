@@ -6,9 +6,17 @@ Balaji Chippada teaches software engineers to ship production-grade agentic AI s
 
 ## Primary pages
 
-- [Home & Roadmap](https://balajichippada.com/): Interactive 9-phase / 26-week curriculum with module videos, playlists, and login-gated progress tracking
+- [Home](https://balajichippada.com/): Overview, live masterclass schedule, how it works, curriculum preview, instructor bio
+- [Roadmap](https://balajichippada.com/roadmap): Interactive 9-phase / 26-week curriculum with module videos, playlists, and login-gated progress tracking
+- [Masterclasses](https://balajichippada.com/masterclasses): Live, demo-first build sessions (RAG, Claude Code, LangGraph, deployment) — free and paid
+- [About](https://balajichippada.com/about): Balaji Chippada — instructor background and credentials
 - [Roadmap walkthrough video](https://www.youtube.com/watch?v=Eze6D8jAMjI): Full curriculum overview on YouTube
 - [Open-source roadmap (GitHub Pages)](https://ch-balaji.github.io/ai-engineer-roadmap/): Static mirror of the curriculum
+
+## Guides & reference
+
+- [How to Become an Agentic AI Engineer in 2026](https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer): Step-by-step guide — skills, the 9-phase path, projects, and how to start
+- [Agentic AI Glossary](https://balajichippada.com/glossary): Plain-English definitions of 28 core terms (RAG, MCP, LangGraph, ReAct, guardrails, LLMOps, etc.)
 
 ## What this site offers
 

@@ -1,0 +1,17 @@
+{
+  "name": "ai-coach-site",
+  "version": "1.0.0",
+  "description": "Balaji Chippada — Agentic AI roadmap & masterclasses site build tooling",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:js": "node scripts/build-js.mjs",
+    "prerender": "node scripts/prerender.mjs",
+    "build": "npm run build:js && npm run prerender",
+    "verify": "node scripts/verify-render.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "puppeteer": "^24.43.1"
+  }
+}
