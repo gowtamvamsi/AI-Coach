@@ -5926,14 +5926,9 @@ function App() {
           className="nav"
           aria-label="Primary"
           animate={{
-            backdropFilter: scrolled ? 'blur(14px)' : 'blur(0px)',
-            WebkitBackdropFilter: scrolled ? 'blur(14px)' : 'blur(0px)',
-            backgroundColor: scrolled
-              ? (theme === 'dark' ? 'rgba(10,9,16,0.88)' : 'rgba(244,241,236,0.88)')
-              : 'transparent',
-            borderBottom: scrolled
-              ? (theme === 'dark' ? '0.5px solid rgba(255,255,255,0.08)' : '0.5px solid rgba(28,24,20,0.10)')
-              : '0.5px solid transparent',
+            boxShadow: scrolled
+              ? (theme === 'dark' ? '0 14px 44px rgba(0,0,0,0.5)' : '0 14px 44px rgba(28,24,20,0.16)')
+              : (theme === 'dark' ? '0 8px 30px rgba(0,0,0,0.35)' : '0 8px 30px rgba(28,24,20,0.08)'),
           }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
         >
@@ -5998,7 +5993,7 @@ function App() {
         </div>
         </motion.nav>
       ) : (
-        <nav className="nav" aria-label="Primary" style={{ background: 'transparent' }}>
+        <nav className="nav" aria-label="Primary">
           <div className="nav__start">
             {navMenuButton}
             <div className="nav__brand-wrap">{navBrand}</div>
