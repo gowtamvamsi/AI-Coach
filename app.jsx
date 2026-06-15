@@ -605,7 +605,7 @@ function RoadmapView({
       <section className="instructor reveal" data-screen-label="03 Instructor">
         <div className="instructor__card">
           <div className="instructor__photo">
-            <img src="uploads/balaji-chippada-portrait.png" alt="Balaji Chippada" loading="lazy" decoding="async" />
+            <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
           </div>
           <div className="instructor__body">
             <div className="instructor__label">Your Instructor</div>
@@ -1300,7 +1300,7 @@ function InstructorBio() {
             <div className="instructor__photo">
               {/* Instructor card intentionally keeps the original portrait photo;
                   the new square headshot is used everywhere else. */}
-              <img src="uploads/balaji-chippada-portrait.png" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
+              <img src="uploads/balaji-chippada-portrait.webp" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>
@@ -1328,7 +1328,7 @@ function InstructorBio() {
             <div className="instructor__photo">
               {/* Instructor card intentionally keeps the original portrait photo;
                   the new square headshot is used everywhere else. */}
-              <img src="uploads/balaji-chippada-portrait.png" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
+              <img src="uploads/balaji-chippada-portrait.webp" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
             </div>
             <div className="instructor__body">
               <div className="instructor__label">Your Instructor</div>

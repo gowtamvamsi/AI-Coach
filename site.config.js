@@ -52,7 +52,7 @@ window.SITE_CONFIG = {
   instructor: {
     name: 'Balaji Chippada',
     title: '8 years in AI/ML · Production agentic AI · 22K+ YouTube',
-    photo: 'uploads/balaji-chippada.png', // leave empty for initials avatar
+    photo: 'uploads/balaji-chippada-avatar.webp', // optimized 256px avatar (full-res PNG kept for og:image). Leave empty for initials avatar
     bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (150K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
     quote: 'I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.',
     chips: ['150K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
