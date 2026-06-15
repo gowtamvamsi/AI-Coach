@@ -1567,3 +1567,111 @@ exports.sendMasterclassCancellation = functions.runWith({ timeoutSeconds: 540, m
   return { success: true, queued: recipients.length, batches, jobId: jobRef.id };
 });
 
+// ===============================================================
+// Public support chatbot — answers basic visitor questions about the
+// roadmap & masterclasses, grounded on site knowledge, via Gemini.
+// The API key stays server-side (GEMINI_API_KEY); it is never exposed to
+// the browser. Per-IP rate limiting + short output keep abuse/cost bounded.
+// ===============================================================
+const CHATBOT_KNOWLEDGE = `ABOUT: Balaji Chippada teaches production-grade Agentic AI engineering. The site has two things: (1) a FREE, open 26-week "Agentic AI Engineer" roadmap (9 phases, ~60 modules, ~150K YouTube views) and (2) live, demo-first masterclasses.
+
+ROADMAP PHASES (26 weeks, free, no paywall): 1) Python Foundations, 2) The Mental Model of an LLM, 3) Prompt Engineering & API Access, 4) RAG + Evaluation, 5) Tools, MCP & Single Agents, 6) Memory & Context Engineering, 7) Multi-Agent Orchestration, 8) Guardrails & LLMOps, 9) Cloud Infrastructure & Deployment. There are 3 capstone projects. Prerequisite: you can write basic Python and use a terminal.
+
+MASTERCLASSES: Live ~3-hour build sessions. The FIRST masterclass is FREE; future ones are paid (around ₹499). Sessions are recorded and emailed to registrants within 48 hours. A certificate of completion is issued after attending (or via the recording for paid ones). Language: English for technical content with some Telugu where it helps; Q&A welcomes Hindi/Telugu.
+
+REGISTRATION & LOGISTICS: Reserve a seat on the site — name + email, no payment for the free class. The Zoom link is emailed on registration and reappears ~15 min before start; reminders also go to the WhatsApp community. To watch videos on the site, create a free account (sign in). Prep: a laptop with Python 3.10+, VS Code, and API access (Anthropic/OpenAI free tiers work).
+
+REFUNDS: 100% refund within 24 hours of purchase, no questions asked. The free masterclass has nothing to refund.
+
+CONTACT: Email team@balajichippada.com (replies within ~24h). WhatsApp community and YouTube (@balajichippada) are linked on the site.`;
+
+async function chatbotRateLimitOk(ip) {
+  if (!ip) return true;
+  const safe = ip.replace(/[^\w.:-]/g, "_").slice(0, 120);
+  const ref = db.collection("chatRateLimits").doc(safe);
+  const WINDOW_MS = 60 * 1000, MAX = 12;
+  try {
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const now = Date.now();
+      const d = snap.exists ? snap.data() : null;
+      if (!d || now - (d.windowStart || 0) > WINDOW_MS) {
+        tx.set(ref, { windowStart: now, count: 1 });
+        return true;
+      }
+      if ((d.count || 0) >= MAX) return false;
+      tx.update(ref, { count: (d.count || 0) + 1 });
+      return true;
+    });
+  } catch (e) {
+    return true; // fail-open: never block real users on a rate-limit hiccup
+  }
+}
+
+exports.chatbot = functions.runWith({ timeoutSeconds: 60, memory: "256MB" }).https.onCall(async (data, context) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const message = String((data && data.message) || "").trim().slice(0, 600);
+  const history = Array.isArray(data && data.history) ? data.history.slice(-8) : [];
+  const mc = (data && data.context) || {};
+  if (!message) throw new functions.https.HttpsError("invalid-argument", "Empty message.");
+
+  if (!apiKey) {
+    return { reply: "Our assistant isn't set up yet — please email team@balajichippada.com or ask in the WhatsApp community and we'll help you out." };
+  }
+
+  // Per-IP rate limit (fail-open).
+  const fwd = (context.rawRequest && context.rawRequest.headers && context.rawRequest.headers["x-forwarded-for"]) || "";
+  const ip = (String(fwd).split(",")[0] || (context.rawRequest && context.rawRequest.ip) || "").trim();
+  if (!(await chatbotRateLimitOk(ip))) {
+    return { reply: "You're sending messages a little fast — give it a few seconds and try again. 🙂" };
+  }
+
+  const liveFacts = [];
+  if (mc.title) liveFacts.push(`Next masterclass: "${mc.title}".`);
+  if (mc.dateTime) liveFacts.push(`Scheduled for: ${mc.dateTime}.`);
+  if (typeof mc.price === "number") {
+    liveFacts.push(mc.price === 0 ? `It is FREE to attend${mc.originalPrice ? ` (normally ₹${mc.originalPrice})` : ""}.` : `Price: ₹${mc.price}.`);
+  }
+
+  const systemPrompt = `You are the friendly support assistant on Balaji Chippada's website. Answer ONLY questions about the roadmap, the masterclasses, registration/logistics, and using this site. Keep replies short (1–4 sentences), warm, and accurate. NEVER invent prices, dates, or policies — if you're unsure, say so and point them to team@balajichippada.com or the WhatsApp community. If a question is off-topic (not about this site / its roadmap / its masterclasses / learning AI engineering here), politely decline and steer back. Do not output code unless asked about a roadmap topic.
+
+SITE KNOWLEDGE:
+${CHATBOT_KNOWLEDGE}
+
+CURRENT SESSION FACTS:
+${liveFacts.join("\n") || "(none provided — if asked about the next session's exact date/price, tell them to check the site.)"}`;
+
+  const contents = [];
+  history.forEach((h) => {
+    if (h && h.role && h.text) {
+      contents.push({ role: h.role === "bot" ? "model" : "user", parts: [{ text: String(h.text).slice(0, 1000) }] });
+    }
+  });
+  contents.push({ role: "user", parts: [{ text: message }] });
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
+      }),
+    });
+    if (!res.ok) {
+      const errTxt = await res.text();
+      console.error("[chatbot] Gemini error", res.status, errTxt.slice(0, 300));
+      return { reply: "Sorry, I hit a snag answering that. Please email team@balajichippada.com or ask in the WhatsApp community." };
+    }
+    const resp = await res.json();
+    const reply = resp && resp.candidates && resp.candidates[0] && resp.candidates[0].content
+      && resp.candidates[0].content.parts && resp.candidates[0].content.parts[0]
+      && resp.candidates[0].content.parts[0].text;
+    return { reply: (reply || "").trim() || "I'm not sure about that one — please email team@balajichippada.com and we'll help." };
+  } catch (e) {
+    console.error("[chatbot] exception", e);
+    return { reply: "Sorry, something went wrong. Please email team@balajichippada.com." };
+  }
+});
+

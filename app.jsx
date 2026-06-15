@@ -4946,6 +4946,96 @@ function AdminEmailTasks() {
 }
 
 // ===============================================================
+// Public support chatbot widget — floating bubble + chat panel.
+// Sends messages to the `chatbot` Cloud Function (Gemini, key server-side)
+// and renders the conversation. Falls back to email/WhatsApp on any error.
+// ===============================================================
+function V2Chatbot({ nextMc }) {
+  const GREETING = "Hi! 👋 Ask me anything about the roadmap or the masterclasses — pricing, schedule, what you'll learn, or how to join.";
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([{ role: 'bot', text: GREETING }]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const scrollRef = React.useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, open, loading]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    const history = messages.slice(-8).map((m) => ({ role: m.role, text: m.text }));
+    setMessages((prev) => [...prev, { role: 'user', text }]);
+    setInput('');
+    setLoading(true);
+    try {
+      if (!functions) throw new Error('offline');
+      const mc = nextMc || (window.SITE_CONFIG && window.SITE_CONFIG.nextMasterclass) || {};
+      const ctx = { title: mc.title || mc.shortTitle, dateTime: mc.dateTime, price: mc.price, originalPrice: mc.originalPrice };
+      const res = await functions.httpsCallable('chatbot')({ message: text, history, context: ctx });
+      const reply = (res && res.data && res.data.reply) || "Sorry, I couldn't answer that. Please email team@balajichippada.com.";
+      setMessages((prev) => [...prev, { role: 'bot', text: reply }]);
+    } catch (e) {
+      setMessages((prev) => [...prev, { role: 'bot', text: "I'm having trouble right now. Please email team@balajichippada.com or ask in the WhatsApp community." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const waUrl = (typeof V2_BRAND !== 'undefined' && V2_BRAND.whatsappCommunity) || '#';
+
+  return (
+    <React.Fragment>
+      <button
+        type="button"
+        className={`v2-chat-fab ${open ? 'is-open' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-label={open ? 'Close chat assistant' : 'Open chat assistant'}
+      >
+        <span aria-hidden="true">{open ? '✕' : '💬'}</span>
+      </button>
+
+      {open && (
+        <div className="v2-chat-panel" role="dialog" aria-label="Chat assistant">
+          <div className="v2-chat-head">
+            <div className="v2-chat-head-text">
+              <div className="v2-chat-title">Ask a question</div>
+              <div className="v2-chat-sub">Roadmap &amp; masterclasses · AI assistant</div>
+            </div>
+            <button type="button" className="v2-chat-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+          </div>
+
+          <div className="v2-chat-msgs" ref={scrollRef}>
+            {messages.map((m, i) => (
+              <div key={i} className={`v2-chat-msg v2-chat-msg--${m.role}`}>{m.text}</div>
+            ))}
+            {loading && (
+              <div className="v2-chat-msg v2-chat-msg--bot v2-chat-typing"><span></span><span></span><span></span></div>
+            )}
+          </div>
+
+          <form className="v2-chat-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your question…"
+              maxLength={600}
+              aria-label="Your question"
+            />
+            <button type="submit" disabled={loading || !input.trim()} aria-label="Send">↑</button>
+          </form>
+
+          <div className="v2-chat-foot">
+            AI answers can be imperfect · <a href={waUrl} target="_blank" rel="noopener noreferrer">WhatsApp</a> · <a href="mailto:team@balajichippada.com">Email</a>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+// ===============================================================
 // MAIN APPLICATION ROOT COMPONENT
 // ===============================================================
 
@@ -7074,6 +7164,7 @@ function App() {
 
       <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
       <V2WhatsAppButton />
+      <V2Chatbot nextMc={nextMasterclass} />
       <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
     </React.Fragment>
