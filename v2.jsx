@@ -380,7 +380,6 @@ function V2PlaylistEmbed({ playlistId, title }) {
   const [loading, setLoading] = useState(seedItems.length === 0);
   const [listFailed, setListFailed] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const hasStaticSeed = seedItems.length > 0;
 
   useEffect(() => {
@@ -422,37 +421,17 @@ function V2PlaylistEmbed({ playlistId, title }) {
   const goNext = () => setActiveIdx((i) => Math.min(items.length - 1, i + 1));
   const scrollListRef = React.useRef(null);
 
-  const scrollActiveTrackInList = React.useCallback((behavior = 'smooth') => {
-    const container = scrollListRef.current;
-    if (!container) return;
-    const activeEl = container.querySelector('.v2-playlist-track.is-active');
-    if (!activeEl) return;
-    const pad = 8;
-    const elTop = activeEl.offsetTop;
-    const elBottom = elTop + activeEl.offsetHeight;
-    const viewTop = container.scrollTop;
-    const viewBottom = viewTop + container.clientHeight;
-    if (elTop < viewTop + pad) {
-      container.scrollTo({ top: elTop - pad, behavior });
-    } else if (elBottom > viewBottom - pad) {
-      container.scrollTo({ top: elBottom - container.clientHeight + pad, behavior });
-    }
-  }, []);
-
-  const selectTrack = (i) => {
-    setActiveIdx(i);
-    requestAnimationFrame(() => scrollActiveTrackInList());
-  };
-
   const videoIndex = activeIdx + 1;
 
-  const embedSrc = active
-    ? (H.youtubeEmbedUrl
-      ? H.youtubeEmbedUrl({ youtubeId: active.videoId, playlistId, videoIndex })
-      : `https://www.youtube-nocookie.com/embed/${active.videoId}?list=${playlistId}&index=${videoIndex}&rel=0`)
-    : (H.youtubeEmbedUrl
-      ? H.youtubeEmbedUrl({ playlistId })
-      : `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}&rel=0`);
+  // Play on YouTube itself (not an embedded on-site player) so views, watch
+  // time, and ads all land on YouTube — maximising the channel's ad revenue.
+  // The watch URL keeps the playlist context (&list / &index).
+  const ytWatchUrl = (vid, idx) => {
+    if (!vid) return `https://www.youtube.com/playlist?list=${playlistId}`;
+    let u = `https://www.youtube.com/watch?v=${vid}&list=${playlistId}`;
+    if (idx != null) u += `&index=${idx}`;
+    return u;
+  };
 
   const posterUrl = active?.videoId
     ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/hqdefault.jpg`)
@@ -462,25 +441,16 @@ function V2PlaylistEmbed({ playlistId, title }) {
     <div className="v2-playlist-embed">
       <div className="v2-video-frame v2-video-frame--playlist">
         {!loading && items.length > 0 && (
-          playing ? (
-            <iframe
-              key={`${active.videoId}-${activeIdx}`}
-              src={`${embedSrc}${embedSrc.includes('?') ? '&' : '?'}autoplay=1`}
-              title={active?.title || title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <button
-              type="button"
-              className="v2-video-poster"
-              onClick={() => setPlaying(true)}
-              aria-label={`Play: ${active?.title || title}`}
-              style={posterUrl ? { backgroundImage: `url(${posterUrl})` } : undefined}
-            >
-              <span className="v2-video-play" aria-hidden="true">▶</span>
-            </button>
-          )
+          <a
+            className="v2-video-poster"
+            href={ytWatchUrl(active?.videoId, videoIndex)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Watch on YouTube: ${active?.title || title}`}
+            style={posterUrl ? { backgroundImage: `url(${posterUrl})` } : undefined}
+          >
+            <span className="v2-video-play" aria-hidden="true">▶</span>
+          </a>
         )}
         {loading && (
           <div className="v2-playlist-loading">Loading playlist…</div>
@@ -515,7 +485,7 @@ function V2PlaylistEmbed({ playlistId, title }) {
 
       {items.length > 0 && active && (
         <div className="v2-playlist-now" aria-live="polite">
-          <span className="v2-playlist-now-label">Now playing</span>
+          <span className="v2-playlist-now-label">Featured</span>
           <span className="v2-playlist-now-title">{active.title}</span>
         </div>
       )}
@@ -534,13 +504,14 @@ function V2PlaylistEmbed({ playlistId, title }) {
           <div className="v2-playlist-tracks-head">{items.length} videos in this playlist</div>
           <div className="v2-playlist-tracks-scroll" role="list" ref={scrollListRef}>
             {items.map((v, i) => (
-              <button
+              <a
                 key={`${v.videoId}-${i}`}
-                type="button"
                 role="listitem"
+                href={ytWatchUrl(v.videoId, i + 1)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`v2-playlist-track ${i === activeIdx ? 'is-active' : ''}`}
                 aria-current={i === activeIdx ? 'true' : undefined}
-                onClick={() => selectTrack(i)}
               >
                 <img
                   className="v2-playlist-track-thumb"
@@ -557,8 +528,8 @@ function V2PlaylistEmbed({ playlistId, title }) {
                 />
                 <span className="v2-playlist-track-num">{i + 1}</span>
                 <span className="v2-playlist-track-title">{v.title}</span>
-                {i === activeIdx && <span className="v2-playlist-track-now">Now playing</span>}
-              </button>
+                {i === activeIdx && <span className="v2-playlist-track-now">Featured</span>}
+              </a>
             ))}
           </div>
         </div>
@@ -567,61 +538,106 @@ function V2PlaylistEmbed({ playlistId, title }) {
   );
 }
 
-function V2ClickToPlayVideo({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption }) {
+// ── Auth gate for all video content ─────────────────────────────────────
+// Subscribes to Firebase auth so EVERY video on the site stays hidden until
+// the visitor is signed in (and not anonymous). Centralised here so any call
+// site — hero promo, roadmap module playlists, masterclass clips — is gated
+// without threading a `user` prop through every component.
+function useV2AuthUser() {
+  const [state, setState] = useState({ ready: false, user: null });
+  useEffect(() => {
+    let settled = false;
+    let unsub = null;
+    try {
+      if (window.firebase && window.firebase.auth) {
+        unsub = window.firebase.auth().onAuthStateChanged((u) => {
+          settled = true;
+          setState({ ready: true, user: u });
+        });
+      }
+    } catch (e) {}
+    // If Firebase never reports (SDK blocked / offline), stop blocking after a
+    // short grace period and treat the visitor as signed-out (show the gate).
+    const t = setTimeout(() => {
+      setState((s) => (s.ready ? s : { ready: true, user: null }));
+    }, 2500);
+    return () => { clearTimeout(t); if (unsub) unsub(); };
+  }, []);
+  return state;
+}
+
+function V2VideoGate() {
+  return (
+    <div className="v2-video-block">
+      <div className="v2-video-frame v2-video-gate">
+        <div className="v2-video-gate__inner">
+          <span className="v2-video-gate__lock" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </span>
+          <p className="v2-video-gate__title">Sign in to watch</p>
+          <p className="v2-video-gate__sub">Create a free account to unlock every video on the site.</p>
+          <button
+            type="button"
+            className="v2-video-gate__btn"
+            onClick={() => { try { window.dispatchEvent(new CustomEvent('v2:open-signin')); } catch (e) {} }}
+          >
+            Sign in / Register
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function V2ClickToPlayVideo(props) {
+  const { ready, user } = useV2AuthUser();
+  const signedIn = !!(user && !user.isAnonymous);
+  // While auth is resolving, hold a neutral placeholder so signed-in users
+  // don't see the gate flash before their video appears.
+  if (!ready) {
+    return (
+      <div className="v2-video-block">
+        <div className="v2-video-frame v2-video-gate v2-video-gate--loading" aria-hidden="true" />
+      </div>
+    );
+  }
+  if (!signedIn) return <V2VideoGate />;
+  return <V2ClickToPlayVideoInner {...props} />;
+}
+
+function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption }) {
   const isPlaylist = Boolean(playlistId);
 
   if (isPlaylist) {
     return <V2PlaylistEmbed playlistId={playlistId} title={title} />;
   }
 
-  const canTrack = trackable && onVideoProgress && videoId;
-
-  if (canTrack) {
-    return (
-      <V2TrackableVideo
-        videoId={videoId}
-        title={title}
-        caption={hideCaption ? null : caption}
-        startSec={startSec}
-        onVideoProgress={onVideoProgress}
-        mappingId={mappingId}
-        modules={modules}
-      />
-    );
-  }
-
-  const [playing, setPlaying] = useState(false);
   const H = window.ROADMAP_VIDEO_HELPERS || {};
-  const embedSrc = H.youtubeEmbedUrl
-    ? H.youtubeEmbedUrl({ youtubeId: videoId, startSec: startSec || 0 })
-    : `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&start=${startSec || 0}`;
   const thumbUrl = H.youtubePoster
     ? H.youtubePoster(videoId)
     : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-  const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
+  // Open on YouTube (not an embedded player) to maximise ad revenue + watch time.
+  const watchUrl = H.youtubeWatchUrl
+    ? H.youtubeWatchUrl(videoId, startSec || 0)
+    : `https://www.youtube.com/watch?v=${videoId}${startSec ? `&t=${startSec}s` : ''}`;
   const showCaption = !hideCaption && caption;
 
   return (
     <div className="v2-video-block">
       <div className="v2-video-frame">
-        {playing ? (
-          <iframe
-            src={`${embedSrc}${embedSrc.includes('?') ? '&' : '?'}autoplay=1`}
-            title={title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : (
-          <button
-            type="button"
-            className="v2-video-poster"
-            onClick={() => setPlaying(true)}
-            aria-label={`Play: ${title}`}
-            style={{ backgroundImage: `url(${thumbUrl})` }}
-          >
-            <span className="v2-video-play" aria-hidden="true">▶</span>
-          </button>
-        )}
+        <a
+          className="v2-video-poster"
+          href={watchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Watch on YouTube: ${title}`}
+          style={{ backgroundImage: `url(${thumbUrl})` }}
+        >
+          <span className="v2-video-play" aria-hidden="true">▶</span>
+        </a>
       </div>
       {showCaption && (
         <p className="v2-video-caption">
@@ -759,10 +775,11 @@ function V2HeroSocialProof() {
   );
 }
 
-function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum }) {
+function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, reserved, onManage }) {
   const seats = getSeatsRemaining(nextMc);
   const dateStr = nextMc ? formatMcShortDate(nextMc.dateTime) : 'Coming soon';
   const free = isMcFree(nextMc);
+  const nextMcDate = nextMc && nextMc.dateTime ? new Date(nextMc.dateTime) : null;
 
   return (
     <header className="coaching-home__hero v2-hero hero--split">
@@ -783,56 +800,88 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum }) {
             English + Telugu · built for Indian engineers
           </p>
 
-          <div className="v2-hero-actions">
-            <button
-              type="button"
-              className="v2-hero-cta"
-              onClick={() => onReserve(nextMc)}
-              disabled={!nextMc}
-            >
-              {nextMc ? (
-                <>
-                  <span className="v2-hero-cta-text">
-                    {free ? `Reserve free seat · ${dateStr}` : `Book my seat · ${formatMcPriceShort(nextMc)} · ${dateStr}`}
-                  </span>
+          {reserved && nextMc ? (
+            /* Seat already reserved — show the booked session instead of a sell */
+            <div className="v2-hero-upcoming">
+              <p className="v2-hero-upcoming-label">Upcoming session for you</p>
+              <h3 className="v2-hero-upcoming-title">{nextMc.title}</h3>
+              <p className="v2-hero-upcoming-date">
+                {nextMcDate && !isNaN(nextMcDate) ? formatMcFullDateTime(nextMcDate) : 'Date TBA'}
+              </p>
+              <p className="v2-hero-upcoming-note">
+                You&apos;re registered ✓ · Zoom link sent by email
+              </p>
+              <div className="v2-hero-actions">
+                <button type="button" className="v2-hero-cta" onClick={onManage}>
+                  <span className="v2-hero-cta-text">View in my account</span>
                   <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
-                </>
-              ) : (
-                'Next masterclass dropping soon'
-              )}
-            </button>
-            {V2_CONFIG.showHeroSecondaryCta && (
-              <button
-                type="button"
-                className="v2-hero-cta v2-hero-cta--ghost"
-                onClick={onExploreCurriculum || onRoadmap}
-              >
-                <span className="v2-hero-cta-text">Explore the curriculum</span>
-                <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
-              </button>
-            )}
-          </div>
+                </button>
+                {V2_CONFIG.showHeroSecondaryCta && (
+                  <button
+                    type="button"
+                    className="v2-hero-cta v2-hero-cta--ghost"
+                    onClick={onExploreCurriculum || onRoadmap}
+                  >
+                    <span className="v2-hero-cta-text">Explore the curriculum</span>
+                    <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="v2-hero-actions">
+                <button
+                  type="button"
+                  className="v2-hero-cta"
+                  onClick={() => onReserve(nextMc)}
+                  disabled={!nextMc}
+                >
+                  {nextMc ? (
+                    <>
+                      <span className="v2-hero-cta-text">
+                        {free ? `Reserve free seat · ${dateStr}` : `Book my seat · ${formatMcPriceShort(nextMc)} · ${dateStr}`}
+                      </span>
+                      <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
+                    </>
+                  ) : (
+                    'Next masterclass dropping soon'
+                  )}
+                </button>
+                {V2_CONFIG.showHeroSecondaryCta && (
+                  <button
+                    type="button"
+                    className="v2-hero-cta v2-hero-cta--ghost"
+                    onClick={onExploreCurriculum || onRoadmap}
+                  >
+                    <span className="v2-hero-cta-text">Explore the curriculum</span>
+                    <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
+                  </button>
+                )}
+              </div>
 
-          {nextMc && (
-            <p className="v2-hero-microcopy">
-              {free ? (
-                <>
-                  <span className="v2-hero-microcopy-lock" aria-hidden="true">🎟️</span>
-                  Free to attend · Calendar invite + Zoom link emailed instantly
-                </>
-              ) : (
-                <>
-                  <span className="v2-hero-microcopy-lock" aria-hidden="true">🔒</span>
-                  Razorpay · 100% refund within 24h
-                </>
+              {nextMc && (
+                <p className="v2-hero-microcopy">
+                  {free ? (
+                    <>
+                      <span className="v2-hero-microcopy-lock" aria-hidden="true">🎟️</span>
+                      Free to attend · Calendar invite + Zoom link emailed instantly
+                    </>
+                  ) : (
+                    <>
+                      <span className="v2-hero-microcopy-lock" aria-hidden="true">🔒</span>
+                      Razorpay · 100% refund within 24h
+                    </>
+                  )}
+                  {seats > 0 && (
+                    <>
+                      {' · '}
+                      <span className="v2-hero-microcopy-seats">{seats} of {nextMc.seatsTotal || 50} seats left</span>
+                    </>
+                  )}
+                </p>
               )}
-              {seats > 0 && (
-                <>
-                  {' · '}
-                  <span className="v2-hero-microcopy-seats">{seats} of {nextMc.seatsTotal || 50} seats left</span>
-                </>
-              )}
-            </p>
+            </>
           )}
         </div>
 
@@ -1352,11 +1401,11 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Download the AI roadmap PDF">
+      <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Access the AI roadmap">
         <button type="button" className="modal-close" onClick={onClose} aria-label="Close modal">×</button>
-        <h3 className="modal-title">Get the <em>26-Week AI Roadmap PDF</em></h3>
+        <h3 className="modal-title">Get the <em>26-Week AI Roadmap</em></h3>
         <p className="modal-desc">
-          Enter your name and email to download the high-resolution curriculum and receive weekly phase study guides.
+          Enter your name and email to access the full curriculum and receive weekly phase study guides.
         </p>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1386,7 +1435,7 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
           </div>
           {error && <p className="status-box status-box--error" style={{ margin: 0, padding: '10px 14px' }}>{error}</p>}
           <button type="submit" className="form-btn" disabled={loading}>
-            {loading ? 'Submitting...' : 'Download Roadmap PDF'}
+            {loading ? 'Submitting...' : 'Get instant access'}
           </button>
         </form>
       </div>
@@ -1917,7 +1966,7 @@ function V2HowItWorks({ nextMc }) {
 
 // On-page curriculum section — what the "Explore the curriculum" hero button scrolls to.
 // Reads instructor + about + curriculum modules from site.config.js so this is fully editable.
-function V2Curriculum({ nextMc, onReserve }) {
+function V2Curriculum({ nextMc, onReserve, reserved, onManage }) {
   if (!nextMc) return null;
   const merged = mergeMcWithConfig(nextMc);
   if (!merged) return null;
@@ -1989,9 +2038,15 @@ function V2Curriculum({ nextMc, onReserve }) {
       )}
 
       <div className="v2-curriculum-footer">
-        <button type="button" className="v2-curriculum-cta" onClick={() => onReserve(nextMc)}>
-          {free ? 'Reserve my free seat' : `Book my seat · ${formatMcPriceShort(merged)}`} →
-        </button>
+        {reserved ? (
+          <button type="button" className="v2-curriculum-cta" onClick={() => onManage && onManage()}>
+            You&apos;re registered ✓ · View my account →
+          </button>
+        ) : (
+          <button type="button" className="v2-curriculum-cta" onClick={() => onReserve(nextMc)}>
+            {free ? 'Reserve my free seat' : `Book my seat · ${formatMcPriceShort(merged)}`} →
+          </button>
+        )}
       </div>
     </section>
   );
@@ -2130,7 +2185,7 @@ function V2SuccessStories() {
   );
 }
 
-function V2ClosingCTA({ nextMc, onReserve }) {
+function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
   if (!nextMc) return null;
   const free = isMcFree(nextMc);
   const seats = getSeatsRemaining(nextMc);
@@ -2138,16 +2193,25 @@ function V2ClosingCTA({ nextMc, onReserve }) {
     <section className="closing-cta">
       <RevealOnScroll>
         <span className="closing-cta__eyebrow">Next session · {formatMcFullDateTime(nextMc.dateTime)}</span>
-        <h2 className="closing-cta__headline">Stop watching tutorials. Ship one with me.</h2>
+        <h2 className="closing-cta__headline">
+          {reserved ? 'You’re in. See you live.' : 'Stop watching tutorials. Ship one with me.'}
+        </h2>
         <p className="closing-cta__sub">
           3 hours live · {free ? 'free first masterclass' : 'single price'} · recording &amp; slides included
           {free ? ' · WhatsApp community access' : ' · 100% refund within 24h'}.
         </p>
-        <button className="hero__primary-cta v2-closing-btn" onClick={() => onReserve(nextMc)}>
-          {free ? `Reserve my free seat →` : `Book my seat · ${formatMcPriceShort(nextMc)} →`}
+        <button
+          className="hero__primary-cta v2-closing-btn"
+          onClick={() => reserved ? (onManage && onManage()) : onReserve(nextMc)}
+        >
+          {reserved
+            ? 'You’re registered ✓ · View my account →'
+            : (free ? `Reserve my free seat →` : `Book my seat · ${formatMcPriceShort(nextMc)} →`)}
         </button>
         <div className="closing-cta__microcopy">
-          {seats > 0 ? `Only ${seats} seats left · ` : ''}Instant Zoom link · No account needed
+          {reserved
+            ? 'Zoom link sent by email · Session details in My Account'
+            : `${seats > 0 ? `Only ${seats} seats left · ` : ''}Instant Zoom link · No account needed`}
         </div>
       </RevealOnScroll>
     </section>
@@ -2220,15 +2284,41 @@ function V2LegalModal({ page, onClose }) {
     refund: { title: 'Refund Policy', body: '100% refund within 24 hours of purchase, no questions asked. Email balajichippada.20@gmail.com with your order ID.' },
     privacy: { title: 'Privacy Policy', body: 'We collect name, email, and phone to deliver masterclass access and updates. We do not sell your data. Contact us to delete your account.' },
     terms: { title: 'Terms of Service', body: 'Masterclass content is for personal learning. Recording redistribution is prohibited. Sessions may be rescheduled with 48h notice.' },
-    contact: { title: 'Contact', body: `Email: balajichippada.20@gmail.com · WhatsApp community: ${V2_BRAND.whatsappCommunity} · We respond within 24 hours.` },
-  }[page] || { title: page, body: '' };
+    contact: {
+      title: 'Contact',
+      body: (
+        <>
+          <p className="modal-desc">
+            Email: <a href="mailto:balajichippada.20@gmail.com">balajichippada.20@gmail.com</a>
+            {' · '}We respond within 24 hours.
+          </p>
+          <a
+            href={V2_BRAND.whatsappCommunity}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="form-btn v2-btn-secondary v2-contact-whatsapp"
+          >
+            <svg className="v2-contact-whatsapp-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            Join the WhatsApp community
+          </a>
+        </>
+      ),
+    },
+  }[page] || { title: page, body: <p className="modal-desc"></p> };
+
+  // `body` may be a plain string (legal pages) or a JSX node (contact).
+  const bodyNode = typeof content.body === 'string'
+    ? <p className="modal-desc">{content.body}</p>
+    : content.body;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={content.title}>
         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         <h2 className="modal-title">{content.title}</h2>
-        <p className="modal-desc">{content.body}</p>
+        {bodyNode}
       </div>
     </div>
   );

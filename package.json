@@ -8,7 +8,8 @@
     "build:js": "node scripts/build-js.mjs",
     "prerender": "node scripts/prerender.mjs",
     "build": "npm run build:js && npm run prerender",
-    "verify": "node scripts/verify-render.mjs"
+    "verify": "node scripts/verify-render.mjs",
+    "pdf": "node scripts/roadmap-to-pdf.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

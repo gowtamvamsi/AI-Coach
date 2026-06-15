@@ -495,19 +495,6 @@ function RoadmapView({
                 Explore the roadmap
                 <span aria-hidden="true">↓</span>
               </button>
-              <button 
-                className="hero__cta" 
-                type="button" 
-                onClick={onDownloadRoadmap}
-                style={{ 
-                  background: 'var(--c-pink)', 
-                  borderColor: 'var(--c-pink)', 
-                  color: '#fff',
-                  boxShadow: '0 4px 20px rgba(224, 86, 126, 0.2)' 
-                }}
-              >
-                Download PDF Roadmap
-              </button>
               {!tracking && (
                 <button
                   className="hero__cta hero__cta--ghost"
@@ -4649,23 +4636,6 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // ── Lenis smooth scroll ─────────────────────────────────────
-  useEffect(() => {
-    const LenisClass = window.Lenis;
-    if (!LenisClass) return;
-    const lenis = new LenisClass({ lerp: 0.08, smoothWheel: true });
-    let rafId;
-    function raf(time) {
-      lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
-    }
-    rafId = requestAnimationFrame(raf);
-    return () => {
-      cancelAnimationFrame(rafId);
-      lenis.destroy();
-    };
-  }, []);
-
   // Main navigation tabs routing state: 'home' | 'roadmap' | 'dashboard'
   const [activeMainTab, setActiveMainTab] = useState(() => {
     try {
@@ -4750,7 +4720,15 @@ function App() {
 
   // Staff Login modal state
   const [staffLoginOpen, setStaffLoginOpen] = useState(false);
-  
+
+  // Video paywall gate (in v2.jsx) dispatches this when a signed-out visitor
+  // clicks "Sign in to watch" — open the login/register modal in response.
+  useEffect(() => {
+    const open = () => { setLoginError(""); setStaffLoginOpen(true); };
+    window.addEventListener('v2:open-signin', open);
+    return () => window.removeEventListener('v2:open-signin', open);
+  }, []);
+
   // Lead Capture Modal states
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadModalSource, setLeadModalSource] = useState('roadmap_pdf');
@@ -5387,6 +5365,10 @@ function App() {
     if (auth) {
       await auth.signOut();
       setActiveMainTab('home');
+      // Reserved-seat state is a per-visitor cache; clear it on sign-out so a
+      // signed-out visitor no longer sees "Seat booked ✓" / upcoming-session UI.
+      setReservedMcIds([]);
+      try { localStorage.removeItem('reserved_mc_ids'); } catch (e) {}
     }
   };
 
@@ -5840,7 +5822,9 @@ function App() {
         className="nav__drawer-cta"
         onClick={() => {
           setNavMenuOpen(false);
-          if (nextMasterclass) {
+          if (nextMcReserved) {
+            goToAccount();
+          } else if (nextMasterclass) {
             openBooking(nextMasterclass);
           } else {
             const el = document.getElementById('masterclasses');
@@ -5848,7 +5832,7 @@ function App() {
           }
         }}
       >
-        {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
+        {nextMcReserved ? 'Seat booked ✓ · View' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
       </button>
       {user && !user.isAnonymous ? (
         <React.Fragment>
@@ -5883,22 +5867,60 @@ function App() {
     </React.Fragment>
   );
 
-  const navBrand = (
+  // Signed-in identity chip: Google avatar (or generic icon) + first name,
+  // with a hover/focus dropdown for Profile and Logout.
+  const navUserMenu = user && !user.isAnonymous ? (
+    <div className="nav__user">
+      <button
+        type="button"
+        className="nav__user-btn"
+        aria-haspopup="menu"
+        onClick={goToAccount}
+      >
+        {user.photoURL ? (
+          <img
+            className="nav__user-avatar"
+            src={user.photoURL}
+            alt=""
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="nav__user-avatar nav__user-avatar--icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </span>
+        )}
+        <span className="nav__user-name">
+          {user.displayName ? user.displayName.split(' ')[0] : 'My account'}
+        </span>
+        <span className="nav__user-caret" aria-hidden="true">▾</span>
+      </button>
+      <div className="nav__user-menu" role="menu">
+        <button type="button" role="menuitem" className="nav__user-menu-item" onClick={goToAccount}>
+          Profile
+        </button>
+        <button type="button" role="menuitem" className="nav__user-menu-item nav__user-menu-item--logout" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  // Signed-out CTA — sits on the left next to the menu button (mirrors where
+  // the signed-in user chip appears).
+  const navSignInButton = (!user || user.isAnonymous) ? (
     <button
-      type="button"
-      className="nav__brand"
-      onClick={() => switchMainTab('home')}
-      aria-label="Go to home"
+      className="nav__auth-btn"
+      onClick={() => {
+        setLoginError("");
+        setStaffLoginOpen(true);
+      }}
     >
-      <img
-        className="nav__brand-photo"
-        src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
-        alt=""
-        aria-hidden="true"
-      />
-      <span className="nav__brand-name">{V2_BRAND.name}</span>
+      Sign In / Register
     </button>
-  );
+  ) : null;
 
   const navMenuButton = (
     <button
@@ -5918,7 +5940,11 @@ function App() {
       {/* Interruption ladder: welcome popup first → (on close) promo banner → (on close) nothing.
           The banner only appears once the popup has been resolved (shown+closed, already
           dismissed on a prior visit, or disabled). */}
-      <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} onResolve={handleWelcomeResolved} />
+      {/* Skip the sales popup entirely once the seat is reserved (banner is
+          independently hidden via canShow below). */}
+      {!nextMcReserved && (
+        <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} onResolve={handleWelcomeResolved} />
+      )}
       <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} canShow={welcomeResolved && !nextMcReserved} />
 
       {motion ? (
@@ -5934,7 +5960,8 @@ function App() {
         >
         <div className="nav__start">
           {navMenuButton}
-          <div className="nav__brand-wrap">{navBrand}</div>
+          {navUserMenu}
+          {navSignInButton}
         </div>
 
         <div className="nav__tabs" role="tablist">
@@ -5942,32 +5969,12 @@ function App() {
         </div>
 
         <div className="nav__right">
-          {user && !user.isAnonymous ? (
-            <button
-              className="nav__auth-btn is-active"
-              onClick={() => {
-                if (isUserStaff) switchMainTab('dashboard');
-                else switchMainTab('mybookings');
-              }}
-            >
-              {user.displayName ? user.displayName.split(' ')[0] : 'My account'}
-            </button>
-          ) : (
-            <button
-              className="nav__auth-btn"
-              onClick={() => {
-                setLoginError("");
-                setStaffLoginOpen(true);
-              }}
-            >
-              Sign In / Register
-            </button>
-          )}
-
           <button
             className="nav__book-seat-btn"
             onClick={() => {
-              if (nextMasterclass) {
+              if (nextMcReserved) {
+                goToAccount();
+              } else if (nextMasterclass) {
                 openBooking(nextMasterclass);
               } else {
                 const el = document.getElementById('masterclasses');
@@ -5975,7 +5982,7 @@ function App() {
               }
             }}
           >
-            {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
+            {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
           </button>
 
           <button
@@ -5996,37 +6003,19 @@ function App() {
         <nav className="nav" aria-label="Primary">
           <div className="nav__start">
             {navMenuButton}
-            <div className="nav__brand-wrap">{navBrand}</div>
+            {navUserMenu}
+            {navSignInButton}
           </div>
           <div className="nav__tabs" role="tablist">
             {mainNavTabs}
           </div>
           <div className="nav__right">
-            {user && !user.isAnonymous ? (
-              <button
-                className="nav__auth-btn is-active"
-                onClick={() => {
-                  if (isUserStaff) switchMainTab('dashboard');
-                  else switchMainTab('mybookings');
-                }}
-              >
-                {user.displayName ? user.displayName.split(' ')[0] : 'My account'}
-              </button>
-            ) : (
-              <button
-                className="nav__auth-btn"
-                onClick={() => {
-                  setLoginError("");
-                  setStaffLoginOpen(true);
-                }}
-              >
-                Sign In / Register
-              </button>
-            )}
             <button
               className="nav__book-seat-btn"
               onClick={() => {
-                if (nextMasterclass) {
+                if (nextMcReserved) {
+                  goToAccount();
+                } else if (nextMasterclass) {
                   openBooking(nextMasterclass);
                 } else {
                   const el = document.getElementById('masterclasses');
@@ -6034,7 +6023,7 @@ function App() {
                 }
               }}
             >
-              {nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes'}
+              {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
             </button>
             <button
               type="button"
@@ -6124,6 +6113,8 @@ function App() {
           <V2HeroSection
             nextMc={nextMasterclass}
             onReserve={openBooking}
+            reserved={nextMcReserved}
+            onManage={goToAccount}
             onRoadmap={() => { setActiveMainTab('roadmap'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             onExploreCurriculum={() => {
               const el = document.getElementById('v2-curriculum');
@@ -6136,7 +6127,7 @@ function App() {
 
           {/* ── On-page curriculum — what "Explore the curriculum" scrolls to ── */}
           {V2_CONFIG.showCurriculumSection && (
-            <V2Curriculum nextMc={nextMasterclass} onReserve={openBooking} />
+            <V2Curriculum nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
           )}
 
           {/* ── Not sure where to start? → Roadmap ── */}
@@ -6222,9 +6213,9 @@ function App() {
 
                           <ShimmerButton
                             variant="dark"
-                            onClick={() => openBooking(s)}
+                            onClick={() => reservedMcIds.includes(s.id) ? goToAccount() : openBooking(s)}
                           >
-                            {isMcFree(s) ? 'Reserve free seat' : 'Book Seat'}
+                            {reservedMcIds.includes(s.id) ? 'You’re registered ✓' : (isMcFree(s) ? 'Reserve free seat' : 'Book Seat')}
                           </ShimmerButton>
                         </article>
                       ))}
@@ -6252,7 +6243,7 @@ function App() {
           <V2FAQSection onLegal={setLegalPage} />
 
           {/* ── Closing CTA Section ── */}
-          <V2ClosingCTA nextMc={nextMasterclass} onReserve={openBooking} />
+          <V2ClosingCTA nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
 
           {/* ── Footer Section ── */}
           <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
@@ -6278,7 +6269,7 @@ function App() {
           onStartTracking={handleStartTracking}
           onVideoProgress={handleVideoProgress}
           onOpenLogin={() => { setLoginError(''); setStaffLoginOpen(true); }}
-          onDownloadRoadmap={() => handleOpenLeadModal('https://github.com/ch-balaji/ai-engineer-roadmap/raw/main/AI-Engineer-Roadmap.pdf', 'roadmap_hero_cta')}
+          onDownloadRoadmap={() => handleOpenLeadModal('/roadmap', 'roadmap_hero_cta')}
           onGatedDownloadClick={(url, src) => handleOpenLeadModal(url, src)}
         />
       )}
