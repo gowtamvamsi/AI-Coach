@@ -173,6 +173,7 @@ function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoPro
                     trackable={tracking && !link.playlistId}
                     mappingId={link.id}
                     modules={link.modules}
+                    codeUrl={link.codeUrl}
                     onVideoProgress={onVideoProgress}
                   />
                 </div>
@@ -914,7 +915,7 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
   const soldOut = hasSeatData && seatsLeft <= 0;
   const showUrgency = hasSeatData && seatsLeft > 0 && seatsLeft <= 15;
   const priceText = free ? 'Free' : `₹${(mc.price || 0).toLocaleString()}`;
-  const ctaText = soldOut ? 'Sold out' : (free ? 'Reserve free seat' : `Book my seat — ${priceText}`);
+  const ctaText = soldOut ? 'Sold out' : (free ? <>Reserve seat · <V2McPrice mc={mc} /></> : `Book my seat — ${priceText}`);
   const subcopyText = free ? 'Instant Zoom link · No sign-up needed' : 'Instant Zoom link · No account needed';
 
   return (
@@ -2164,7 +2165,7 @@ function TestimonialsSection() {
           >
             {nextMcReserved
               ? 'You\u2019re registered ✓ · View'
-              : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve my free seat →' : 'Book my seat →') : 'See upcoming classes →')}
+              : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve seat · <V2McPrice mc={nextMasterclass} /> →</> : 'Book my seat →') : 'See upcoming classes →')}
           </button>
         </div>
       </RevealOnScroll>
@@ -2231,6 +2232,14 @@ function SplitPaneSyllabus({ syllabus }) {
 function DashboardView({ user, role, onLogout }) {
   const [sessions, setSessions] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  // Zoom-link manager (per-masterclass): input value, busy + result message keyed by sessionId.
+  const [zoomInputs, setZoomInputs] = useState({});
+  const [zoomBusy, setZoomBusy] = useState({});
+  const [zoomMsg, setZoomMsg] = useState({});
+  // Optional "edit the email before sending" editor for the zoom-link email.
+  const [zoomEditOpen, setZoomEditOpen] = useState(false);
+  const [zoomSubject, setZoomSubject] = useState("");
+  const [zoomBody, setZoomBody] = useState("");
   const [editSessionId, setEditSessionId] = useState("");
   const [editSessionIsMc, setEditSessionIsMc] = useState(false);
   const [selectedRosterClassId, setSelectedRosterClassId] = useState("all");
@@ -2291,8 +2300,15 @@ function DashboardView({ user, role, onLogout }) {
   const [rvTitle, setRvTitle] = useState("");
   const [rvStartTs, setRvStartTs] = useState("");
   const [rvKind, setRvKind] = useState("deep-dive");
+  const [rvCodeUrl, setRvCodeUrl] = useState("");
   const [rvSaving, setRvSaving] = useState(false);
   const [rvFilter, setRvFilter] = useState("");
+  // Per-video "Link to code" (videoId → codeUrl), works for any video incl.
+  // individual videos inside a playlist.
+  const [vcUrl, setVcUrl] = useState("");
+  const [vcCodeUrl, setVcCodeUrl] = useState("");
+  const [vcSaving, setVcSaving] = useState(false);
+  const [videoCodeDocs, setVideoCodeDocs] = useState([]);
 
   const CAMPAIGN_TEMPLATES = {
     general: {
@@ -2745,6 +2761,47 @@ function DashboardView({ user, role, onLogout }) {
     return () => unsub();
   }, []);
 
+  // Load per-video code links (videoCodeLinks/{videoId})
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('videoCodeLinks').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setVideoCodeDocs(list);
+    }, () => setVideoCodeDocs([]));
+    return () => unsub();
+  }, []);
+
+  const handleSaveVideoCodeLink = async (e) => {
+    e.preventDefault();
+    const H = window.ROADMAP_VIDEO_HELPERS || {};
+    const videoId = H.parseYouTubeId ? H.parseYouTubeId(vcUrl.trim()) : null;
+    const code = vcCodeUrl.trim();
+    if (!videoId) { setStatus({ type: 'error', message: 'Paste a valid YouTube VIDEO URL (a single video, not a playlist).' }); return; }
+    if (!code) { setStatus({ type: 'error', message: 'Enter the code (repo) URL.' }); return; }
+    setVcSaving(true);
+    try {
+      await db.collection('videoCodeLinks').doc(videoId).set({
+        videoId,
+        codeUrl: code,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: user?.uid || '',
+      }, { merge: true });
+      setVcUrl('');
+      setVcCodeUrl('');
+      setStatus({ type: 'success', message: `Code link saved for video ${videoId}.` });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to save code link.' });
+    } finally {
+      setVcSaving(false);
+    }
+  };
+
+  const handleDeleteVideoCodeLink = async (videoId) => {
+    try { await db.collection('videoCodeLinks').doc(videoId).delete(); }
+    catch (err) { setStatus({ type: 'error', message: err.message || 'Failed to remove code link.' }); }
+  };
+
   const rvPhaseSections = (window.ROADMAP || []).find((p) => p.id === rvPhaseId)?.sections || [];
 
   const handleRvPhaseChange = (pid) => {
@@ -2802,6 +2859,7 @@ function DashboardView({ user, role, onLogout }) {
         modules: rvModules.slice().sort(),
         startSec,
         endSec: null,
+        codeUrl: rvCodeUrl.trim() || null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: user?.uid || '',
@@ -2809,6 +2867,7 @@ function DashboardView({ user, role, onLogout }) {
       setRvUrl('');
       setRvTitle('');
       setRvStartTs('');
+      setRvCodeUrl('');
       setRvModules([]);
       setStatus({ type: 'success', message: 'Video linked to roadmap modules.' });
     } catch (err) {
@@ -2832,6 +2891,7 @@ function DashboardView({ user, role, onLogout }) {
   const handleSelectSessionToEdit = (id, isMcCollection = false) => {
     setEditSessionId(id);
     setEditSessionIsMc(isMcCollection);
+    setZoomEditOpen(false); // collapse the email editor when switching targets
     if (!id) {
       // Reset form to blank creation
       setTitle("");
@@ -2967,8 +3027,35 @@ function DashboardView({ user, role, onLogout }) {
     }
   };
 
+  // Count completed registrations for a session (used for cancel confirmations).
+  const completedRegCount = (sessionId) =>
+    (registrations || []).filter(r => r.sessionId === sessionId && r.status === 'completed').length;
+
+  // Email all registrants that a masterclass was cancelled (also marks their
+  // registrations cancelled so reminders stop). Returns the send stats.
+  const notifyCancellation = async (sessionId) => {
+    try {
+      const call = functions.httpsCallable('sendMasterclassCancellation');
+      const res = await call({ sessionId });
+      return (res && res.data) || null;
+    } catch (e) {
+      console.warn('Cancellation email failed:', e);
+      return { error: e.message || 'failed' };
+    }
+  };
+
+  const cancellationResultMsg = (title, r) => {
+    let msg = `"${title}" cancelled.`;
+    if (r && r.error) msg += ` (Couldn't notify registrants: ${r.error})`;
+    else if (r && r.skippedPast) msg += ` (Session already passed — no emails sent.)`;
+    else if (r && r.queued > 0) msg += ` Notifying ${r.queued} registrant(s) in the background.`;
+    else if (r && r.queued === 0) msg += ` (No registrants to notify.)`;
+    return msg;
+  };
+
   const handleDeleteSession = async (sessionId, sessionTitle, isMcCollection = false) => {
-    if (!window.confirm(`Delete "${sessionTitle}"? This cannot be undone.`)) return;
+    const count = completedRegCount(sessionId);
+    if (!window.confirm(`Cancel & delete "${sessionTitle}"?${count ? ` This will email ${count} registered student(s) that it's cancelled.` : ''} This cannot be undone.`)) return;
     try {
       const targetCollection = isMcCollection ? "masterclasses" : "sessions";
       await db.collection(targetCollection).doc(sessionId).set({
@@ -2976,10 +3063,11 @@ function DashboardView({ user, role, onLogout }) {
         status: "deleted",
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-      
+
       // If we were editing this session, reset form
       if (editSessionId === sessionId) handleSelectSessionToEdit("", false);
-      setStatus({ type: "success", message: `"${sessionTitle}" deleted.` });
+      const stats = await notifyCancellation(sessionId);
+      setStatus({ type: "success", message: cancellationResultMsg(sessionTitle, stats) });
     } catch (err) {
       setStatus({ type: "error", message: err.message || "Failed to delete session." });
     }
@@ -3091,21 +3179,92 @@ ${mcRawSyllabus}`;
   };
 
   const handleDeleteMasterclass = async (mcId, mcTitle) => {
-    if (!window.confirm(`Delete "${mcTitle}"? This cannot be undone.`)) return;
+    const count = completedRegCount(mcId);
+    if (!window.confirm(`Cancel & delete "${mcTitle}"?${count ? ` This will email ${count} registered student(s) that it's cancelled.` : ''} This cannot be undone.`)) return;
     try {
       await db.collection('masterclasses').doc(mcId).set({
         deleted: true,
         status: "deleted",
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-      
+
       // If we were editing this session, reset form
       if (editSessionId === mcId) handleSelectSessionToEdit("", false);
-      setStatus({ type: 'success', message: `"${mcTitle}" masterclass deleted.` });
+      const stats = await notifyCancellation(mcId);
+      setStatus({ type: 'success', message: cancellationResultMsg(mcTitle, stats) });
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Failed to delete masterclass.' });
     }
   };
+
+  // Save a Zoom link for a masterclass and email it to everyone already
+  // registered (via the sendZoomLinkToRegistrants Cloud Function). Future
+  // registrants get it automatically in their confirmation email.
+  // Default zoom-link email shown in the editor. {{name}} is substituted with
+  // each student's name server-side.
+  const buildDefaultZoomEmail = (mcTitle, mcDateTime, zoomLink) => {
+    const when = (typeof formatMcFullDateTime === 'function' && mcDateTime)
+      ? formatMcFullDateTime(mcDateTime)
+      : (mcDateTime ? new Date(mcDateTime).toLocaleString('en-IN') : 'TBA');
+    return {
+      subject: `Your Zoom link for ${mcTitle || 'the masterclass'} 🔗`,
+      body: `Hi {{name}},\n\n` +
+        `Here's your private Zoom joining link for ${mcTitle || 'the masterclass'}:\n\n` +
+        `Class: ${mcTitle || 'Masterclass'}\n` +
+        `Date & Time: ${when}\n` +
+        `Zoom link: ${zoomLink || '<add the link above>'}\n\n` +
+        `Save this email — we'll also send you a reminder on each of the 2 days before the session.\n\n` +
+        `See you live,\nBalaji Chippada Masterclass\nteam@balajichippada.com`,
+    };
+  };
+
+  const handleSendZoom = async (sessionId, registeredCount) => {
+    const zoomLink = (zoomInputs[sessionId] || '').trim();
+    if (!zoomLink) {
+      setZoomMsg(m => ({ ...m, [sessionId]: '⚠️ Enter a Zoom link first.' }));
+      return;
+    }
+    if (registeredCount > 0 && !window.confirm(`Email this Zoom link to ${registeredCount} registered student(s) now?`)) return;
+    setZoomBusy(b => ({ ...b, [sessionId]: true }));
+    setZoomMsg(m => ({ ...m, [sessionId]: '' }));
+    try {
+      const call = functions.httpsCallable('sendZoomLinkToRegistrants');
+      // Include the edited subject/body when the editor is open and filled.
+      const payload = { sessionId, zoomLink };
+      if (zoomEditOpen && zoomBody.trim()) {
+        payload.customSubject = zoomSubject.trim();
+        payload.customBody = zoomBody;
+      }
+      const res = await call(payload);
+      const d = (res && res.data) || {};
+      setZoomMsg(m => ({
+        ...m,
+        [sessionId]: d.queued > 0
+          ? `✓ Saved. Queued ${d.queued} email(s) — they'll send in the background over the next few minutes.`
+          : (d.message || '✓ Saved.'),
+      }));
+    } catch (err) {
+      setZoomMsg(m => ({ ...m, [sessionId]: `⚠️ ${err.message || 'Failed to send.'}` }));
+    } finally {
+      setZoomBusy(b => ({ ...b, [sessionId]: false }));
+    }
+  };
+
+  // Masterclasses that have at least one registration (covers both Firestore
+  // and config-only masterclasses, since both produce registration docs).
+  const sessionsWithRegs = (() => {
+    const map = new Map();
+    (registrations || []).forEach(r => {
+      if (!r.sessionId) return;
+      if (!map.has(r.sessionId)) {
+        map.set(r.sessionId, { sessionId: r.sessionId, title: r.sessionTitle || 'Masterclass', registered: 0, zoomLink: '' });
+      }
+      const e = map.get(r.sessionId);
+      if (r.status === 'completed') e.registered++;
+      if (r.zoomLink && !e.zoomLink) e.zoomLink = r.zoomLink;
+    });
+    return [...map.values()];
+  })();
 
   // Compute all scheduled and virtual default config masterclasses/sessions in a unified list (excluding soft deleted ones)
   const combinedClasses = (() => {
@@ -3182,7 +3341,7 @@ ${mcRawSyllabus}`;
   const totalSeats = filteredRegistrations
     .filter(r => r.status === 'completed').length;
 
-  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase());
 
   // ── Marketing Segmentation & Deduplication Computations ──
@@ -3657,6 +3816,13 @@ ${mcRawSyllabus}`;
                   <option value="supplement">Supplement</option>
                 </select>
               </div>
+              {rvKind !== 'playlist' && (
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Link to code (optional — this single video's GitHub / repo URL)</label>
+                  <input className="form-input" value={rvCodeUrl} onChange={(e) => setRvCodeUrl(e.target.value)} placeholder="https://github.com/…" />
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--fg-faint)', margin: '6px 0 0' }}>For playlists, add a code link per video in the “Per-video code links” section below.</p>
+                </div>
+              )}
             </div>
             <button type="submit" className="form-btn" disabled={rvSaving}>{rvSaving ? 'Linking…' : 'Link video'}</button>
           </form>
@@ -3678,6 +3844,7 @@ ${mcRawSyllabus}`;
                     Phase {doc.phaseId} · {(doc.modules || []).join(', ')} · {doc.kind}
                     {doc.playlistId ? ` · playlist ${doc.playlistId}` : ''}
                     {doc.startSec ? ` · @ ${(window.ROADMAP_VIDEO_HELPERS || {}).formatTimestamp?.(doc.startSec) || doc.startSec}` : ''}
+                    {doc.codeUrl ? <> · <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>code ↗</a></> : ''}
                   </div>
                 </div>
                 <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteRoadmapVideo(doc.id, doc.title)}>Remove</button>
@@ -3685,6 +3852,47 @@ ${mcRawSyllabus}`;
             ))}
             {roadmapVideoDocs.length === 0 && (
               <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No admin-linked videos yet. Seed data from videos.js still shows on the roadmap.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Per-video "Link to code" manager (Admins only) ── */}
+      {isAdmin && (
+        <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+          <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
+          <p style={{ fontSize: '13px', color: 'var(--fg-dim)', margin: '0 0 16px' }}>
+            Add a “Link to code” button to any individual video by its URL — including each video inside a playlist. Paste the single video’s YouTube link (not the playlist link).
+          </p>
+          <form className="roadmap-admin-form" onSubmit={handleSaveVideoCodeLink}>
+            <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">YouTube video URL</label>
+                <input className="form-input" value={vcUrl} onChange={(e) => setVcUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Code (repo) URL</label>
+                <input className="form-input" value={vcCodeUrl} onChange={(e) => setVcCodeUrl(e.target.value)} placeholder="https://github.com/…" required />
+              </div>
+            </div>
+            <button type="submit" className="form-btn" disabled={vcSaving}>{vcSaving ? 'Saving…' : 'Save code link'}</button>
+          </form>
+
+          <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>Saved code links ({videoCodeDocs.length})</h3>
+            {videoCodeDocs.map((doc) => (
+              <div key={doc.id} className="roadmap-admin-list-item">
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{doc.id}</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px', wordBreak: 'break-all' }}>
+                    <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>{doc.codeUrl}</a>
+                  </div>
+                </div>
+                <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteVideoCodeLink(doc.id)}>Remove</button>
+              </div>
+            ))}
+            {videoCodeDocs.length === 0 && (
+              <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No per-video code links yet.</p>
             )}
           </div>
         </div>
@@ -3797,118 +4005,6 @@ ${mcRawSyllabus}`;
           })()}
         </div>
       )}
-      {/* ── AI Masterclass Panel (Admins only) ── */}
-      {isAdmin && (
-        <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
-          <h2 className="dashboard__panel-title" style={{ marginBottom: "6px" }}>
-            <span style={{ marginRight: "8px" }}>✨</span> AI Masterclass Generator
-          </h2>
-          <p style={{ fontSize: "13px", color: "var(--fg-faint)", marginBottom: "20px" }}>
-            Paste your raw syllabus notes — Gemini will structure them into a beautiful interactive course outline automatically.
-          </p>
-
-          {/* Gemini API Key settings row */}
-          <div className="form-group" style={{ marginBottom: "20px" }}>
-            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              🔑 Gemini API Key
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: "11px", color: "var(--c-rust)", textDecoration: "none", marginLeft: "6px" }}>
-                Get free key →
-              </a>
-            </label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="AIza..."
-              value={geminiKey}
-              onChange={e => handleGeminiKeyChange(e.target.value)}
-              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
-            />
-            {geminiKey && (
-              <div style={{ fontSize: "11px", color: "var(--c-emerald)", marginTop: "5px" }}>
-                ✓ Key saved in browser storage
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleMasterclassSubmit}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Masterclass Title *</label>
-                <input type="text" className="form-input"
-                  placeholder="e.g. Claude Code Masterclass"
-                  value={mcTitle} onChange={e => setMcTitle(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Instructor</label>
-                <input type="text" className="form-input"
-                  value={mcInstructor} onChange={e => setMcInstructor(e.target.value)} />
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Price (INR) *</label>
-                <input type="number" className="form-input"
-                  placeholder="e.g. 4999"
-                  value={mcPrice} onChange={e => setMcPrice(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Date & Time *</label>
-                <input type="datetime-local" className="form-input"
-                  value={mcDateTime} onChange={e => setMcDateTime(e.target.value)} required />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Promo Video (YouTube URL or ID)</label>
-              <input type="text" className="form-input"
-                placeholder="e.g. https://www.youtube.com/watch?v=Eze6D8jAMjI"
-                value={mcVideoUrl} onChange={e => setMcVideoUrl(e.target.value)} />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Raw Syllabus Text *</label>
-              <textarea
-                className="form-input form-textarea"
-                rows={8}
-                placeholder={`Paste your unstructured syllabus notes here. Example:\n\nWeek 1: Getting started with Claude Code CLI. Setting up permissions, understanding the token model, context management...\nWeek 2: Autonomous codebase navigation — multi-file refactoring, security audits...\nWeek 3: Building production agents — memory, tool use, orchestration...`}
-                value={mcRawSyllabus}
-                onChange={e => setMcRawSyllabus(e.target.value)}
-                required
-                style={{ minHeight: "180px", fontFamily: "'Inter Tight', sans-serif", fontSize: "13px", lineHeight: 1.6 }}
-              />
-            </div>
-
-            {aiStatus.msg && (
-              <div className={`ai-status ai-status--${aiStatus.type}`}>
-                {aiStatus.type === 'loading' && <div className="ai-status__spinner" />}
-                {aiStatus.type === 'success' && <span>✅</span>}
-                {aiStatus.type === 'error' && <span>⚠️</span>}
-                <span>{aiStatus.msg}</span>
-              </div>
-            )}
-
-            <button type="submit" className="form-btn" disabled={mcLoading}
-              style={{ marginTop: "16px", background: "linear-gradient(135deg, var(--c-rust), #9b4fd4)" }}>
-              {mcLoading ? "⏳ Generating..." : "✨ Generate & Publish with Gemini"}
-            </button>
-          </form>
-
-          {/* Inline preview of last generated syllabus */}
-          {mcPreview && mcPreview.length > 0 && (
-            <div style={{ marginTop: "24px" }}>
-              <div style={{ fontSize: "12px", color: "var(--fg-faint)", marginBottom: "8px", fontFamily: "'JetBrains Mono', monospace" }}>
-                SYLLABUS PREVIEW
-              </div>
-              <div style={{ border: "1px solid var(--line)", borderRadius: "12px", overflow: "hidden" }}>
-                <SplitPaneSyllabus syllabus={mcPreview} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Published Masterclasses Management ── */}
       {(() => {
         const activeMcs = masterclasses.filter(m => !m.deleted && m.status !== 'deleted');
@@ -4050,6 +4146,100 @@ ${mcRawSyllabus}`;
                 )}
               </div>
             </form>
+
+            {/* ── Zoom Link & Reminders — scoped to the masterclass being edited ── */}
+            {editSessionId && (() => {
+              const regEntry = sessionsWithRegs.find(x => x.sessionId === editSessionId);
+              const registered = regEntry ? regEntry.registered : 0;
+              const currentZoom = (combinedClasses.find(c => c.id === editSessionId) || {}).zoomLink || (regEntry && regEntry.zoomLink) || '';
+              return (
+                <div style={{ marginTop: "22px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
+                  <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔗</span> Zoom Link &amp; Reminders
+                  </label>
+                  <p style={{ fontSize: "12px", color: "var(--fg-faint)", margin: "4px 0 10px" }}>
+                    Saving emails this link (with a calendar invite) to {registered} registered student(s) now, and auto-includes it for anyone who registers afterwards. Daily reminders go out automatically on the 2 days before the session.
+                  </p>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="https://zoom.us/j/…"
+                      value={zoomInputs[editSessionId] ?? currentZoom}
+                      onChange={e => setZoomInputs(v => ({ ...v, [editSessionId]: e.target.value }))}
+                      style={{ flex: 1, minWidth: "220px", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
+                    />
+                    <button
+                      type="button"
+                      className="form-btn"
+                      disabled={zoomBusy[editSessionId]}
+                      onClick={() => handleSendZoom(editSessionId, registered)}
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {zoomBusy[editSessionId] ? "Sending…" : `Save & email ${registered}`}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (zoomEditOpen) { setZoomEditOpen(false); return; }
+                      const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
+                      const def = buildDefaultZoomEmail(title, dateTime, z);
+                      setZoomSubject(def.subject);
+                      setZoomBody(def.body);
+                      setZoomEditOpen(true);
+                    }}
+                    style={{ marginTop: "10px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "12px", padding: 0 }}
+                  >
+                    {zoomEditOpen ? "↩ Use the default email" : "✎ Edit email before sending"}
+                  </button>
+
+                  {zoomEditOpen && (
+                    <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={zoomSubject}
+                        onChange={e => setZoomSubject(e.target.value)}
+                        placeholder="Email subject"
+                        style={{ fontSize: "13px" }}
+                      />
+                      <textarea
+                        className="form-input form-textarea"
+                        rows={12}
+                        value={zoomBody}
+                        onChange={e => setZoomBody(e.target.value)}
+                        style={{ fontSize: "13px", lineHeight: 1.6, fontFamily: "'Inter Tight', sans-serif", minHeight: "220px" }}
+                      />
+                      <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
+                        <code>{'{{name}}'}</code> is replaced with each student&apos;s name. A calendar invite (.ics) is attached automatically.
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
+                            const def = buildDefaultZoomEmail(title, dateTime, z);
+                            setZoomSubject(def.subject);
+                            setZoomBody(def.body);
+                          }}
+                          style={{ marginLeft: "8px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "11px", padding: 0 }}
+                        >
+                          ↺ Reset to default
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {zoomMsg[editSessionId] && (
+                    <div style={{
+                      fontSize: "12px", marginTop: "8px",
+                      color: zoomMsg[editSessionId].startsWith('⚠') ? "var(--c-rust)" : "var(--c-emerald)"
+                    }}>
+                      {zoomMsg[editSessionId]}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "50px 30px" }}>
@@ -4606,6 +4796,156 @@ ${mcRawSyllabus}`;
 
 
 // ===============================================================
+// ADMIN — Email send-task viewer. Lists every bulk-email job
+// (emailJobs collection, written by Cloud Functions) with live
+// progress; click one to see counts and who it went to.
+// ===============================================================
+function AdminEmailTasks() {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    if (!db) { setLoading(false); return; }
+    const unsub = db.collection('emailJobs').orderBy('createdAt', 'desc').limit(200)
+      .onSnapshot(
+        (snap) => {
+          const list = [];
+          snap.forEach((d) => list.push(Object.assign({ id: d.id }, d.data())));
+          setJobs(list);
+          setLoading(false);
+        },
+        (err) => { console.error('[email-tasks] fetch failed:', err); setLoading(false); }
+      );
+    return () => unsub();
+  }, []);
+
+  const processedOf = (j) => (j.sent || 0) + (j.errors || 0) + (j.skipped || 0);
+  const statusOf = (j) => {
+    const total = j.total || 0;
+    const done = processedOf(j);
+    if (total > 0 && done >= total) return 'done';
+    if (done > 0) return 'sending';
+    return 'queued';
+  };
+  const statusLabel = { done: 'Completed', sending: 'Sending…', queued: 'Queued' };
+  const fmtDate = (ts) => {
+    try {
+      const d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+      return d ? d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    } catch (e) { return '—'; }
+  };
+
+  const selected = jobs.find((j) => j.id === selectedId) || null;
+
+  if (selected) {
+    const status = statusOf(selected);
+    const total = selected.total || 0;
+    const processed = processedOf(selected);
+    const pct = total ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+    const recipients = Array.isArray(selected.recipients) ? selected.recipients : [];
+    return (
+      <section className="email-tasks">
+        <button type="button" className="email-tasks__back" onClick={() => setSelectedId(null)}>← All tasks</button>
+        <div className="email-tasks__detail-head">
+          <span className={`email-tasks__badge email-tasks__badge--${status}`}>{statusLabel[status]}</span>
+          <h2 className="email-tasks__title">{(selected.label || selected.type || 'Email')} — {selected.title || selected.sessionId || 'Masterclass'}</h2>
+          <p className="email-tasks__meta">Started {fmtDate(selected.createdAt)} · {total} recipient{total === 1 ? '' : 's'}</p>
+        </div>
+
+        {status === 'done' ? (
+          <div className="email-tasks__counts email-tasks__counts--big">
+            <span><strong>{selected.sent || 0}</strong> emails sent</span>
+            {(selected.skipped || 0) > 0 && <span>{selected.skipped} skipped</span>}
+            {(selected.errors || 0) > 0 && <span className="is-err">{selected.errors} failed</span>}
+          </div>
+        ) : (
+          <div className="email-tasks__progress">
+            <div className="email-tasks__bar"><div className="email-tasks__bar-fill" style={{ width: pct + '%' }} /></div>
+            <div className="email-tasks__progress-label">{processed} / {total} processed · {pct}%</div>
+            <div className="email-tasks__counts">
+              <span>✅ {selected.sent || 0} sent</span>
+              <span>⏭ {selected.skipped || 0} skipped</span>
+              <span>⚠ {selected.errors || 0} errors</span>
+            </div>
+          </div>
+        )}
+
+        {Array.isArray(selected.failures) && selected.failures.length > 0 && (
+          <div className="email-tasks__failures">
+            <div className="email-tasks__recips-head email-tasks__recips-head--err">
+              Failed {(selected.errors || 0) > selected.failures.length ? `(showing ${selected.failures.length} of ${selected.errors})` : `(${selected.failures.length})`}
+            </div>
+            <ul className="email-tasks__fail-list">
+              {selected.failures.map((f, i) => (
+                <li key={i}>
+                  <div className="email-tasks__fail-who">
+                    <span className="email-tasks__recip-name">{f.name || '—'}</span>
+                    <span className="email-tasks__recip-email">{f.email}</span>
+                  </div>
+                  <span className="email-tasks__fail-reason">{f.error || 'Unknown error'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="email-tasks__recips">
+          <div className="email-tasks__recips-head">
+            Recipients {selected.recipientsTruncated ? `(first ${recipients.length} of ${total})` : `(${recipients.length})`}
+          </div>
+          {recipients.length === 0 ? (
+            <p className="email-tasks__empty">No recipient list stored for this task.</p>
+          ) : (
+            <ul className="email-tasks__recip-list">
+              {recipients.map((r, i) => (
+                <li key={i}>
+                  <span className="email-tasks__recip-name">{r.name || '—'}</span>
+                  <span className="email-tasks__recip-email">{r.email}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="email-tasks">
+      <div className="email-tasks__head">
+        <h2 className="email-tasks__title">Email send tasks</h2>
+        <p className="email-tasks__sub">Live progress of every bulk email — zoom links, reminders, and cancellations.</p>
+      </div>
+      {loading ? (
+        <p className="email-tasks__empty">Loading…</p>
+      ) : jobs.length === 0 ? (
+        <p className="email-tasks__empty">No email tasks yet. They appear here when you send zoom links, reminders, or cancellations.</p>
+      ) : (
+        <ul className="email-tasks__list">
+          {jobs.map((j) => {
+            const status = statusOf(j);
+            return (
+              <li key={j.id}>
+                <button type="button" className="email-tasks__row" onClick={() => setSelectedId(j.id)}>
+                  <span className={`email-tasks__badge email-tasks__badge--${status}`}>{status === 'done' ? 'Done' : statusLabel[status]}</span>
+                  <span className="email-tasks__row-main">
+                    <span className="email-tasks__row-title">{(j.label || j.type || 'Email')} — {j.title || j.sessionId || 'Masterclass'}</span>
+                    <span className="email-tasks__row-sub">{fmtDate(j.createdAt)}</span>
+                  </span>
+                  <span className="email-tasks__row-count">{j.sent || 0}/{j.total || 0}</span>
+                  <span className="email-tasks__row-arrow" aria-hidden="true">→</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ===============================================================
 // MAIN APPLICATION ROOT COMPONENT
 // ===============================================================
 
@@ -4907,6 +5247,22 @@ function App() {
       snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
       setFirestoreVideoDocs(list);
     }, () => setFirestoreVideoDocs([]));
+    return () => unsub();
+  }, []);
+
+  // Per-video "Link to code" map (videoId → codeUrl). Published on window so the
+  // video players (v2.jsx) can resolve the right code link for whichever video
+  // is showing — including each individual video inside a playlist. The version
+  // bump forces a re-render so the buttons appear once the map loads.
+  const [codeLinkVersion, setCodeLinkVersion] = useState(0);
+  useEffect(() => {
+    if (!db) { return; }
+    const unsub = db.collection('videoCodeLinks').onSnapshot((snap) => {
+      const map = {};
+      snap.forEach((doc) => { const v = doc.data(); if (v && v.codeUrl) map[doc.id] = v.codeUrl; });
+      window.VIDEO_CODE_LINKS = map;
+      setCodeLinkVersion((n) => n + 1);
+    }, () => {});
     return () => unsub();
   }, []);
 
@@ -5464,6 +5820,15 @@ function App() {
             status: 'completed',
             userId: effectiveUser.uid,
             isFree: true,
+            // Snapshot the session details so confirmation + reminder emails work
+            // even when the masterclass lives only in site.config (no Firestore doc).
+            price: 0,
+            sessionDateTime: bookingSession.dateTime || null,
+            sessionDuration: bookingSession.duration || null,
+            instructor: typeof bookingSession.instructor === 'object'
+              ? (bookingSession.instructor.name || 'Balaji Chippada')
+              : (bookingSession.instructor || 'Balaji Chippada'),
+            zoomLink: bookingSession.zoomLink || '',
             orderId: 'free_' + Date.now(),
             bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5700,6 +6065,15 @@ function App() {
   // Helper check for staff role authorization
   const isUserStaff = userRole === 'admin' || userRole === 'teacher' || userRole === 'support';
 
+  // Expose whether the signed-in user may add/edit per-video "Code" links inline
+  // in the roadmap. Mirrors the videoCodeLinks Firestore rule (admins / bootstrap
+  // emails). Set during render so the video players (v2.jsx) read it immediately.
+  const CODE_ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+  if (typeof window !== 'undefined') {
+    window.__CODE_ADMIN = !!(user && !user.isAnonymous &&
+      (userRole === 'admin' || CODE_ADMIN_EMAILS.includes((user.email || '').toLowerCase())));
+  }
+
   // ── Single source of truth for the live masterclass ──
   // Compute once at the top of render so every downstream surface (hero, banner,
   // popup, curriculum, booking, sticky bar, closing CTA) sees the SAME object.
@@ -5723,7 +6097,7 @@ function App() {
   // ── Path-based routing (crawlable URLs for /roadmap, /masterclasses, /about) ──
   const tabToPath = (tab) => {
     if (tab === 'roadmap') return '/roadmap';
-    if (tab === 'mybookings' || tab === 'dashboard') return '/account';
+    if (tab === 'mybookings' || tab === 'dashboard' || tab === 'emailtasks') return '/account';
     return '/';
   };
 
@@ -5812,6 +6186,16 @@ function App() {
           Dashboard
         </button>
       )}
+      {userRole === 'admin' && (
+        <button
+          role="tab"
+          aria-selected={activeMainTab === 'emailtasks'}
+          className={`nav__tab-btn ${activeMainTab === 'emailtasks' ? 'active' : ''}`}
+          onClick={() => switchMainTab('emailtasks')}
+        >
+          Email Tasks
+        </button>
+      )}
     </React.Fragment>
   );
 
@@ -5832,7 +6216,7 @@ function App() {
           }
         }}
       >
-        {nextMcReserved ? 'Seat booked ✓ · View' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
+        {nextMcReserved ? 'Seat booked ✓ · View' : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve · <V2McPrice mc={nextMasterclass} /></> : 'Book a seat') : 'See classes')}
       </button>
       {user && !user.isAnonymous ? (
         <React.Fragment>
@@ -5982,7 +6366,7 @@ function App() {
               }
             }}
           >
-            {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
+            {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve · <V2McPrice mc={nextMasterclass} /></> : 'Book a seat') : 'See classes')}
           </button>
 
           <button
@@ -6023,7 +6407,7 @@ function App() {
                 }
               }}
             >
-              {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? 'Reserve free seat' : 'Book a seat') : 'See classes')}
+              {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve · <V2McPrice mc={nextMasterclass} /></> : 'Book a seat') : 'See classes')}
             </button>
             <button
               type="button"
@@ -6073,19 +6457,9 @@ function App() {
               <span className="nav__drawer-user-chevron" aria-hidden="true">›</span>
             </button>
           ) : (
-            <button
-              type="button"
-              className="nav__drawer-brand"
-              onClick={() => switchMainTab('home')}
-            >
-              <img
-                className="nav__drawer-photo"
-                src={V2_INSTRUCTOR.photo || 'uploads/balaji-chippada.png'}
-                alt=""
-                aria-hidden="true"
-              />
-              <span className="nav__drawer-title">{V2_BRAND.name}</span>
-            </button>
+            // Signed-out: no brand/name in the drawer header — just a spacer so
+            // the close button stays right-aligned.
+            <span aria-hidden="true" />
           )}
           <button
             type="button"
@@ -6215,7 +6589,7 @@ function App() {
                             variant="dark"
                             onClick={() => reservedMcIds.includes(s.id) ? goToAccount() : openBooking(s)}
                           >
-                            {reservedMcIds.includes(s.id) ? 'You’re registered ✓' : (isMcFree(s) ? 'Reserve free seat' : 'Book Seat')}
+                            {reservedMcIds.includes(s.id) ? 'You’re registered ✓' : (isMcFree(s) ? <>Reserve · <V2McPrice mc={s} /></> : 'Book Seat')}
                           </ShimmerButton>
                         </article>
                       ))}
@@ -6285,11 +6659,17 @@ function App() {
       )}
 
       {activeMainTab === 'dashboard' && isUserStaff && (
-        <DashboardView 
-          user={user} 
-          role={userRole} 
+        <DashboardView
+          user={user}
+          role={userRole}
           onLogout={handleLogout}
         />
+      )}
+
+      {activeMainTab === 'emailtasks' && userRole === 'admin' && (
+        <div className="email-tasks-page">
+          <AdminEmailTasks />
+        </div>
       )}
 
 

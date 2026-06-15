@@ -81,7 +81,7 @@ window.SITE_CONFIG = {
 
     // ── Pricing ──
     price: 0,             // 0 = FREE (entire UI adapts). Set to 499 / 999 / etc.
-    originalPrice: null,  // optional — show strikethrough (e.g. originalPrice: 999 with price: 499)
+    originalPrice: null,  // struck "was" price. FREE class → price:0 + originalPrice:599 shows "₹599 ̶Free" everywhere. Paid discount → originalPrice:999 + price:499. null → free shows the ₹299 default anchor.
     currency: 'INR',
 
     // ── Seats ──

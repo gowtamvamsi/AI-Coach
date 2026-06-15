@@ -161,6 +161,7 @@ function mergeMcWithConfig(mc, masterclasses, sessions) {
     about: mc.rawSyllabus || mc.description || V2_CONFIG_MASTERCLASS.about,
     dateTime: mc.dateTime || V2_CONFIG_MASTERCLASS.dateTime,
     price: typeof mc.price === 'number' ? mc.price : V2_CONFIG_MASTERCLASS.price,
+    originalPrice: typeof mc.originalPrice === 'number' ? mc.originalPrice : V2_CONFIG_MASTERCLASS.originalPrice,
     videoUrl: mc.videoUrl || mc.youtubeVideoId || mc.videoId || V2_CONFIG_MASTERCLASS.videoUrl || null,
     instructor: Object.assign({}, V2_INSTRUCTOR, 
       typeof mc.instructor === 'object' 
@@ -287,6 +288,30 @@ function formatMcPriceShort(mc) {
   return isMcFree(mc) ? 'Free' : `₹${getMcPrice(mc).toLocaleString()}`;
 }
 
+// Anchor ("was") price shown struck-through next to "Free", so a free class
+// reads as a discount (e.g. ₹599 → Free) rather than just "Free".
+// Per-class override: set `originalPrice` on the masterclass (site.config.js
+// `nextMasterclass.originalPrice`, or the Firestore doc). Falls back to this
+// default when none is set. To offer a ₹599 course for free: price: 0,
+// originalPrice: 599.
+const V2_FREE_STRIKE_PRICE = 299;
+function getMcStrikePrice(mc) {
+  return (mc && typeof mc.originalPrice === 'number' && mc.originalPrice > 0)
+    ? mc.originalPrice
+    : V2_FREE_STRIKE_PRICE;
+}
+function V2McPrice({ mc }) {
+  if (isMcFree(mc)) {
+    return (
+      <span className="v2-mc-price">
+        <s className="v2-mc-price-was">₹{getMcStrikePrice(mc).toLocaleString()}</s>
+        <span className="v2-mc-price-free">Free</span>
+      </span>
+    );
+  }
+  return <span className="v2-mc-price">₹{getMcPrice(mc).toLocaleString()}</span>;
+}
+
 function padIcs(n) { return String(n).padStart(2, '0'); }
 
 // UTC stamp (used for DTSTAMP only).
@@ -323,7 +348,7 @@ function generateICS({ title, startDate, endDate, description, location, organiz
     `DTSTART;TZID=Asia/Kolkata:${toIcsDateIST(startDate)}`,
     `DTEND;TZID=Asia/Kolkata:${toIcsDateIST(endDate)}`,
     `SUMMARY:${title}`, `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
-    `LOCATION:${location || 'Online'}`, `ORGANIZER:mailto:${organizerEmail || 'balajichippada.20@gmail.com'}`,
+    `LOCATION:${location || 'Online'}`, `ORGANIZER:mailto:${organizerEmail || 'team@balajichippada.com'}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
@@ -370,7 +395,149 @@ function getMcOutcome(mc) {
 
 // Click-to-play YouTube thumbnail. No iframe loads until user clicks — faster, no ads on the page,
 // and we still capture the watch on YouTube once they click through.
-function V2PlaylistEmbed({ playlistId, title }) {
+// Remembers playback position per video (localStorage) so a lesson resumes
+// where the viewer left off. Only mid-watch positions are kept — not the first
+// few seconds or the last 5% — and completed lessons clear themselves so they
+// start fresh next time.
+const V2_VIDEO_RESUME = {
+  _key: (id) => `v2_vpos_${id}`,
+  MIN_RATIO: 0.05,
+  MAX_RATIO: 0.95,
+  save(id, sec, dur) {
+    if (!id || !dur || !(sec > 5)) return;
+    const ratio = sec / dur;
+    if (ratio < this.MIN_RATIO || ratio > this.MAX_RATIO) { this.clear(id); return; }
+    try { localStorage.setItem(this._key(id), String(Math.floor(sec))); } catch (e) {}
+  },
+  load(id) {
+    if (!id) return 0;
+    try {
+      const v = parseInt(localStorage.getItem(this._key(id)) || '0', 10);
+      return Number.isFinite(v) && v > 5 ? v : 0;
+    } catch (e) { return 0; }
+  },
+  clear(id) { try { localStorage.removeItem(this._key(id)); } catch (e) {} },
+  // "Watched" flag — set once a video is completed (80% or ends), shown as a
+  // badge so the viewer can see what they've finished. Persists per device.
+  _wkey: (id) => `v2_vwatched_${id}`,
+  markWatched(id) { if (!id) return; try { localStorage.setItem(this._wkey(id), '1'); } catch (e) {} },
+  isWatched(id) { if (!id) return false; try { return localStorage.getItem(this._wkey(id)) === '1'; } catch (e) { return false; } },
+};
+
+// Small "✓ Watched" badge overlaid on a player frame once the lesson is done.
+function V2WatchedBadge() {
+  return (
+    <span className="v2-video-watched" aria-label="Watched">
+      <span className="v2-video-watched__check" aria-hidden="true">✓</span>
+      Watched
+    </span>
+  );
+}
+
+// "Link to code" button pinned bottom-right of a video frame. Resolves the URL
+// from the per-video map (videoCodeLinks → window.VIDEO_CODE_LINKS) for the
+// given videoId, falling back to a per-link codeUrl. Admins (window.__CODE_ADMIN)
+// get an inline add/edit control that writes straight to Firestore — so code
+// links are managed right here in the roadmap, not the dashboard.
+function V2CodeLink({ videoId, fallbackUrl }) {
+  const resolved = (videoId && window.VIDEO_CODE_LINKS && window.VIDEO_CODE_LINKS[videoId]) || fallbackUrl || null;
+  const canEdit = !!window.__CODE_ADMIN && !!videoId;
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (!resolved && !canEdit) return null;
+
+  const openEditor = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setVal(resolved || "");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const fb = window.firebase;
+      const ref = fb.firestore().collection("videoCodeLinks").doc(videoId);
+      const u = val.trim();
+      if (u) {
+        await ref.set({ codeUrl: u, updatedAt: fb.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      } else {
+        await ref.set({ codeUrl: fb.firestore.FieldValue.delete() }, { merge: true });
+      }
+      setEditing(false);
+    } catch (err) {
+      console.error("[CODE LINK] save failed:", err);
+    }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="v2-video-code-edit" onClick={(e) => e.stopPropagation()}>
+        <input
+          className="v2-video-code-input"
+          type="url"
+          placeholder="https://github.com/…"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+        />
+        <button type="button" className="v2-video-code-btn" onClick={save} disabled={saving}>
+          {saving ? "…" : "Save"}
+        </button>
+        <button type="button" className="v2-video-code-btn v2-video-code-btn--ghost" onClick={() => setEditing(false)} aria-label="Cancel">✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="v2-video-code-wrap" onClick={(e) => e.stopPropagation()}>
+      {resolved && (
+        <a className="v2-video-code" href={resolved} target="_blank" rel="noopener noreferrer" title="Link to code">
+          <span className="v2-video-code__icon" aria-hidden="true">&lt;/&gt;</span>
+          Code
+        </a>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          className="v2-video-code v2-video-code--edit-trigger"
+          onClick={openEditor}
+          title={resolved ? "Edit code link" : "Add code link"}
+        >
+          {resolved ? "✎" : "+ Code"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Persistent row under every inline player. Videos play on-site (the embed
+// still serves ads + counts views/watch-time for the channel), while these
+// links recover the engagement a full redirect gave us: a one-tap jump to the
+// YouTube watch page (recommendations, comments) and a direct Subscribe CTA.
+function V2VideoActions({ watchUrl }) {
+  if (!watchUrl) return null;
+  const subUrl = `${V2_BRAND.youtubeChannel}?sub_confirmation=1`;
+  return (
+    <div className="v2-video-actions">
+      <a className="v2-video-action v2-video-action--watch" href={watchUrl} target="_blank" rel="noopener noreferrer">
+        <span className="v2-video-action-yt" aria-hidden="true">▶</span>
+        Watch on YouTube
+        <span className="v2-video-action-ext" aria-hidden="true">↗</span>
+      </a>
+      <a className="v2-video-action v2-video-action--sub" href={subUrl} target="_blank" rel="noopener noreferrer">
+        Subscribe
+      </a>
+    </div>
+  );
+}
+
+function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, modules, codeUrl }) {
   const H = window.ROADMAP_VIDEO_HELPERS || {};
   const seedItems = React.useMemo(
     () => (H.getPlaylistItemsSync ? H.getPlaylistItemsSync(playlistId) : []),
@@ -380,7 +547,25 @@ function V2PlaylistEmbed({ playlistId, title }) {
   const [loading, setLoading] = useState(seedItems.length === 0);
   const [listFailed, setListFailed] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [watchedTick, setWatchedTick] = useState(0);
   const hasStaticSeed = seedItems.length > 0;
+  // Player + progress-tracking refs (the playlist plays via the YouTube IFrame
+  // API so watching a lesson can mark its roadmap module(s) complete).
+  const frameRef = React.useRef(null);
+  const playerRef = React.useRef(null);
+  const playerHostRef = React.useRef(null);
+  const pollRef = React.useRef(null);
+  const reportedRef = React.useRef(false);
+  const activeRef = React.useRef(null);
+  const threshold = H.PROGRESS_THRESHOLD || 0.8;
+  const canTrack = Boolean(onVideoProgress && modules && modules.length);
+  const inView = useV2InView(frameRef);
+  // Which lessons in this playlist are already watched (for the ✓ markers).
+  const watchedSet = React.useMemo(() => {
+    const s = new Set();
+    (items || []).forEach((v) => { if (v.videoId && V2_VIDEO_RESUME.isWatched(v.videoId)) s.add(v.videoId); });
+    return s;
+  }, [items, watchedTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -423,9 +608,11 @@ function V2PlaylistEmbed({ playlistId, title }) {
 
   const videoIndex = activeIdx + 1;
 
-  // Play on YouTube itself (not an embedded on-site player) so views, watch
-  // time, and ads all land on YouTube — maximising the channel's ad revenue.
-  // The watch URL keeps the playlist context (&list / &index).
+  // Inline playback via the official YouTube embed keeps ads, view counts, and
+  // watch-time crediting the channel — embedding does NOT forfeit ad revenue.
+  // The "Watch on YouTube" / Subscribe row (below) recovers the engagement
+  // (subs, recommendations) that the embed alone doesn't capture. The watch URL
+  // keeps the playlist context (&list / &index).
   const ytWatchUrl = (vid, idx) => {
     if (!vid) return `https://www.youtube.com/playlist?list=${playlistId}`;
     let u = `https://www.youtube.com/watch?v=${vid}&list=${playlistId}`;
@@ -433,29 +620,116 @@ function V2PlaylistEmbed({ playlistId, title }) {
     return u;
   };
 
+  // Keep a live ref to the active item so the (once-created) player's ENDED
+  // handler always reports the video that actually finished.
+  activeRef.current = active;
+
+  // Create the inline player on first play and switch videos in place via
+  // loadVideoById. Polls watch-progress and reports the link's module(s) at the
+  // completion threshold so the roadmap tracker updates.
+  useEffect(() => {
+    if (!inView || !active || !active.videoId) return;
+    let destroyed = false;
+    reportedRef.current = false;
+    const vid = active.videoId;            // the video this effect run owns
+    const resumeSec = V2_VIDEO_RESUME.load(vid);
+    const run = async () => {
+      await ensureYouTubeIframeAPI();
+      if (destroyed || !playerHostRef.current) return;
+      if (playerRef.current && playerRef.current.loadVideoById) {
+        // A track switch is an explicit choice, so play it straight away —
+        // resuming from the saved position for that lesson if we have one.
+        playerRef.current.loadVideoById(resumeSec > 0 ? { videoId: vid, startSeconds: resumeSec } : { videoId: vid });
+      } else {
+        // Initial mount: NO autoplay, so the viewer presses YouTube's own play
+        // button (user-initiated playback is what makes YouTube serve ads).
+        playerRef.current = new window.YT.Player(playerHostRef.current, {
+          videoId: vid,
+          playerVars: { rel: 0, modestbranding: 1, enablejsapi: 1, playsinline: 1, origin: window.location.origin, ...(resumeSec > 0 ? { start: resumeSec } : {}) },
+          events: {
+            onStateChange: (e) => {
+              if (e.data === window.YT.PlayerState.ENDED && !reportedRef.current) {
+                reportedRef.current = true;
+                const a = activeRef.current;
+                const endedId = a && a.videoId;
+                V2_VIDEO_RESUME.markWatched(endedId);
+                setWatchedTick((t) => t + 1);
+                V2_VIDEO_RESUME.clear(endedId);   // finished -> don't resume it
+                if (canTrack) onVideoProgress({ videoId: endedId, mappingId, modules, watchedRatio: 1 });
+              }
+            },
+          },
+        });
+      }
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => {
+        const p = playerRef.current;
+        if (!p || !p.getCurrentTime || reportedRef.current) return;
+        try {
+          const cur = p.getCurrentTime();
+          const dur = p.getDuration();
+          if (!dur || dur <= 0) return;
+          if (cur / dur >= threshold) {
+            reportedRef.current = true;
+            V2_VIDEO_RESUME.markWatched(vid);
+            setWatchedTick((t) => t + 1);
+            V2_VIDEO_RESUME.clear(vid);
+            if (canTrack) onVideoProgress({ videoId: vid, mappingId, modules, watchedRatio: cur / dur });
+          } else {
+            V2_VIDEO_RESUME.save(vid, cur, dur);
+          }
+        } catch (_) { /* player not ready */ }
+      }, 5000);
+    };
+    run();
+    return () => {
+      destroyed = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+      // Capture the final position of the outgoing video before switching/unmount.
+      try {
+        const p = playerRef.current;
+        if (p && p.getCurrentTime && !reportedRef.current) {
+          const cur = p.getCurrentTime();
+          const dur = p.getDuration();
+          if (dur > 0) V2_VIDEO_RESUME.save(vid, cur, dur);
+        }
+      } catch (_) {}
+    };
+  }, [inView, active && active.videoId, canTrack, mappingId, modules, onVideoProgress, threshold]);
+
+  // Tear the player down when the embed unmounts.
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (playerRef.current && playerRef.current.destroy) { try { playerRef.current.destroy(); } catch (_) {} }
+    playerRef.current = null;
+  }, []);
+
   const posterUrl = active?.videoId
     ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/hqdefault.jpg`)
     : '';
 
   return (
     <div className="v2-playlist-embed">
-      <div className="v2-video-frame v2-video-frame--playlist">
-        {!loading && items.length > 0 && (
-          <a
-            className="v2-video-poster"
-            href={ytWatchUrl(active?.videoId, videoIndex)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Watch on YouTube: ${active?.title || title}`}
-            style={posterUrl ? { backgroundImage: `url(${posterUrl})` } : undefined}
-          >
-            <span className="v2-video-play" aria-hidden="true">▶</span>
-          </a>
+      <div
+        className="v2-video-frame v2-video-frame--playlist"
+        ref={frameRef}
+        style={posterUrl ? { backgroundImage: `url(${posterUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {!loading && items.length > 0 && inView && active?.videoId && (
+          <div ref={playerHostRef} className="v2-video-yt-player" title={active?.title || title} />
         )}
+        {active?.videoId && watchedSet.has(active.videoId) && <V2WatchedBadge />}
+        {/* Per-video code link — keyed by the ACTIVE video's id, so each lesson
+            in the playlist shows (and edits) its own, not one for the whole list. */}
+        <V2CodeLink videoId={active && active.videoId} />
         {loading && (
           <div className="v2-playlist-loading">Loading playlist…</div>
         )}
       </div>
+
+      {!loading && items.length > 0 && (
+        <V2VideoActions watchUrl={ytWatchUrl(active?.videoId, videoIndex)} />
+      )}
 
       {items.length > 0 && (
         <div className="v2-playlist-nav" aria-label="Playlist navigation">
@@ -485,7 +759,7 @@ function V2PlaylistEmbed({ playlistId, title }) {
 
       {items.length > 0 && active && (
         <div className="v2-playlist-now" aria-live="polite">
-          <span className="v2-playlist-now-label">Featured</span>
+          <span className="v2-playlist-now-label">Now playing</span>
           <span className="v2-playlist-now-title">{active.title}</span>
         </div>
       )}
@@ -504,13 +778,12 @@ function V2PlaylistEmbed({ playlistId, title }) {
           <div className="v2-playlist-tracks-head">{items.length} videos in this playlist</div>
           <div className="v2-playlist-tracks-scroll" role="list" ref={scrollListRef}>
             {items.map((v, i) => (
-              <a
+              <button
                 key={`${v.videoId}-${i}`}
+                type="button"
                 role="listitem"
-                href={ytWatchUrl(v.videoId, i + 1)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`v2-playlist-track ${i === activeIdx ? 'is-active' : ''}`}
+                onClick={() => setActiveIdx(i)}
+                className={`v2-playlist-track ${i === activeIdx ? 'is-active' : ''} ${watchedSet.has(v.videoId) ? 'is-watched' : ''}`}
                 aria-current={i === activeIdx ? 'true' : undefined}
               >
                 <img
@@ -528,8 +801,10 @@ function V2PlaylistEmbed({ playlistId, title }) {
                 />
                 <span className="v2-playlist-track-num">{i + 1}</span>
                 <span className="v2-playlist-track-title">{v.title}</span>
-                {i === activeIdx && <span className="v2-playlist-track-now">Featured</span>}
-              </a>
+                {i === activeIdx
+                  ? <span className="v2-playlist-track-now">Now playing</span>
+                  : (watchedSet.has(v.videoId) && <span className="v2-playlist-track-check" aria-label="Watched">✓</span>)}
+              </button>
             ))}
           </div>
         </div>
@@ -608,44 +883,54 @@ function V2ClickToPlayVideo(props) {
   return <V2ClickToPlayVideoInner {...props} />;
 }
 
-function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption }) {
-  const isPlaylist = Boolean(playlistId);
-
-  if (isPlaylist) {
-    return <V2PlaylistEmbed playlistId={playlistId} title={title} />;
+function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption, codeUrl }) {
+  if (playlistId) {
+    return (
+      <V2PlaylistEmbed
+        playlistId={playlistId}
+        title={title}
+        onVideoProgress={onVideoProgress}
+        mappingId={mappingId}
+        modules={modules}
+        codeUrl={codeUrl}
+      />
+    );
   }
-
-  const H = window.ROADMAP_VIDEO_HELPERS || {};
-  const thumbUrl = H.youtubePoster
-    ? H.youtubePoster(videoId)
-    : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-  // Open on YouTube (not an embedded player) to maximise ad revenue + watch time.
-  const watchUrl = H.youtubeWatchUrl
-    ? H.youtubeWatchUrl(videoId, startSec || 0)
-    : `https://www.youtube.com/watch?v=${videoId}${startSec ? `&t=${startSec}s` : ''}`;
-  const showCaption = !hideCaption && caption;
-
+  // Single video: play inline via the official YouTube IFrame player (ads,
+  // views, and watch-time still credit the channel) with progress tracking when
+  // a callback is supplied, plus a persistent Watch-on-YouTube / Subscribe row.
   return (
-    <div className="v2-video-block">
-      <div className="v2-video-frame">
-        <a
-          className="v2-video-poster"
-          href={watchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Watch on YouTube: ${title}`}
-          style={{ backgroundImage: `url(${thumbUrl})` }}
-        >
-          <span className="v2-video-play" aria-hidden="true">▶</span>
-        </a>
-      </div>
-      {showCaption && (
-        <p className="v2-video-caption">
-          <a href={watchUrl} target="_blank" rel="noopener noreferrer">{caption}</a>
-        </p>
-      )}
-    </div>
+    <V2TrackableVideo
+      videoId={videoId}
+      title={title}
+      caption={hideCaption ? null : caption}
+      startSec={startSec}
+      onVideoProgress={onVideoProgress}
+      mappingId={mappingId}
+      modules={modules}
+      codeUrl={codeUrl}
+    />
   );
+}
+
+// Mounts heavy embeds only when they scroll near the viewport, so the page
+// doesn't load a YouTube iframe for every video at once. We mount the player
+// (rather than a click-to-load facade) so the viewer's click lands on YouTube's
+// own play button — that user-initiated play is what makes YouTube serve ads.
+function useV2InView(ref, rootMargin = '300px') {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (inView) return;
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setInView(true); obs.disconnect(); }
+    }, { rootMargin });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [ref, inView, rootMargin]);
+  return inView;
 }
 
 let _ytApiReady = null;
@@ -658,13 +943,22 @@ function ensureYouTubeIframeAPI() {
       if (prev) prev();
       resolve();
     };
-    if (window.YT && window.YT.Player) resolve();
+    if (window.YT && window.YT.Player) { resolve(); return; }
+    // Inject the IFrame Player API once. Without this the ready callback above
+    // never fires and the player stays a black box. (id guards double-inject.)
+    if (!document.getElementById('youtube-iframe-api')) {
+      const s = document.createElement('script');
+      s.id = 'youtube-iframe-api';
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.async = true;
+      (document.head || document.body).appendChild(s);
+    }
   });
   return _ytApiReady;
 }
 
-function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, mappingId, modules }) {
-  const [playing, setPlaying] = useState(false);
+function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, mappingId, modules, codeUrl }) {
+  const frameRef = React.useRef(null);
   const playerRef = React.useRef(null);
   const containerRef = React.useRef(null);
   const pollRef = React.useRef(null);
@@ -675,30 +969,46 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
     : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
   const threshold = H.PROGRESS_THRESHOLD || 0.8;
+  const canTrack = Boolean(onVideoProgress && modules && modules.length);
+  // Resume is keyed per (video, chapter) context: mappingId is unique per
+  // module mapping; standalone videos (hero) fall back to videoId.
+  const resumeKey = mappingId || videoId;
+  const inView = useV2InView(frameRef);
+  const [watched, setWatched] = useState(() => V2_VIDEO_RESUME.isWatched(resumeKey));
 
   useEffect(() => {
-    if (!playing || !videoId) return;
+    if (!inView || !videoId) return;
     let destroyed = false;
 
     const startPlayer = async () => {
       await ensureYouTubeIframeAPI();
       if (destroyed || !containerRef.current) return;
 
+      // Resume where the viewer left off (falls back to the fixed chapter start).
+      const resumeSec = V2_VIDEO_RESUME.load(resumeKey);
+      const startAt = resumeSec > 0 ? Math.max(resumeSec, startSec || 0) : (startSec || 0);
+
+      // No `autoplay`: the player shows YouTube's own poster + play button, and
+      // the viewer's click on it counts as user-initiated playback — the thing
+      // that makes YouTube serve pre-roll ads on an embed.
       playerRef.current = new window.YT.Player(containerRef.current, {
         videoId,
         playerVars: {
-          autoplay: 1,
           rel: 0,
-          start: startSec || 0,
+          start: startAt,
           enablejsapi: 1,
           origin: window.location.origin,
           modestbranding: 1,
+          playsinline: 1,
         },
         events: {
           onStateChange: (e) => {
-            if (e.data === window.YT.PlayerState.ENDED && !reportedRef.current && onVideoProgress) {
+            if (e.data === window.YT.PlayerState.ENDED && !reportedRef.current) {
               reportedRef.current = true;
-              onVideoProgress({ videoId, mappingId, modules, watchedRatio: 1 });
+              V2_VIDEO_RESUME.markWatched(resumeKey);
+              setWatched(true);
+              V2_VIDEO_RESUME.clear(resumeKey);   // finished -> start fresh next time
+              if (canTrack) onVideoProgress({ videoId, mappingId, modules, watchedRatio: 1 });
             }
           },
         },
@@ -710,12 +1020,16 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
         try {
           const cur = p.getCurrentTime();
           const dur = p.getDuration();
-          if (dur > 0 && cur / dur >= threshold) {
+          if (!dur || dur <= 0) return;
+          if (cur / dur >= threshold) {
+            // Completed: mark watched (for the badge), clear resume, report module.
             reportedRef.current = true;
-            if (onVideoProgress) {
-              onVideoProgress({ videoId, mappingId, modules, watchedRatio: cur / dur });
-            }
-            clearInterval(pollRef.current);
+            V2_VIDEO_RESUME.markWatched(resumeKey);
+            setWatched(true);
+            V2_VIDEO_RESUME.clear(resumeKey);
+            if (canTrack) onVideoProgress({ videoId, mappingId, modules, watchedRatio: cur / dur });
+          } else {
+            V2_VIDEO_RESUME.save(resumeKey, cur, dur);
           }
         } catch (_) { /* player not ready */ }
       }, 5000);
@@ -726,35 +1040,39 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
     return () => {
       destroyed = true;
       if (pollRef.current) clearInterval(pollRef.current);
+      // Capture the final position before tearing the player down.
+      try {
+        const p = playerRef.current;
+        if (p && p.getCurrentTime && !reportedRef.current) {
+          const cur = p.getCurrentTime();
+          const dur = p.getDuration();
+          if (dur > 0) V2_VIDEO_RESUME.save(resumeKey, cur, dur);
+        }
+      } catch (_) {}
       if (playerRef.current && playerRef.current.destroy) {
         try { playerRef.current.destroy(); } catch (_) {}
       }
       playerRef.current = null;
     };
-  }, [playing, videoId, startSec, mappingId, modules, onVideoProgress, threshold]);
+  }, [inView, videoId, startSec, canTrack, mappingId, modules, onVideoProgress, threshold, resumeKey]);
 
   return (
     <div className="v2-video-block">
-      <div className="v2-video-frame">
-        {playing ? (
-          <div ref={containerRef} className="v2-video-yt-player" title={title} />
-        ) : (
-          <button
-            type="button"
-            className="v2-video-poster"
-            onClick={() => setPlaying(true)}
-            aria-label={`Play: ${title}`}
-            style={{ backgroundImage: `url(${thumbUrl})` }}
-          >
-            <span className="v2-video-play" aria-hidden="true">▶</span>
-          </button>
-        )}
+      <div
+        className="v2-video-frame"
+        ref={frameRef}
+        style={{ backgroundImage: `url(${thumbUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
+        {inView && <div ref={containerRef} className="v2-video-yt-player" title={title} />}
+        {watched && <V2WatchedBadge />}
+        <V2CodeLink videoId={videoId} fallbackUrl={codeUrl} />
       </div>
       {caption && (
         <p className="v2-video-caption">
           <a href={watchUrl} target="_blank" rel="noopener noreferrer">{caption}</a>
         </p>
       )}
+      <V2VideoActions watchUrl={watchUrl} />
     </div>
   );
 }
@@ -840,7 +1158,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                   {nextMc ? (
                     <>
                       <span className="v2-hero-cta-text">
-                        {free ? `Reserve free seat · ${dateStr}` : `Book my seat · ${formatMcPriceShort(nextMc)} · ${dateStr}`}
+                        {free ? <>Reserve seat · <V2McPrice mc={nextMc} /> · {dateStr}</> : `Book my seat · ${formatMcPriceShort(nextMc)} · ${dateStr}`}
                       </span>
                       <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
                     </>
@@ -966,6 +1284,11 @@ function V2BookingWizard({
   successData, setActiveMainTab,
 }) {
   const [stepError, setStepError] = useState('');
+  // Free seats are reserved for our YouTube community — viewers subscribe before
+  // they can confirm. We can't verify a subscription server-side, so we open the
+  // channel and require an explicit confirmation.
+  const [ytVisited, setYtVisited] = useState(false);
+  const [ytSubscribed, setYtSubscribed] = useState(false);
   if (!session) return null;
   const tiers = getMcTiers(session);
   const tier = selectedTier || tiers[0];
@@ -1054,6 +1377,10 @@ function V2BookingWizard({
               setStepError('Please enter a valid email address.');
               return;
             }
+            if (free && !ytSubscribed) {
+              setStepError('Please subscribe on YouTube to reserve your free seat.');
+              return;
+            }
             setStepError('');
             // FREE → submit straight from this form. PAID → continue to payment step.
             if (free) {
@@ -1108,16 +1435,43 @@ function V2BookingWizard({
             <div className="v2-order-summary">
               <div className="v2-order-summary-row">
                 <span>One live session · 3 hours · recording included</span>
-                <span className="v2-order-price">{free ? 'Free' : `₹${price.toLocaleString()}`}</span>
+                <span className="v2-order-price"><V2McPrice mc={session} /></span>
               </div>
             </div>
+
+            {free && (
+              <div className="v2-yt-gate">
+                <div className="v2-yt-gate-head">
+                  <span className="v2-yt-gate-icon" aria-hidden="true">▶</span>
+                  <span>Free seats are for our YouTube community — subscribe to unlock yours.</span>
+                </div>
+                <a
+                  className="v2-yt-gate-btn"
+                  href={`${V2_BRAND.youtubeChannel}?sub_confirmation=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setYtVisited(true)}
+                >
+                  ▶ Subscribe on YouTube
+                </a>
+                <label className={`v2-yt-gate-check${ytVisited ? '' : ' is-disabled'}`}>
+                  <input
+                    type="checkbox"
+                    checked={ytSubscribed}
+                    disabled={!ytVisited}
+                    onChange={(e) => setYtSubscribed(e.target.checked)}
+                  />
+                  <span>{ytVisited ? "I've subscribed on YouTube" : 'Tap “Subscribe” first, then confirm here'}</span>
+                </label>
+              </div>
+            )}
 
             {(stepError || bookingError) && (
               <p className="v2-booking-error" role="alert" style={{ color: 'var(--c-rust)', fontSize: '13px', margin: '4px 0 0' }}>
                 {stepError || bookingError}
               </p>
             )}
-            <button type="submit" className="form-btn v2-pay-btn" disabled={bookingLoading}>
+            <button type="submit" className="form-btn v2-pay-btn" disabled={bookingLoading || (free && !ytSubscribed)}>
               {free
                 ? (bookingLoading ? 'Reserving…' : 'Confirm my free seat →')
                 : 'Continue to payment →'}
@@ -1636,10 +1990,10 @@ function V2TopBanner({ nextMc, onReserve, canShow = true }) {
         <span className="v2-top-banner-text">
           <span className="v2-top-banner-lead">Learn by doing — </span>
           <strong>{titleShort}</strong> · {dateStr}
-          <span className="v2-top-banner-price"> · {formatMcPriceShort(nextMc)}</span>
+          <span className="v2-top-banner-price"> · <V2McPrice mc={nextMc} /></span>
         </span>
         <button type="button" className="v2-top-banner-cta" onClick={() => onReserve(nextMc)}>
-          <span className="v2-top-banner-cta-full">{free ? 'Reserve free seat →' : 'Enroll now →'}</span>
+          <span className="v2-top-banner-cta-full">{free ? <>Reserve seat · <V2McPrice mc={nextMc} /> →</> : 'Enroll now →'}</span>
           <span className="v2-top-banner-cta-short">{free ? 'Reserve →' : 'Enroll →'}</span>
         </button>
       </div>
@@ -1865,7 +2219,7 @@ function V2WelcomePopup({ nextMc, onReserve, onResolve }) {
             <div className="v2-welcome-meta-row">
               <span className="v2-welcome-chip">📅 {formatMcShortDate(merged.dateTime)}</span>
               <span className="v2-welcome-chip">⏱ {merged.duration || 180} min</span>
-              <span className="v2-welcome-chip v2-welcome-chip--accent">{free ? '🎟️ Free to attend' : formatMcPriceShort(merged)}</span>
+              <span className="v2-welcome-chip v2-welcome-chip--accent">{free ? <>🎟️ <V2McPrice mc={merged} /></> : formatMcPriceShort(merged)}</span>
             </div>
 
             {/* Instructor */}
@@ -1909,7 +2263,7 @@ function V2WelcomePopup({ nextMc, onReserve, onResolve }) {
 
             <div className="v2-welcome-actions">
               <button type="button" className="v2-welcome-primary" onClick={register}>
-                {wp.primaryCtaDetails || (free ? 'Reserve my free seat' : 'Reserve my seat')} →
+                {free ? <>Reserve seat · <V2McPrice mc={merged} /></> : (wp.primaryCtaDetails || 'Reserve my seat')} →
               </button>
               <button type="button" className="v2-welcome-secondary" onClick={dismiss}>
                 {wp.dismissLabel || 'Maybe later'}
@@ -1987,7 +2341,7 @@ function V2Curriculum({ nextMc, onReserve, reserved, onManage }) {
       <div className="v2-curriculum-meta">
         <span className="v2-curriculum-chip">📅 {formatMcFullDateTime(merged.dateTime)}</span>
         <span className="v2-curriculum-chip">⏱ {merged.duration || 180} min</span>
-        <span className="v2-curriculum-chip v2-curriculum-chip--accent">{free ? '🎟️ Free to attend' : formatMcPriceShort(merged)}</span>
+        <span className="v2-curriculum-chip v2-curriculum-chip--accent">{free ? <>🎟️ <V2McPrice mc={merged} /></> : formatMcPriceShort(merged)}</span>
         {Array.isArray(merged.stack) && merged.stack.length > 0 && (
           <span className="v2-curriculum-stack">{merged.stack.join(' · ')}</span>
         )}
@@ -2044,7 +2398,7 @@ function V2Curriculum({ nextMc, onReserve, reserved, onManage }) {
           </button>
         ) : (
           <button type="button" className="v2-curriculum-cta" onClick={() => onReserve(nextMc)}>
-            {free ? 'Reserve my free seat' : `Book my seat · ${formatMcPriceShort(merged)}`} →
+            {free ? <>Reserve seat · <V2McPrice mc={merged} /></> : `Book my seat · ${formatMcPriceShort(merged)}`} →
           </button>
         )}
       </div>
@@ -2206,7 +2560,7 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
         >
           {reserved
             ? 'You’re registered ✓ · View my account →'
-            : (free ? `Reserve my free seat →` : `Book my seat · ${formatMcPriceShort(nextMc)} →`)}
+            : (free ? <>Reserve seat · <V2McPrice mc={nextMc} /> →</> : `Book my seat · ${formatMcPriceShort(nextMc)} →`)}
         </button>
         <div className="closing-cta__microcopy">
           {reserved
@@ -2252,7 +2606,7 @@ function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
         )}
       </div>
       <button type="button" className="hero__primary-cta v2-mobile-sticky-btn" onClick={() => onReserve(nextMc)}>
-        {free ? 'Reserve · Free' : `Book · ${formatMcPriceShort(nextMc)}`}
+        {free ? <>Reserve · <V2McPrice mc={nextMc} /></> : `Book · ${formatMcPriceShort(nextMc)}`}
       </button>
     </div>
   );
@@ -2281,7 +2635,7 @@ function V2WhatsAppButton() {
 function V2LegalModal({ page, onClose }) {
   if (!page) return null;
   const content = {
-    refund: { title: 'Refund Policy', body: '100% refund within 24 hours of purchase, no questions asked. Email balajichippada.20@gmail.com with your order ID.' },
+    refund: { title: 'Refund Policy', body: '100% refund within 24 hours of purchase, no questions asked. Email team@balajichippada.com with your order ID.' },
     privacy: { title: 'Privacy Policy', body: 'We collect name, email, and phone to deliver masterclass access and updates. We do not sell your data. Contact us to delete your account.' },
     terms: { title: 'Terms of Service', body: 'Masterclass content is for personal learning. Recording redistribution is prohibited. Sessions may be rescheduled with 48h notice.' },
     contact: {
@@ -2289,7 +2643,7 @@ function V2LegalModal({ page, onClose }) {
       body: (
         <>
           <p className="modal-desc">
-            Email: <a href="mailto:balajichippada.20@gmail.com">balajichippada.20@gmail.com</a>
+            Email: <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>
             {' · '}We respond within 24 hours.
           </p>
           <a

@@ -362,6 +362,7 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
           modules: m.modules || [],
           startSec: m.startSec || 0,
           endSec: m.endSec != null ? m.endSec : null,
+          codeUrl: m.codeUrl || v.codeUrl || null,
           source: 'seed',
         });
       });
@@ -385,6 +386,7 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
         modules: doc.modules || [],
         startSec: doc.startSec || 0,
         endSec: doc.endSec != null ? doc.endSec : null,
+        codeUrl: doc.codeUrl || null,
         source: 'firestore',
       };
       map.set(key(l), l);

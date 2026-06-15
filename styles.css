@@ -4754,6 +4754,83 @@ body.modal-open {
   font-size: 15px;
   margin-top: 8px;
 }
+
+/* Struck anchor price (₹299 → Free) for free masterclasses */
+.v2-mc-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.v2-mc-price-was {
+  text-decoration: line-through;
+  opacity: 0.55;
+  font-weight: 500;
+}
+.v2-mc-price-free {
+  font-weight: 700;
+}
+
+/* "Subscribe on YouTube before reserving a free seat" gate */
+.v2-yt-gate {
+  margin: 14px 0 4px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #ff0000 32%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, #ff0000 5%, var(--bg-card));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.v2-yt-gate-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+.v2-yt-gate-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: #ff0000;
+  color: #fff;
+  font-size: 10px;
+}
+.v2-yt-gate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: flex-start;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #ff0000;
+  color: #fff;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 150ms var(--ease, ease), transform 150ms var(--ease, ease);
+}
+.v2-yt-gate-btn:hover { background: #cc0000; transform: translateY(-1px); }
+.v2-yt-gate-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+}
+.v2-yt-gate-check input { width: 16px; height: 16px; accent-color: #ff0000; cursor: pointer; }
+.v2-yt-gate-check.is-disabled { color: var(--fg-faint); cursor: default; }
+.v2-yt-gate-check.is-disabled input { cursor: not-allowed; }
 .v2-modal-back {
   background: none;
   border: 0;
@@ -5267,6 +5344,177 @@ body.modal-open {
 }
 .v2-video-caption a { color: var(--c-rust); text-decoration: none; }
 .v2-video-caption a:hover { text-decoration: underline; }
+
+/* ── Hybrid actions row under inline players: keep ad revenue (video plays
+   on-site via the official embed) while recovering YouTube engagement ── */
+.v2-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.v2-video-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 150ms var(--ease, ease), background 150ms var(--ease, ease), border-color 150ms var(--ease, ease);
+}
+.v2-video-action--watch {
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+.v2-video-action--watch:hover {
+  border-color: var(--c-rust);
+  transform: translateY(-1px);
+}
+.v2-video-action-yt { color: #ff0000; font-size: 11px; }
+.v2-video-action-ext { color: var(--fg-faint); font-size: 12px; }
+.v2-video-action--sub {
+  border: 1px solid transparent;
+  background: #ff0000;
+  color: #fff;
+}
+.v2-video-action--sub:hover { background: #cc0000; transform: translateY(-1px); }
+.v2-video-action:focus-visible { outline: 2px solid var(--c-rust); outline-offset: 2px; }
+
+/* "✓ Watched" badge overlaid on a completed video, + per-lesson check marks */
+.v2-video-watched {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 7px;
+  border-radius: 999px;
+  background: rgba(20, 19, 26, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--c-emerald) 60%, transparent);
+  color: #fff;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.v2-video-watched__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--c-emerald);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* "Link to code" button pinned to the bottom-right of a video frame. Sits
+   above the control bar so it doesn't cover YouTube's fullscreen button. */
+/* Container pinned bottom-right of the video frame; holds the Code link and,
+   for admins, the add/edit control. */
+.v2-video-code-wrap,
+.v2-video-code-edit {
+  position: absolute;
+  right: 10px;
+  bottom: 48px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.v2-video-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(20, 19, 26, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms var(--ease, ease), transform 150ms var(--ease, ease), border-color 150ms var(--ease, ease);
+}
+.v2-video-code:hover {
+  background: var(--c-rust);
+  border-color: var(--c-rust);
+  transform: translateY(-1px);
+}
+.v2-video-code__icon { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; opacity: 0.95; }
+.v2-video-code--edit-trigger { padding: 6px 10px; }
+
+/* Inline editor (admin only). */
+.v2-video-code-edit {
+  padding: 5px 6px 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(20, 19, 26, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.v2-video-code-input {
+  width: 200px;
+  max-width: 46vw;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 12px;
+}
+.v2-video-code-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+.v2-video-code-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 11px;
+  background: var(--c-rust);
+  color: #fff;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.v2-video-code-btn--ghost { background: transparent; color: rgba(255, 255, 255, 0.7); padding: 5px 8px; }
+@media (max-width: 600px) {
+  .v2-video-code-wrap,
+  .v2-video-code-edit { bottom: 44px; right: 8px; }
+  .v2-video-code { padding: 5px 9px; font-size: 11px; }
+  .v2-video-code-input { width: 130px; }
+}
+.v2-playlist-track-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-emerald) 20%, transparent);
+  color: var(--c-emerald);
+  font-size: 12px;
+  font-weight: 700;
+}
+.v2-playlist-track.is-watched .v2-playlist-track-title { color: var(--fg-dim); }
+.v2-playlist-track.is-watched .v2-playlist-track-thumb { opacity: 0.82; }
 
 .v2-teaser-actions {
   display: flex;
@@ -6957,10 +7205,12 @@ body.has-promo-banner .nav { top: calc(var(--top-banner-h) + 10px); }
   grid-template-columns: 120px 28px 1fr auto;
   gap: 10px;
   align-items: center;
+  width: 100%;
   padding: 8px;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--bg);
+  color: inherit;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -7709,3 +7959,86 @@ body.nav-menu-open .v2-mobile-sticky {
     font-size: clamp(32px, 9vw, 40px);
   }
 }
+
+/* ── Admin: email send-task viewer ─────────────────────────────────── */
+.email-tasks-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 96px 20px 80px;
+}
+.email-tasks__head { margin-bottom: 20px; }
+.email-tasks__title { font-size: 24px; font-weight: 600; color: var(--fg); margin: 0; letter-spacing: -0.01em; }
+.email-tasks__sub { color: var(--fg-dim); font-size: 14px; margin: 6px 0 0; }
+.email-tasks__empty { color: var(--fg-faint); font-size: 14px; padding: 24px 0; }
+
+.email-tasks__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.email-tasks__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.email-tasks__row:hover { border-color: color-mix(in srgb, var(--c-rust) 40%, var(--line)); transform: translateY(-1px); }
+.email-tasks__row-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.email-tasks__row-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.email-tasks__row-sub { font-size: 12px; color: var(--fg-faint); }
+.email-tasks__row-count { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg-dim); white-space: nowrap; }
+.email-tasks__row-arrow { color: var(--fg-faint); }
+
+.email-tasks__badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.email-tasks__badge--done { background: color-mix(in srgb, var(--c-emerald) 18%, transparent); color: var(--c-emerald); }
+.email-tasks__badge--sending { background: color-mix(in srgb, var(--c-amber) 20%, transparent); color: var(--c-amber); }
+.email-tasks__badge--queued { background: var(--bg-elev); color: var(--fg-faint); }
+
+.email-tasks__back {
+  background: none; border: none; color: var(--c-rust); font-family: inherit; font-size: 14px;
+  font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 16px;
+}
+.email-tasks__detail-head { margin-bottom: 18px; }
+.email-tasks__detail-head .email-tasks__title { margin-top: 10px; font-size: 20px; }
+.email-tasks__meta { color: var(--fg-faint); font-size: 13px; margin: 6px 0 0; }
+
+.email-tasks__progress { background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+.email-tasks__bar { height: 10px; border-radius: 999px; background: var(--bg-elev); overflow: hidden; }
+.email-tasks__bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--c-rust), var(--c-amber)); transition: width 0.4s var(--ease, ease); }
+.email-tasks__progress-label { font-size: 13px; color: var(--fg-dim); margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
+.email-tasks__counts { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 13px; color: var(--fg-dim); }
+.email-tasks__counts--big { font-size: 16px; margin: 0 0 18px; }
+.email-tasks__counts--big strong { font-size: 22px; color: var(--fg); }
+.email-tasks__counts .is-err { color: var(--c-rust); }
+
+.email-tasks__recips-head { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 10px; }
+.email-tasks__recip-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; max-height: 480px; overflow-y: auto; }
+.email-tasks__recip-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.email-tasks__recip-list li:last-child { border-bottom: none; }
+.email-tasks__recip-list li:nth-child(even) { background: var(--bg-subtle); }
+.email-tasks__recip-name { color: var(--fg); font-weight: 500; }
+.email-tasks__recip-email { color: var(--fg-dim); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+/* Failed-sends section (with reasons) */
+.email-tasks__failures { margin-bottom: 22px; }
+.email-tasks__recips-head--err { color: var(--c-rust); }
+.email-tasks__fail-list { list-style: none; margin: 0; padding: 0; border: 1px solid color-mix(in srgb, var(--c-rust) 30%, var(--line)); border-radius: 12px; overflow: hidden; }
+.email-tasks__fail-list li { padding: 10px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--c-rust) 5%, transparent); }
+.email-tasks__fail-list li:last-child { border-bottom: none; }
+.email-tasks__fail-who { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.email-tasks__fail-reason { display: block; margin-top: 4px; font-size: 12px; color: var(--c-rust); font-family: 'JetBrains Mono', monospace; word-break: break-word; }

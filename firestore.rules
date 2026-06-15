@@ -72,7 +72,7 @@ service cloud.firestore {
     function isBootstrapUser() {
       return isAuthenticated() && 
         'email' in request.auth.token &&
-        request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+        request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
     }
     
     // Validate required fields exist
@@ -139,7 +139,7 @@ service cloud.firestore {
       function isBootstrapAdmin() {
         return isAuthenticated() &&
           request.auth.token.email != null &&
-          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
       }
 
       allow create: if isBootstrapAdmin();
@@ -176,7 +176,7 @@ service cloud.firestore {
       function isMcBootstrapAdmin() {
         return isAuthenticated() &&
           request.auth.token.email != null &&
-          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com'];
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
       }
 
       allow create: if isMcBootstrapAdmin();
@@ -199,6 +199,21 @@ service cloud.firestore {
     match /email_campaigns/{campaignId} {
       allow read, create: if isStaff();
       allow update, delete: if isAdmin();
+    }
+
+    // Email send-task progress (created/updated only by Cloud Functions via the
+    // admin SDK, which bypasses rules). Admins read it to monitor sends; the
+    // recipient list is student PII, so no public/client access.
+    match /emailJobs/{jobId} {
+      allow read: if isAdmin() || isBootstrapUser();
+      allow write: if false;
+    }
+
+    // Per-video "Link to code" map (videoId -> codeUrl). Public read (shown on
+    // the player); admin-managed writes.
+    match /videoCodeLinks/{videoId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || isBootstrapUser();
     }
 
     // Roadmap video links (admin-managed, public read)
