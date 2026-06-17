@@ -434,6 +434,46 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
     return { phaseStats, overallPct, totalDone, totalModules };
   }
 
+  // Every distinct videoId that belongs to a module (single videos + every
+  // track of any playlist mapped to it). Playlist length comes from the static
+  // seed, which mirrors the live playlist.
+  function getModuleVideoIds(links, moduleN) {
+    const ids = new Set();
+    getModuleEmbedVideos(links, moduleN).forEach((l) => {
+      if (l.playlistId) {
+        (getPlaylistItemsSync(l.playlistId) || []).forEach((it) => { if (it && it.videoId) ids.add(it.videoId); });
+      } else if (l.youtubeId) {
+        ids.add(l.youtubeId);
+      }
+    });
+    return ids;
+  }
+
+  // A module counts as complete only when EVERY video mapped to it has been
+  // watched (videoProgress[id].completed). Derives the completed-module list
+  // from the full per-video watch state — so watching 3 of a 33-video playlist
+  // no longer completes the module.
+  function deriveCompletedModules(links, videoProgress) {
+    const vp = videoProgress || {};
+    // A video counts as watched if EITHER the synced Firestore flag OR the local
+    // "Watched" badge (window.__isVideoWatched) says so — so module completion
+    // always matches the badges the user sees.
+    const isWatched = (id) =>
+      (vp[id] && vp[id].completed) ||
+      (typeof window !== 'undefined' && window.__isVideoWatched && window.__isVideoWatched(id));
+    const out = [];
+    (window.ROADMAP || []).forEach((p) => {
+      (p.sections || []).forEach((s) => {
+        const ids = getModuleVideoIds(links, s.n);
+        if (ids.size === 0) return; // no videos mapped → not auto-completable
+        let all = true;
+        for (const id of ids) { if (!isWatched(id)) { all = false; break; } }
+        if (all) out.push(s.n);
+      });
+    });
+    return out;
+  }
+
   function findNextModule(completedModules) {
     const done = new Set(completedModules || []);
     for (const p of window.ROADMAP || []) {
@@ -481,6 +521,8 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
     getPrimaryPhaseVideo,
     calcRoadmapProgress,
     findNextModule,
+    getModuleVideoIds,
+    deriveCompletedModules,
     PROGRESS_THRESHOLD,
   };
 })();

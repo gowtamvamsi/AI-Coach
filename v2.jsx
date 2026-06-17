@@ -6,6 +6,83 @@ const V2_SITE_URL = 'https://balajichippada.com';
 const V2_ROADMAP_URL = 'https://ch-balaji.github.io/ai-engineer-roadmap/';
 
 // ===============================================================
+// Shared form validation (used by every public-facing form across
+// v2.jsx and app.jsx). Two layers:
+//   • clean*  — sanitize the value as the user types (strip junk, cap length)
+//   • *Error  — return a human message on submit, or '' when valid
+// Keeping these in one place means client checks match the Firestore rules
+// and we never send a malformed name / email / phone to the backend.
+// ===============================================================
+const V2_VALIDATE = {
+  // First char a letter; then letters (any script), spaces, . ' - only. 2–60 chars.
+  NAME_RE: /^\p{L}[\p{L} .'-]{1,59}$/u,
+  // Mirrors isValidEmail() in firestore.rules so client + server agree.
+  EMAIL_RE: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  // We accept two shapes:
+  //   • a bare 10-digit Indian mobile (first digit 6–9) — the common case, and
+  //   • any international number written in E.164 with a leading '+'
+  //     (country code 1–9, then 7–14 more digits → 8–15 digits total).
+  INDIA_RE: /^[6-9]\d{9}$/,
+  E164_RE: /^\+[1-9]\d{7,14}$/,
+  DEFAULT_DIAL_CODE: '91', // India — prepended to bare 10-digit numbers on save
+
+  cleanName(v) {
+    return String(v == null ? '' : v)
+      .replace(/[^\p{L} .'-]/gu, '')   // drop digits & stray symbols
+      .replace(/\s{2,}/g, ' ')          // collapse runs of spaces
+      .replace(/^\s+/, '')              // no leading space
+      .slice(0, 60);
+  },
+  // Sanitize while typing: keep a single leading '+', strip everything that
+  // isn't a digit, cap at the E.164 maximum of 15 digits. International users
+  // keep their '+' and country code; Indian users keep their plain 10 digits.
+  cleanPhone(v) {
+    const s = String(v == null ? '' : v).trim();
+    const hasPlus = s.startsWith('+');
+    let d = s.replace(/\D+/g, ''); // digits only
+    if (!hasPlus && d.length === 11 && d[0] === '0') d = d.slice(1); // strip national trunk 0
+    d = d.slice(0, 15);
+    return hasPlus ? '+' + d : d;
+  },
+  // Normalize an accepted number to full E.164 ("+<country><number>") for
+  // storage. A bare 10-digit number is treated as an Indian mobile.
+  toE164(v) {
+    const c = this.cleanPhone(v);
+    if (!c) return '';
+    if (c.startsWith('+')) return c;
+    if (this.INDIA_RE.test(c)) return '+' + this.DEFAULT_DIAL_CODE + c;
+    return '+' + c; // already carries a country code, just missing the '+'
+  },
+  isEmail(v) { return this.EMAIL_RE.test(String(v == null ? '' : v).trim()); },
+  isPhone(v) {
+    const c = this.cleanPhone(v);
+    return c.startsWith('+') ? this.E164_RE.test(c) : this.INDIA_RE.test(c);
+  },
+
+  nameError(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return 'Please enter your name.';
+    if (s.length < 2) return 'Please enter your full name (at least 2 letters).';
+    if (!this.NAME_RE.test(s)) return 'Name can only contain letters, spaces, hyphens and apostrophes.';
+    return '';
+  },
+  emailError(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return 'Please enter your email address.';
+    if (!this.isEmail(s)) return 'Please enter a valid email address.';
+    return '';
+  },
+  // required=false → empty is OK (optional field); any entered value must still be valid.
+  phoneError(v, required) {
+    const c = this.cleanPhone(v);
+    if (!c) return required ? 'Please enter your phone number.' : '';
+    if (!this.isPhone(v)) return 'Enter a 10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132).';
+    return '';
+  },
+};
+if (typeof window !== 'undefined') window.V2_VALIDATE = V2_VALIDATE;
+
+// ===============================================================
 // UTM Tracking & Lead Persistence Utilities
 // ===============================================================
 const V2_UTM_HELPERS = {
@@ -421,8 +498,23 @@ const V2_VIDEO_RESUME = {
   // badge so the viewer can see what they've finished. Persists per device.
   _wkey: (id) => `v2_vwatched_${id}`,
   markWatched(id) { if (!id) return; try { localStorage.setItem(this._wkey(id), '1'); } catch (e) {} },
-  isWatched(id) { if (!id) return false; try { return localStorage.getItem(this._wkey(id)) === '1'; } catch (e) { return false; } },
+  isWatched(id) {
+    if (!id) return false;
+    try { if (localStorage.getItem(this._wkey(id)) === '1') return true; } catch (e) {}
+    // Account-synced watch state (Firestore, mirrored to window.__VIDEO_PROGRESS
+    // by app.jsx). Keyed by videoId, so the same signed-in account shows
+    // identical ✓ markers in every tab and on every device — not just whatever
+    // this one browser's localStorage holds.
+    try {
+      const vp = typeof window !== 'undefined' ? window.__VIDEO_PROGRESS : null;
+      if (vp && vp[id] && vp[id].completed) return true;
+    } catch (e) {}
+    return false;
+  },
 };
+// Exposed so roadmap progress (videos.js / app.jsx) derives module completion
+// from the SAME "Watched" signal the badges use — keeping them in lockstep.
+if (typeof window !== 'undefined') window.__isVideoWatched = (id) => V2_VIDEO_RESUME.isWatched(id);
 
 // Small "✓ Watched" badge overlaid on a player frame once the lesson is done.
 function V2WatchedBadge() {
@@ -549,23 +641,22 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
   const [activeIdx, setActiveIdx] = useState(0);
   const [watchedTick, setWatchedTick] = useState(0);
   const hasStaticSeed = seedItems.length > 0;
-  // Player + progress-tracking refs (the playlist plays via the YouTube IFrame
-  // API so watching a lesson can mark its roadmap module(s) complete).
-  const frameRef = React.useRef(null);
-  const playerRef = React.useRef(null);
-  const playerHostRef = React.useRef(null);
-  const pollRef = React.useRef(null);
-  const reportedRef = React.useRef(false);
-  const activeRef = React.useRef(null);
-  const threshold = H.PROGRESS_THRESHOLD || 0.8;
   const canTrack = Boolean(onVideoProgress && modules && modules.length);
-  const inView = useV2InView(frameRef);
   // Which lessons in this playlist are already watched (for the ✓ markers).
   const watchedSet = React.useMemo(() => {
     const s = new Set();
     (items || []).forEach((v) => { if (v.videoId && V2_VIDEO_RESUME.isWatched(v.videoId)) s.add(v.videoId); });
     return s;
   }, [items, watchedTick]);
+
+  // Re-derive the ✓ markers whenever the account-synced progress changes — on
+  // first Firestore load, or when another tab/device marks a lesson watched —
+  // so every open tab shows the same watched set.
+  useEffect(() => {
+    const onSync = () => setWatchedTick((t) => t + 1);
+    window.addEventListener('roadmap-progress-sync', onSync);
+    return () => window.removeEventListener('roadmap-progress-sync', onSync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -608,11 +699,7 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
 
   const videoIndex = activeIdx + 1;
 
-  // Inline playback via the official YouTube embed keeps ads, view counts, and
-  // watch-time crediting the channel — embedding does NOT forfeit ad revenue.
-  // The "Watch on YouTube" / Subscribe row (below) recovers the engagement
-  // (subs, recommendations) that the embed alone doesn't capture. The watch URL
-  // keeps the playlist context (&list / &index).
+  // These videos open on YouTube (the playlist context is kept via &list/&index).
   const ytWatchUrl = (vid, idx) => {
     if (!vid) return `https://www.youtube.com/playlist?list=${playlistId}`;
     let u = `https://www.youtube.com/watch?v=${vid}&list=${playlistId}`;
@@ -620,89 +707,17 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
     return u;
   };
 
-  // Keep a live ref to the active item so the (once-created) player's ENDED
-  // handler always reports the video that actually finished.
-  activeRef.current = active;
-
-  // Create the inline player on first play and switch videos in place via
-  // loadVideoById. Polls watch-progress and reports the link's module(s) at the
-  // completion threshold so the roadmap tracker updates.
-  useEffect(() => {
-    if (!inView || !active || !active.videoId) return;
-    let destroyed = false;
-    reportedRef.current = false;
-    const vid = active.videoId;            // the video this effect run owns
-    const resumeSec = V2_VIDEO_RESUME.load(vid);
-    const run = async () => {
-      await ensureYouTubeIframeAPI();
-      if (destroyed || !playerHostRef.current) return;
-      if (playerRef.current && playerRef.current.loadVideoById) {
-        // A track switch is an explicit choice, so play it straight away —
-        // resuming from the saved position for that lesson if we have one.
-        playerRef.current.loadVideoById(resumeSec > 0 ? { videoId: vid, startSeconds: resumeSec } : { videoId: vid });
-      } else {
-        // Initial mount: NO autoplay, so the viewer presses YouTube's own play
-        // button (user-initiated playback is what makes YouTube serve ads).
-        playerRef.current = new window.YT.Player(playerHostRef.current, {
-          videoId: vid,
-          playerVars: { rel: 0, modestbranding: 1, enablejsapi: 1, playsinline: 1, origin: window.location.origin, ...(resumeSec > 0 ? { start: resumeSec } : {}) },
-          events: {
-            onStateChange: (e) => {
-              if (e.data === window.YT.PlayerState.ENDED && !reportedRef.current) {
-                reportedRef.current = true;
-                const a = activeRef.current;
-                const endedId = a && a.videoId;
-                V2_VIDEO_RESUME.markWatched(endedId);
-                setWatchedTick((t) => t + 1);
-                V2_VIDEO_RESUME.clear(endedId);   // finished -> don't resume it
-                if (canTrack) onVideoProgress({ videoId: endedId, mappingId, modules, watchedRatio: 1 });
-              }
-            },
-          },
-        });
-      }
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => {
-        const p = playerRef.current;
-        if (!p || !p.getCurrentTime || reportedRef.current) return;
-        try {
-          const cur = p.getCurrentTime();
-          const dur = p.getDuration();
-          if (!dur || dur <= 0) return;
-          if (cur / dur >= threshold) {
-            reportedRef.current = true;
-            V2_VIDEO_RESUME.markWatched(vid);
-            setWatchedTick((t) => t + 1);
-            V2_VIDEO_RESUME.clear(vid);
-            if (canTrack) onVideoProgress({ videoId: vid, mappingId, modules, watchedRatio: cur / dur });
-          } else {
-            V2_VIDEO_RESUME.save(vid, cur, dur);
-          }
-        } catch (_) { /* player not ready */ }
-      }, 5000);
-    };
-    run();
-    return () => {
-      destroyed = true;
-      if (pollRef.current) clearInterval(pollRef.current);
-      // Capture the final position of the outgoing video before switching/unmount.
-      try {
-        const p = playerRef.current;
-        if (p && p.getCurrentTime && !reportedRef.current) {
-          const cur = p.getCurrentTime();
-          const dur = p.getDuration();
-          if (dur > 0) V2_VIDEO_RESUME.save(vid, cur, dur);
-        }
-      } catch (_) {}
-    };
-  }, [inView, active && active.videoId, canTrack, mappingId, modules, onVideoProgress, threshold]);
-
-  // Tear the player down when the embed unmounts.
-  useEffect(() => () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    if (playerRef.current && playerRef.current.destroy) { try { playerRef.current.destroy(); } catch (_) {} }
-    playerRef.current = null;
-  }, []);
+  // Opening a lesson on YouTube marks that specific lesson watched. The module
+  // is only completed once EVERY video in the playlist is watched — watching a
+  // few of many lessons must NOT mark a multi-video module done.
+  const onPlay = (vid) => {
+    if (vid) V2_VIDEO_RESUME.markWatched(vid);
+    setWatchedTick((t) => t + 1);
+    const allWatched = items.length > 0 && items.every((v) => v.videoId && V2_VIDEO_RESUME.isWatched(v.videoId));
+    if (canTrack && allWatched) {
+      onVideoProgress({ videoId: vid, mappingId, modules, watchedRatio: 1 });
+    }
+  };
 
   const posterUrl = active?.videoId
     ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/hqdefault.jpg`)
@@ -710,17 +725,22 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
 
   return (
     <div className="v2-playlist-embed">
-      <div
-        className="v2-video-frame v2-video-frame--playlist"
-        ref={frameRef}
-        style={posterUrl ? { backgroundImage: `url(${posterUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-      >
-        {!loading && items.length > 0 && inView && active?.videoId && (
-          <div ref={playerHostRef} className="v2-video-yt-player" title={active?.title || title} />
+      <div className="v2-video-frame v2-video-frame--playlist">
+        {!loading && items.length > 0 && active?.videoId && (
+          <a
+            className="v2-video-poster"
+            href={ytWatchUrl(active.videoId, videoIndex)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => onPlay(active.videoId)}
+            aria-label={`Watch on YouTube: ${active.title || title}`}
+            style={posterUrl ? { backgroundImage: `url(${posterUrl})` } : undefined}
+          >
+            <span className="v2-video-play" aria-hidden="true">▶</span>
+          </a>
         )}
         {active?.videoId && watchedSet.has(active.videoId) && <V2WatchedBadge />}
-        {/* Per-video code link — keyed by the ACTIVE video's id, so each lesson
-            in the playlist shows (and edits) its own, not one for the whole list. */}
+        {/* Per-video code link — keyed by the ACTIVE video's id. */}
         <V2CodeLink videoId={active && active.videoId} />
         {loading && (
           <div className="v2-playlist-loading">Loading playlist…</div>
@@ -759,7 +779,7 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
 
       {items.length > 0 && active && (
         <div className="v2-playlist-now" aria-live="polite">
-          <span className="v2-playlist-now-label">Now playing</span>
+          <span className="v2-playlist-now-label">Featured</span>
           <span className="v2-playlist-now-title">{active.title}</span>
         </div>
       )}
@@ -778,11 +798,13 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
           <div className="v2-playlist-tracks-head">{items.length} videos in this playlist</div>
           <div className="v2-playlist-tracks-scroll" role="list" ref={scrollListRef}>
             {items.map((v, i) => (
-              <button
+              <a
                 key={`${v.videoId}-${i}`}
-                type="button"
                 role="listitem"
-                onClick={() => setActiveIdx(i)}
+                href={ytWatchUrl(v.videoId, i + 1)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => { setActiveIdx(i); onPlay(v.videoId); }}
                 className={`v2-playlist-track ${i === activeIdx ? 'is-active' : ''} ${watchedSet.has(v.videoId) ? 'is-watched' : ''}`}
                 aria-current={i === activeIdx ? 'true' : undefined}
               >
@@ -801,10 +823,8 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
                 />
                 <span className="v2-playlist-track-num">{i + 1}</span>
                 <span className="v2-playlist-track-title">{v.title}</span>
-                {i === activeIdx
-                  ? <span className="v2-playlist-track-now">Now playing</span>
-                  : (watchedSet.has(v.videoId) && <span className="v2-playlist-track-check" aria-label="Watched">✓</span>)}
-              </button>
+                {watchedSet.has(v.videoId) && <span className="v2-playlist-track-check" aria-label="Watched">✓</span>}
+              </a>
             ))}
           </div>
         </div>
@@ -883,7 +903,23 @@ function V2ClickToPlayVideo(props) {
   return <V2ClickToPlayVideoInner {...props} />;
 }
 
-function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption, codeUrl }) {
+function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec, trackable, onVideoProgress, mappingId, modules, hideCaption, codeUrl, inline }) {
+  // Only the top hero videos (inline) play on-site. Every other video opens on
+  // YouTube; clicking play marks it watched since we can't track completion off-site.
+  if (inline && !playlistId) {
+    return (
+      <V2TrackableVideo
+        videoId={videoId}
+        title={title}
+        caption={hideCaption ? null : caption}
+        startSec={startSec}
+        onVideoProgress={onVideoProgress}
+        mappingId={mappingId}
+        modules={modules}
+        codeUrl={codeUrl}
+      />
+    );
+  }
   if (playlistId) {
     return (
       <V2PlaylistEmbed
@@ -896,11 +932,8 @@ function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec
       />
     );
   }
-  // Single video: play inline via the official YouTube IFrame player (ads,
-  // views, and watch-time still credit the channel) with progress tracking when
-  // a callback is supplied, plus a persistent Watch-on-YouTube / Subscribe row.
   return (
-    <V2TrackableVideo
+    <V2RedirectVideo
       videoId={videoId}
       title={title}
       caption={hideCaption ? null : caption}
@@ -910,6 +943,54 @@ function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec
       modules={modules}
       codeUrl={codeUrl}
     />
+  );
+}
+
+// A single video that opens on YouTube (poster → new tab). Clicking play marks
+// it watched and completes the linked module(s) — used for all module videos.
+function V2RedirectVideo({ videoId, title, caption, startSec, onVideoProgress, mappingId, modules, codeUrl }) {
+  const H = window.ROADMAP_VIDEO_HELPERS || {};
+  const thumbUrl = H.youtubePoster ? H.youtubePoster(videoId) : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  const watchUrl = H.youtubeWatchUrl
+    ? H.youtubeWatchUrl(videoId, startSec || 0)
+    : `https://www.youtube.com/watch?v=${videoId}${startSec ? `&t=${startSec}s` : ''}`;
+  const [watched, setWatched] = useState(() => V2_VIDEO_RESUME.isWatched(videoId));
+  const canTrack = Boolean(onVideoProgress && modules && modules.length);
+  // Refresh the badge when account-synced progress arrives (other tabs/devices).
+  useEffect(() => {
+    const onSync = () => setWatched(V2_VIDEO_RESUME.isWatched(videoId));
+    window.addEventListener('roadmap-progress-sync', onSync);
+    return () => window.removeEventListener('roadmap-progress-sync', onSync);
+  }, [videoId]);
+  const onPlay = () => {
+    V2_VIDEO_RESUME.markWatched(videoId);
+    setWatched(true);
+    if (canTrack) onVideoProgress({ videoId, mappingId, modules, watchedRatio: 1 });
+  };
+  return (
+    <div className="v2-video-block">
+      <div className="v2-video-frame">
+        <a
+          className="v2-video-poster"
+          href={watchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onPlay}
+          aria-label={`Watch on YouTube: ${title}`}
+          style={{ backgroundImage: `url(${thumbUrl})` }}
+        >
+          <span className="v2-video-play" aria-hidden="true">▶</span>
+        </a>
+        {watched && <V2WatchedBadge />}
+        <V2CodeLink videoId={videoId} fallbackUrl={codeUrl} />
+      </div>
+      {caption && (
+        <p className="v2-video-caption">
+          <a href={watchUrl} target="_blank" rel="noopener noreferrer" onClick={onPlay}>{caption}</a>
+        </p>
+      )}
+      <V2VideoActions watchUrl={watchUrl} />
+    </div>
   );
 }
 
@@ -974,7 +1055,17 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
   // module mapping; standalone videos (hero) fall back to videoId.
   const resumeKey = mappingId || videoId;
   const inView = useV2InView(frameRef);
-  const [watched, setWatched] = useState(() => V2_VIDEO_RESUME.isWatched(resumeKey));
+  // Local resume badge is keyed by resumeKey; the account-synced flag is keyed
+  // by videoId — check both so the badge matches in every tab / on every device.
+  const [watched, setWatched] = useState(
+    () => V2_VIDEO_RESUME.isWatched(resumeKey) || V2_VIDEO_RESUME.isWatched(videoId)
+  );
+  useEffect(() => {
+    const onSync = () =>
+      setWatched((w) => w || V2_VIDEO_RESUME.isWatched(resumeKey) || V2_VIDEO_RESUME.isWatched(videoId));
+    window.addEventListener('roadmap-progress-sync', onSync);
+    return () => window.removeEventListener('roadmap-progress-sync', onSync);
+  }, [resumeKey, videoId]);
 
   useEffect(() => {
     if (!inView || !videoId) return;
@@ -1238,6 +1329,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                 videoId={finalVideoId}
                 title={titleText}
                 caption={captionText}
+                inline
               />
             );
           })()}
@@ -1369,14 +1461,12 @@ function V2BookingWizard({
         {step === 1 && (
           <form className="v2-booking-step" onSubmit={(e) => {
             e.preventDefault();
-            if (!bookingName.trim()) {
-              setStepError('Please enter your name.');
-              return;
-            }
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail.trim())) {
-              setStepError('Please enter a valid email address.');
-              return;
-            }
+            const nameErr = V2_VALIDATE.nameError(bookingName);
+            if (nameErr) { setStepError(nameErr); return; }
+            const emailErr = V2_VALIDATE.emailError(bookingEmail);
+            if (emailErr) { setStepError(emailErr); return; }
+            const phoneErr = V2_VALIDATE.phoneError(bookingPhone, false);
+            if (phoneErr) { setStepError(phoneErr); return; }
             if (free && !ytSubscribed) {
               setStepError('Please subscribe on YouTube to reserve your free seat.');
               return;
@@ -1395,9 +1485,10 @@ function V2BookingWizard({
                 type="text"
                 className="form-input"
                 value={bookingName}
-                onChange={(e) => setBookingName(e.target.value)}
+                onChange={(e) => setBookingName(V2_VALIDATE.cleanName(e.target.value))}
                 placeholder="Your name on the certificate"
                 autoComplete="name"
+                maxLength={60}
                 required
                 autoFocus
               />
@@ -1412,6 +1503,7 @@ function V2BookingWizard({
                 placeholder="you@example.com"
                 autoComplete="email"
                 inputMode="email"
+                maxLength={120}
                 required
                 readOnly={!!(user && !user.isAnonymous && bookingEmail)}
                 aria-readonly={!!(user && !user.isAnonymous && bookingEmail)}
@@ -1422,13 +1514,14 @@ function V2BookingWizard({
               <input
                 type="tel"
                 className="form-input"
-                placeholder="+91 98765 43210"
+                placeholder="e.g. 9876543210 or +1 415 555 0132"
                 value={bookingPhone}
-                onChange={(e) => setBookingPhone(e.target.value)}
+                onChange={(e) => setBookingPhone(V2_VALIDATE.cleanPhone(e.target.value))}
                 autoComplete="tel"
                 inputMode="tel"
-                pattern="[0-9+\-\s()]{7,}"
-                title="Enter a valid phone number"
+                maxLength={16}
+                pattern="\+?[0-9]{7,15}"
+                title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
               />
             </div>
 
@@ -1510,11 +1603,12 @@ function V2BookingWizard({
   );
 }
 
-function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgress }) {
+function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgress, deletedSessionIds }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
+  const [profileError, setProfileError] = useState('');
   const [saving, setSaving] = useState(false);
   const [inquiry, setInquiry] = useState('');
   const [inquirySent, setInquirySent] = useState(false);
@@ -1561,19 +1655,37 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
   }, [user, db]);
 
   const now = Date.now();
-  const upcoming = bookings.filter((b) => {
+  // A booking is a snapshot taken at reservation time; if the admin later deletes
+  // the masterclass, hide it so students don't see a cancelled session.
+  const isDeleted = (b) => !!(deletedSessionIds && deletedSessionIds.has(b.masterclassId || b.sessionId)) || b.status === 'cancelled' || b.deleted === true;
+  // Collapse duplicate booking docs for the same class so a student who booked
+  // more than once doesn't see the session listed twice. Bookings load newest-
+  // first, so the first occurrence we keep is the most recent.
+  const seenClass = new Set();
+  const liveBookings = bookings.filter((b) => !isDeleted(b)).filter((b) => {
+    const key = b.masterclassId || b.sessionId || b.id;
+    if (seenClass.has(key)) return false;
+    seenClass.add(key);
+    return true;
+  });
+  const upcoming = liveBookings.filter((b) => {
     const d = b.sessionDate?.toDate ? b.sessionDate.toDate() : (b.sessionDate ? new Date(b.sessionDate) : null);
     return b.status === 'confirmed' || b.status === 'completed' ? (d ? d.getTime() >= now - 3600000 : true) : false;
   });
-  const past = bookings.filter((b) => b.status === 'completed' || b.status === 'confirmed').filter((b) => {
+  const past = liveBookings.filter((b) => b.status === 'completed' || b.status === 'confirmed').filter((b) => {
     const d = b.sessionDate?.toDate ? b.sessionDate.toDate() : (b.sessionDate ? new Date(b.sessionDate) : null);
     return d && d.getTime() < now - 3600000;
   });
 
   const saveProfile = async () => {
     if (!db || !user) return;
+    const nameErr = V2_VALIDATE.nameError(profileName);
+    if (nameErr) { setProfileError(nameErr); return; }
+    const phoneErr = V2_VALIDATE.phoneError(profilePhone, false);
+    if (phoneErr) { setProfileError(phoneErr); return; }
+    setProfileError('');
     setSaving(true);
-    await db.collection('users').doc(user.uid).set({ name: profileName, phone: profilePhone }, { merge: true });
+    await db.collection('users').doc(user.uid).set({ name: profileName.trim(), phone: V2_VALIDATE.toE164(profilePhone) }, { merge: true });
     setSaving(false);
   };
 
@@ -1680,8 +1792,9 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
       </section>
       <section className="v2-dash-section">
         <h2>Profile</h2>
-        <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={profileName} onChange={(e) => setProfileName(e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={profileName} onChange={(e) => setProfileName(V2_VALIDATE.cleanName(e.target.value))} maxLength={60} /></div>
+        <div className="form-group"><label className="form-label">Phone</label><input className="form-input" type="tel" inputMode="tel" maxLength={16} pattern="\+?[0-9]{7,15}" placeholder="e.g. 9876543210 or +1 415 555 0132" title="10-digit Indian mobile, or an international number with country code" value={profilePhone} onChange={(e) => setProfilePhone(V2_VALIDATE.cleanPhone(e.target.value))} /></div>
+        {profileError && <p className="status-box status-box--error" style={{ margin: '0 0 12px', padding: '10px 14px' }}>{profileError}</p>}
         <button type="button" className="form-btn" onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save Profile'}</button>
       </section>
       <section className="v2-dash-section">
@@ -1732,7 +1845,10 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    const nameErr = V2_VALIDATE.nameError(name);
+    if (nameErr) { setError(nameErr); return; }
+    const emailErr = V2_VALIDATE.emailError(email);
+    if (emailErr) { setError(emailErr); return; }
     setLoading(true);
     setError('');
 
@@ -1767,11 +1883,12 @@ function V2LeadCaptureModal({ open, onClose, onSuccess, source, downloadUrl }) {
             <input 
               type="text" 
               className="form-input" 
-              placeholder="e.g. Balaji Chippada" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
+              placeholder="e.g. Balaji Chippada"
+              value={name}
+              onChange={e => setName(V2_VALIDATE.cleanName(e.target.value))}
               autoComplete="name"
-              required 
+              maxLength={60}
+              required
             />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1808,7 +1925,10 @@ function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    const nameErr = V2_VALIDATE.nameError(name);
+    if (nameErr) { setError(nameErr); return; }
+    const emailErr = V2_VALIDATE.emailError(email);
+    if (emailErr) { setError(emailErr); return; }
     setLoading(true);
     setError('');
 
@@ -1845,25 +1965,32 @@ function V2RoadmapTeaser({ onRoadmap, onLeadCapture }) {
       </div>
       <form className="v2-email-capture" onSubmit={handleSubmit}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', width: '100%', maxWidth: '600px', margin: '0 auto' }}>
-          <input 
-            type="text" 
-            placeholder="Your Name" 
-            value={name} 
-            onChange={(e) => setName(e.target.value)} 
+          <input
+            type="text"
+            id="notify-name"
+            name="name"
+            aria-label="Your name"
+            placeholder="Your Name"
+            value={name}
+            onChange={(e) => setName(V2_VALIDATE.cleanName(e.target.value))}
             autoComplete="name"
-            required 
-            disabled={sent || loading} 
+            maxLength={60}
+            required
+            disabled={sent || loading}
             style={{ flex: '1 1 200px' }}
           />
-          <input 
-            type="email" 
-            placeholder="Your Email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
+          <input
+            type="email"
+            id="notify-email"
+            name="email"
+            aria-label="Your email"
+            placeholder="Your Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             inputMode="email"
-            required 
-            disabled={sent || loading} 
+            required
+            disabled={sent || loading}
             style={{ flex: '1 1 200px' }}
           />
           <button 
@@ -2103,8 +2230,10 @@ function V2WelcomePopup({ nextMc, onReserve, onResolve }) {
     if (!V2_CONFIG.showWelcomePopup || !popupKey) { resolve(); return undefined; }
     let dismissed = false;
     try { dismissed = localStorage.getItem(popupKey) === '1'; } catch (e) {}
-    // Already closed on a prior visit → skip straight to the banner.
-    if (dismissed) { resolve(); return undefined; }
+    // Already closed on a prior visit → skip straight to the banner. Also close
+    // it if it slipped open under a fallback key before the real masterclass id
+    // resolved (otherwise a dismissed popup could re-appear on slow loads).
+    if (dismissed) { setOpen(false); resolve(); return undefined; }
     const id = setTimeout(() => setOpen(true), V2_CONFIG.welcomePopupDelayMs);
     return () => clearTimeout(id);
   }, [popupKey]);
@@ -2613,9 +2742,19 @@ function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
 }
 
 function V2WhatsAppButton() {
+  // On mobile the FAB sits over the hero and clipped the hero microcopy at
+  // certain scroll positions. Fade it in only after scrolling past the hero
+  // (CSS applies the hide on small screens only — desktop is unaffected).
+  const [atTop, setAtTop] = useState(typeof window !== 'undefined' ? window.scrollY < 560 : true);
+  useEffect(() => {
+    const onScroll = () => setAtTop(window.scrollY < 560);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   return (
     <a
-      className="v2-whatsapp-float"
+      className={`v2-whatsapp-float${atTop ? ' v2-whatsapp-float--attop' : ''}`}
       href={V2_BRAND.whatsappCommunity}
       target="_blank"
       rel="noopener noreferrer"

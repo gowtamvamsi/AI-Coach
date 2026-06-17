@@ -1439,10 +1439,16 @@ exports.processEmailBatch = functions
 
     for (const r of recipients) {
       try {
-        const regRef = db.collection("registrations").doc(r.regId);
-        const snap = await regRef.get();
-        if (!snap.exists) { skipped++; continue; }
-        if (flagField && snap.data()[flagField]) { skipped++; continue; } // already sent (retry-safe)
+        // Registration-backed sends (zoom links, reminders, cancellations) read
+        // the reg doc for retry-safe dedupe and to flag it sent. Ad-hoc list
+        // sends (e.g. the bulk marketing upload) carry no regId — those just send.
+        let regRef = null;
+        if (r.regId) {
+          regRef = db.collection("registrations").doc(r.regId);
+          const snap = await regRef.get();
+          if (!snap.exists) { skipped++; continue; }
+          if (flagField && snap.data()[flagField]) { skipped++; continue; } // already sent (retry-safe)
+        }
 
         const vars = Object.assign({}, baseVars, { name: r.name || "there" });
         await sendEmailHelper({
@@ -1454,12 +1460,14 @@ exports.processEmailBatch = functions
           from: process.env.EMAIL_FROM || "Balaji Chippada Masterclass <team@balajichippada.com>",
           attachments,
         });
-        const update = Object.assign({}, extraUpdate || {});
-        if (flagField) {
-          update[flagField] = true;
-          update[`${flagField}At`] = admin.firestore.FieldValue.serverTimestamp();
+        if (regRef) {
+          const update = Object.assign({}, extraUpdate || {});
+          if (flagField) {
+            update[flagField] = true;
+            update[`${flagField}At`] = admin.firestore.FieldValue.serverTimestamp();
+          }
+          await regRef.update(update);
         }
-        await regRef.update(update);
         sent++;
       } catch (e) {
         const msg = String((e && e.message) || e || "Unknown error").slice(0, 300);
@@ -1568,110 +1576,187 @@ exports.sendMasterclassCancellation = functions.runWith({ timeoutSeconds: 540, m
 });
 
 // ===============================================================
-// Public support chatbot — answers basic visitor questions about the
-// roadmap & masterclasses, grounded on site knowledge, via Gemini.
-// The API key stays server-side (GEMINI_API_KEY); it is never exposed to
-// the browser. Per-IP rate limiting + short output keep abuse/cost bounded.
+// Bulk marketing email from an uploaded contact list (a Name/Email/Phone
+// spreadsheet, parsed in the dashboard). Admin-only. Reuses the generic
+// processEmailBatch fan-out, so a large list is sent across many short-lived
+// worker invocations instead of one timeout-bound call. Recipients carry no
+// regId, so the worker sends them directly (no registration doc / sent flag).
+// Body supports {{name}} personalization.
 // ===============================================================
-const CHATBOT_KNOWLEDGE = `ABOUT: Balaji Chippada teaches production-grade Agentic AI engineering. The site has two things: (1) a FREE, open 26-week "Agentic AI Engineer" roadmap (9 phases, ~60 modules, ~150K YouTube views) and (2) live, demo-first masterclasses.
-
-ROADMAP PHASES (26 weeks, free, no paywall): 1) Python Foundations, 2) The Mental Model of an LLM, 3) Prompt Engineering & API Access, 4) RAG + Evaluation, 5) Tools, MCP & Single Agents, 6) Memory & Context Engineering, 7) Multi-Agent Orchestration, 8) Guardrails & LLMOps, 9) Cloud Infrastructure & Deployment. There are 3 capstone projects. Prerequisite: you can write basic Python and use a terminal.
-
-MASTERCLASSES: Live ~3-hour build sessions. The FIRST masterclass is FREE; future ones are paid (around ₹499). Sessions are recorded and emailed to registrants within 48 hours. A certificate of completion is issued after attending (or via the recording for paid ones). Language: English for technical content with some Telugu where it helps; Q&A welcomes Hindi/Telugu.
-
-REGISTRATION & LOGISTICS: Reserve a seat on the site — name + email, no payment for the free class. The Zoom link is emailed on registration and reappears ~15 min before start; reminders also go to the WhatsApp community. To watch videos on the site, create a free account (sign in). Prep: a laptop with Python 3.10+, VS Code, and API access (Anthropic/OpenAI free tiers work).
-
-REFUNDS: 100% refund within 24 hours of purchase, no questions asked. The free masterclass has nothing to refund.
-
-CONTACT: Email team@balajichippada.com (replies within ~24h). WhatsApp community and YouTube (@balajichippada) are linked on the site.`;
-
-async function chatbotRateLimitOk(ip) {
-  if (!ip) return true;
-  const safe = ip.replace(/[^\w.:-]/g, "_").slice(0, 120);
-  const ref = db.collection("chatRateLimits").doc(safe);
-  const WINDOW_MS = 60 * 1000, MAX = 12;
-  try {
-    return await db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const now = Date.now();
-      const d = snap.exists ? snap.data() : null;
-      if (!d || now - (d.windowStart || 0) > WINDOW_MS) {
-        tx.set(ref, { windowStart: now, count: 1 });
-        return true;
-      }
-      if ((d.count || 0) >= MAX) return false;
-      tx.update(ref, { count: (d.count || 0) + 1 });
-      return true;
-    });
-  } catch (e) {
-    return true; // fail-open: never block real users on a rate-limit hiccup
-  }
-}
-
-exports.chatbot = functions.runWith({ timeoutSeconds: 60, memory: "256MB" }).https.onCall(async (data, context) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const message = String((data && data.message) || "").trim().slice(0, 600);
-  const history = Array.isArray(data && data.history) ? data.history.slice(-8) : [];
-  const mc = (data && data.context) || {};
-  if (!message) throw new functions.https.HttpsError("invalid-argument", "Empty message.");
-
-  if (!apiKey) {
-    return { reply: "Our assistant isn't set up yet — please email team@balajichippada.com or ask in the WhatsApp community and we'll help you out." };
-  }
-
-  // Per-IP rate limit (fail-open).
-  const fwd = (context.rawRequest && context.rawRequest.headers && context.rawRequest.headers["x-forwarded-for"]) || "";
-  const ip = (String(fwd).split(",")[0] || (context.rawRequest && context.rawRequest.ip) || "").trim();
-  if (!(await chatbotRateLimitOk(ip))) {
-    return { reply: "You're sending messages a little fast — give it a few seconds and try again. 🙂" };
-  }
-
-  const liveFacts = [];
-  if (mc.title) liveFacts.push(`Next masterclass: "${mc.title}".`);
-  if (mc.dateTime) liveFacts.push(`Scheduled for: ${mc.dateTime}.`);
-  if (typeof mc.price === "number") {
-    liveFacts.push(mc.price === 0 ? `It is FREE to attend${mc.originalPrice ? ` (normally ₹${mc.originalPrice})` : ""}.` : `Price: ₹${mc.price}.`);
-  }
-
-  const systemPrompt = `You are the friendly support assistant on Balaji Chippada's website. Answer ONLY questions about the roadmap, the masterclasses, registration/logistics, and using this site. Keep replies short (1–4 sentences), warm, and accurate. NEVER invent prices, dates, or policies — if you're unsure, say so and point them to team@balajichippada.com or the WhatsApp community. If a question is off-topic (not about this site / its roadmap / its masterclasses / learning AI engineering here), politely decline and steer back. Do not output code unless asked about a roadmap topic.
-
-SITE KNOWLEDGE:
-${CHATBOT_KNOWLEDGE}
-
-CURRENT SESSION FACTS:
-${liveFacts.join("\n") || "(none provided — if asked about the next session's exact date/price, tell them to check the site.)"}`;
-
-  const contents = [];
-  history.forEach((h) => {
-    if (h && h.role && h.text) {
-      contents.push({ role: h.role === "bot" ? "model" : "user", parts: [{ text: String(h.text).slice(0, 1000) }] });
+exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB" }).https.onCall(async (data, context) => {
+  const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isEmulator) {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
     }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    const role = callerDoc.exists ? callerDoc.data().role : "";
+    if (role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "Access denied. Only admins can send bulk email.");
+    }
+  }
+
+  const subject = ((data && data.subject) || "").trim();
+  const body = (data && data.body) || "";
+  const label = ((data && data.label) || "Spreadsheet upload").toString().slice(0, 140);
+  const rawRecipients = Array.isArray(data && data.recipients) ? data.recipients : [];
+
+  if (!subject) throw new functions.https.HttpsError("invalid-argument", "An email subject is required.");
+  if (!body.trim()) throw new functions.https.HttpsError("invalid-argument", "An email body is required.");
+  if (rawRecipients.length === 0) throw new functions.https.HttpsError("invalid-argument", "No recipients were provided.");
+
+  // Validate each row (skip empty / malformed emails). No de-duplication: every
+  // uploaded recipient is kept, matching exactly what the admin sees in the list
+  // — two people can legitimately share one inbox, each with their own {{name}}.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const recipients = [];
+  const contactsToSave = [];
+  for (const r of rawRecipients) {
+    const email = String((r && (r.email != null ? r.email : r.Email)) || "").trim().toLowerCase();
+    if (!email || !EMAIL_RE.test(email)) continue;
+    const nameRaw = String((r && (r.name != null ? r.name : r.Name)) || "").trim();
+    const phone = String((r && (r.phone != null ? r.phone : r.Phone)) || "").trim();
+    recipients.push({ email, name: nameRaw || "there" });
+    contactsToSave.push({ email, name: nameRaw, phone });
+  }
+
+  if (recipients.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "No valid, unique email addresses were found in the uploaded list.");
+  }
+
+  // Persist the audience (deduped by email) so it can be re-emailed later from
+  // the "Saved Contacts" panel. Best-effort — a persistence hiccup must never
+  // block the send. Dedup happens naturally because the email is the doc id.
+  try {
+    const FieldValue = admin.firestore.FieldValue;
+    for (let i = 0; i < contactsToSave.length; i += 400) {
+      const batch = db.batch();
+      contactsToSave.slice(i, i + 400).forEach((c) => {
+        const doc = {
+          email: c.email,
+          source: label,
+          updatedAt: FieldValue.serverTimestamp(),
+          lastEmailedAt: FieldValue.serverTimestamp(),
+          emailCount: FieldValue.increment(1),
+        };
+        if (c.name) doc.name = c.name;
+        if (c.phone) doc.phone = c.phone;
+        batch.set(db.collection("marketingContacts").doc(c.email), doc, { merge: true });
+      });
+      await batch.commit();
+    }
+    console.log(`[BULK EMAIL] persisted ${contactsToSave.length} contact(s) to marketingContacts.`);
+  } catch (e) {
+    console.error("[BULK EMAIL] persisting contacts failed (send still proceeds):", e);
+  }
+
+  // Progress tracker doc — live counts show in the admin Email Tasks viewer.
+  const jobRef = db.collection("emailJobs").doc();
+  await jobRef.set({
+    type: "bulk", label, subject,
+    total: recipients.length, sent: 0, errors: 0, skipped: 0,
+    recipients: jobRecipientList(recipients),
+    recipientsTruncated: recipients.length > EMAIL_JOB_RECIPIENT_CAP,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: (context.auth && context.auth.uid) || "emulator",
   });
-  contents.push({ role: "user", parts: [{ text: message }] });
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
-      }),
+  // Fan out into processEmailBatch tasks (no regId/flagField → direct send).
+  const { getFunctions } = require("firebase-admin/functions");
+  const queue = getFunctions().taskQueue("processEmailBatch");
+  let batches = 0;
+  for (let i = 0; i < recipients.length; i += EMAIL_BATCH_SIZE) {
+    await queue.enqueue({
+      jobId: jobRef.id,
+      subjectTpl: subject,
+      bodyTpl: body,
+      baseVars: {},
+      ics: null,
+      recipients: recipients.slice(i, i + EMAIL_BATCH_SIZE),
     });
-    if (!res.ok) {
-      const errTxt = await res.text();
-      console.error("[chatbot] Gemini error", res.status, errTxt.slice(0, 300));
-      return { reply: "Sorry, I hit a snag answering that. Please email team@balajichippada.com or ask in the WhatsApp community." };
-    }
-    const resp = await res.json();
-    const reply = resp && resp.candidates && resp.candidates[0] && resp.candidates[0].content
-      && resp.candidates[0].content.parts && resp.candidates[0].content.parts[0]
-      && resp.candidates[0].content.parts[0].text;
-    return { reply: (reply || "").trim() || "I'm not sure about that one — please email team@balajichippada.com and we'll help." };
-  } catch (e) {
-    console.error("[chatbot] exception", e);
-    return { reply: "Sorry, something went wrong. Please email team@balajichippada.com." };
+    batches++;
   }
+
+  console.log(`[BULK EMAIL] queued ${recipients.length} email(s) in ${batches} batch(es), job ${jobRef.id} (label: ${label})`);
+  return { success: true, queued: recipients.length, batches, jobId: jobRef.id, total: recipients.length };
 });
 
+// ===============================================================
+// Cascade a masterclass/session deletion to every registrant's per-user
+// booking (users/{uid}/bookings/{id}) so "My Masterclasses" reflects the
+// cancellation even on a hard delete. The client already hides soft-deleted
+// classes; this makes the underlying data consistent and survives hard deletes.
+// Requires a collection-group index on bookings.masterclassId (firestore.indexes.json).
+// ===============================================================
+async function cascadeCancelDocs(snapPromise, kind, classId, isAlreadyDone, makeUpdate) {
+  let snap;
+  try {
+    snap = await snapPromise;
+  } catch (e) {
+    console.error(`[CASCADE] ${kind} lookup failed for ${classId}:`, e);
+    return;
+  }
+  let n = 0;
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = db.batch();
+    let c = 0;
+    snap.docs.slice(i, i + 400).forEach((d) => {
+      if (isAlreadyDone(d.data() || {})) return; // idempotent
+      batch.update(d.ref, makeUpdate());
+      c++; n++;
+    });
+    if (c > 0) await batch.commit();
+  }
+  console.log(`[CASCADE] ${classId}: updated ${n} ${kind}.`);
+}
+
+// Cascade a masterclass/session deletion to (1) every registrant's per-user
+// booking and (2) the top-level registrations, marking them cancelled — so
+// "My Masterclasses" and the registrations list stay consistent, and it works
+// even on a hard delete or when no cancellation email was sent.
+async function cascadeClassDeletion(classId) {
+  if (!classId) return;
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  // (1) Per-user bookings — collection-group query needs the
+  //     bookings.masterclassId index (firestore.indexes.json).
+  await cascadeCancelDocs(
+    db.collectionGroup("bookings").where("masterclassId", "==", classId).get(),
+    "booking(s)", classId,
+    (d) => d.status === "cancelled",
+    () => ({ status: "cancelled", cancelledAt: now, cancelledReason: "masterclass_deleted" })
+  );
+  // (2) Top-level registrations (sessionId == classId; auto single-field index).
+  await cascadeCancelDocs(
+    db.collection("registrations").where("sessionId", "==", classId).get(),
+    "registration(s)", classId,
+    (d) => d.cancelled === true,
+    () => ({ cancelled: true, cancelledAt: now, cancelledReason: "masterclass_deleted" })
+  );
+}
+
+function wasJustDeleted(before, after) {
+  const del = (d) => !!(d && (d.deleted === true || d.status === "deleted"));
+  return !del(before) && del(after);
+}
+
+// Soft delete (admin sets deleted/status='deleted') on a masterclass or session.
+exports.onMasterclassDeleted = functions.firestore.document("masterclasses/{id}").onUpdate(async (change, context) => {
+  if (!wasJustDeleted(change.before.data(), change.after.data())) return null;
+  await cascadeClassDeletion(context.params.id);
+  return null;
+});
+exports.onSessionDeleted = functions.firestore.document("sessions/{id}").onUpdate(async (change, context) => {
+  if (!wasJustDeleted(change.before.data(), change.after.data())) return null;
+  await cascadeClassDeletion(context.params.id);
+  return null;
+});
+
+// Hard delete (doc removed) — same cascade, so nothing dangles.
+exports.onMasterclassHardDeleted = functions.firestore.document("masterclasses/{id}").onDelete(async (snap, context) => {
+  await cascadeClassDeletion(context.params.id);
+  return null;
+});
+exports.onSessionHardDeleted = functions.firestore.document("sessions/{id}").onDelete(async (snap, context) => {
+  await cascadeClassDeletion(context.params.id);
+  return null;
+});

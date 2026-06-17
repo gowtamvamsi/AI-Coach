@@ -73,6 +73,29 @@ function loadRazorpaySdk() {
   });
 }
 
+// Lazily load SheetJS (xlsx) only when an admin actually uploads a spreadsheet —
+// keeps the ~900KB parser off the critical path for everyone else. Parses both
+// .xlsx/.xls and .csv. Resolves with the global `XLSX`.
+function loadXlsxLib() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((resolve, reject) => {
+    const done = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX failed to initialize.')));
+    const existing = document.querySelector('script[data-xlsx-lib]');
+    if (existing) {
+      existing.addEventListener('load', done);
+      existing.addEventListener('error', () => reject(new Error('Failed to load the spreadsheet parser.')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.async = true;
+    script.dataset.xlsxLib = 'true';
+    script.onload = done;
+    script.onerror = () => reject(new Error('Failed to load the spreadsheet parser.'));
+    document.head.appendChild(script);
+  });
+}
+
 const GOOGLE_AUTH_INTENT_KEY = 'googleAuthIntent';
 const PENDING_BOOKING_KEY = 'pendingBookingSession';
 const PENDING_BOOKING_TIER_KEY = 'pendingBookingTier';
@@ -2292,6 +2315,29 @@ function DashboardView({ user, role, onLogout }) {
   const [broadcastCampaignId, setBroadcastCampaignId] = useState("");
   const [broadcastIsMock, setBroadcastIsMock] = useState(false);
 
+  // ── Bulk Email from Spreadsheet (Name/Email/Phone upload) ──
+  // bulkRows accumulates across multiple uploaded files (deduped by email);
+  // bulkFiles tracks each file added and how many recipients it contributed.
+  const [bulkRows, setBulkRows] = useState([]);          // [{ name, email, phone }]
+  const [bulkFiles, setBulkFiles] = useState([]);        // [{ name, added }]
+  const [bulkNote, setBulkNote] = useState("");          // feedback from the last upload
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkParseError, setBulkParseError] = useState("");
+  const [bulkSubject, setBulkSubject] = useState("");
+  const [bulkBody, setBulkBody] = useState("");
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkSuccess, setBulkSuccess] = useState("");
+
+  // ── Saved marketing contacts (persisted from spreadsheet sends; reusable) ──
+  const [savedContacts, setSavedContacts] = useState([]);   // [{ id(email), name, email, phone, source, lastEmailedAt, emailCount }]
+  const [savedSearch, setSavedSearch] = useState("");
+  const [savedSubject, setSavedSubject] = useState("");
+  const [savedBody, setSavedBody] = useState("");
+  const [savedSending, setSavedSending] = useState(false);
+  const [savedError, setSavedError] = useState("");
+  const [savedSuccess, setSavedSuccess] = useState("");
+
   // ── Roadmap Video Linker (Admin) ──
   const [roadmapVideoDocs, setRoadmapVideoDocs] = useState([]);
   const [rvPhaseId, setRvPhaseId] = useState(1);
@@ -2358,6 +2404,165 @@ function DashboardView({ user, role, onLogout }) {
     if (CAMPAIGN_TEMPLATES[key]) {
       setBroadcastSubject(CAMPAIGN_TEMPLATES[key].subject);
       setBroadcastBody(CAMPAIGN_TEMPLATES[key].body);
+    }
+  };
+
+  // Parse an uploaded spreadsheet (.xlsx/.xls/.csv) into recipients. Columns are
+  // matched case-insensitively by header (Name / Email / Phone). Rows without a
+  // valid email — and duplicates — are dropped, with a count surfaced to the UI.
+  const handleBulkFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    // Allow re-selecting the same file later (onChange won't fire otherwise).
+    e.target.value = "";
+    if (!file) return;
+
+    setBulkParseError("");
+    setBulkError("");
+    setBulkSuccess("");
+    setBulkNote("");
+    setBulkParsing(true);
+
+    try {
+      const XLSX = await loadXlsxLib();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      if (!sheet) throw new Error("The first sheet appears to be empty.");
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (json.length === 0) throw new Error("No data rows found in the sheet.");
+
+      // Resolve the Name / Email / Phone columns from the header keys.
+      const keys = Object.keys(json[0]);
+      const findKey = (re) => keys.find((k) => re.test(String(k).toLowerCase().trim()));
+      const emailKey = findKey(/e-?mail/);
+      const nameKey = findKey(/name/);
+      const phoneKey = findKey(/phone|mobile|contact|number/);
+      if (!emailKey) {
+        throw new Error('No "Email" column found. The sheet needs Name, Email, and Phone number columns.');
+      }
+
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      // Every row with a valid email is added to the running list — including an
+      // address that's already present (two people can share one inbox, and
+      // re-uploading a file should add its rows). Nothing the admin uploaded is
+      // silently dropped; only empty / malformed emails are skipped.
+      const existing = bulkRows;
+      const added = [];
+      let skipped = 0;
+      json.forEach((r) => {
+        const email = String(r[emailKey] == null ? "" : r[emailKey]).trim().toLowerCase();
+        if (!email || !EMAIL_RE.test(email)) { skipped++; return; }
+        added.push({
+          name: nameKey ? String(r[nameKey] == null ? "" : r[nameKey]).trim() : "",
+          email,
+          phone: phoneKey ? String(r[phoneKey] == null ? "" : r[phoneKey]).trim() : "",
+        });
+      });
+
+      if (added.length === 0) {
+        setBulkNote(`No recipients added from “${file.name}” — ${skipped} row${skipped === 1 ? "" : "s"} had an empty or invalid email.`);
+        return;
+      }
+      setBulkRows(existing.concat(added));
+      setBulkFiles((prev) => prev.concat([{ name: file.name, added: added.length }]));
+      setBulkNote(`Added ${added.length} recipient${added.length === 1 ? "" : "s"} from “${file.name}”${skipped ? ` · ${skipped} skipped (empty / invalid email)` : ""}. ${existing.length + added.length} total.`);
+    } catch (err) {
+      console.error("Spreadsheet parse failed:", err);
+      // A bad file never wipes the recipients already gathered from earlier files.
+      setBulkParseError(err.message || "Could not read this file. Use a .xlsx or .csv with Name, Email, Phone columns.");
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  const handleClearBulkList = () => {
+    setBulkRows([]);
+    setBulkFiles([]);
+    setBulkNote("");
+    setBulkParseError("");
+    setBulkError("");
+    setBulkSuccess("");
+  };
+
+  // Live list of saved marketing contacts (persisted by sendBulkEmail on each send).
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('marketingContacts').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((d) => list.push(Object.assign({ id: d.id }, d.data())));
+      setSavedContacts(list);
+    }, () => setSavedContacts([]));
+    return () => unsub();
+  }, []);
+
+  const handleRemoveSavedContact = async (email) => {
+    try { await db.collection('marketingContacts').doc(email).delete(); }
+    catch (err) { setSavedError(err.message || 'Failed to remove contact.'); }
+  };
+
+  // Re-email the entire saved audience — reuses the same fan-out + persistence.
+  const handleEmailSavedContacts = async () => {
+    setSavedError(''); setSavedSuccess('');
+    if (savedContacts.length === 0) { setSavedError('No saved contacts yet — send a spreadsheet campaign first.'); return; }
+    if (!savedSubject.trim()) { setSavedError('Add an email subject.'); return; }
+    if (!savedBody.trim()) { setSavedError('Add an email body.'); return; }
+    if (!functions) { setSavedError('Firebase Functions is not initialized on this platform.'); return; }
+    setSavedSending(true);
+    try {
+      const call = functions.httpsCallable('sendBulkEmail');
+      const res = await call({
+        subject: savedSubject,
+        body: savedBody,
+        label: 'Saved contacts',
+        recipients: savedContacts.map((c) => ({ name: c.name, email: c.email, phone: c.phone })),
+      });
+      const result = res.data || {};
+      if (result.success) {
+        setSavedSuccess(`Queued ${result.queued} email${result.queued === 1 ? '' : 's'} to saved contacts. Track delivery in the Email Tasks section (job ${result.jobId}).`);
+        setSavedSubject(''); setSavedBody('');
+      } else { throw new Error('The server did not confirm the send.'); }
+    } catch (err) {
+      console.error('Saved-contacts email failed:', err);
+      setSavedError(err.message || 'Failed to queue the email.');
+    } finally { setSavedSending(false); }
+  };
+
+  // Hand the parsed list to the sendBulkEmail Cloud Function, which validates,
+  // dedupes, writes an emailJobs progress doc, and fans the send out into
+  // batched workers. Progress shows live in the Email Tasks section below.
+  const handleSendBulkEmail = async () => {
+    setBulkError("");
+    setBulkSuccess("");
+    if (bulkRows.length === 0) { setBulkError("Upload a spreadsheet with recipients first."); return; }
+    if (!bulkSubject.trim()) { setBulkError("Add an email subject."); return; }
+    if (!bulkBody.trim()) { setBulkError("Add an email body."); return; }
+    if (!functions) { setBulkError("Firebase Functions is not initialized on this platform."); return; }
+
+    setBulkSending(true);
+    try {
+      const call = functions.httpsCallable("sendBulkEmail");
+      const res = await call({
+        subject: bulkSubject,
+        body: bulkBody,
+        label: bulkFiles.map((f) => f.name).join(", ") || "Spreadsheet upload",
+        recipients: bulkRows.map((r) => ({ name: r.name, email: r.email, phone: r.phone })),
+      });
+      const result = res.data || {};
+      if (result.success) {
+        setBulkSuccess(`Queued ${result.queued} email${result.queued === 1 ? "" : "s"} in ${result.batches} batch${result.batches === 1 ? "" : "es"}. Track delivery in the Email Tasks section below (job ${result.jobId}).`);
+        setBulkRows([]);
+        setBulkFiles([]);
+        setBulkNote("");
+        setBulkSubject("");
+        setBulkBody("");
+      } else {
+        throw new Error("The server did not confirm the send.");
+      }
+    } catch (err) {
+      console.error("Bulk email send failed:", err);
+      setBulkError(err.message || "Failed to queue the bulk email.");
+    } finally {
+      setBulkSending(false);
     }
   };
 
@@ -3490,279 +3695,7 @@ ${mcRawSyllabus}`;
         </div>
       )}
 
-      {/* ── Welcome Drip Campaign Sandbox ── */}
-      {isAdmin && (
-        <div className="dashboard__panel drip-testing-panel" style={{ marginBottom: "28px" }}>
-          <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-            🧪 Welcome Drip Campaign Sandbox
-          </h2>
-          <p className="hero__sub" style={{ marginTop: "4px", fontSize: "14px", color: "var(--fg-dim)", maxWidth: "100%" }}>
-            Simulate and debug the 3-email onboarding drip series (Welcome → Getting Started → Invite). Seeds three mock leads at different age tiers, triggers the scheduler Cloud Function, and displays Firestore updates and simulated email logs in real-time.
-          </p>
-
-          <div style={{ marginTop: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
-            <button 
-              onClick={runDashboardAutomationTest}
-              className="form-btn" 
-              disabled={dripTestLoading}
-              style={{ 
-                margin: 0, 
-                width: "auto", 
-                padding: "12px 24px", 
-                background: "linear-gradient(135deg, var(--c-violet, #8a5cf6), var(--c-pink, #ec4899))",
-                color: "#fff",
-                border: "none",
-                fontWeight: "600",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              {dripTestLoading ? (
-                <>
-                  <span className="ai-status__spinner" style={{ width: "14px", height: "14px", border: "2px solid #fff", borderTopColor: "transparent" }}></span>
-                  Executing Test...
-                </>
-              ) : "🚀 Run Drip Automation Test"}
-            </button>
-
-            {dripTestResults && (
-              <button 
-                onClick={async () => {
-                  if (!window.confirm("Are you sure you want to clean up the sandbox test leads?")) return;
-                  try {
-                    const testLeadIds = ["dashboard_test_fresh", "dashboard_test_oneday", "dashboard_test_fourday"];
-                    const batch = db.batch();
-                    testLeadIds.forEach(id => batch.delete(db.collection('leads').doc(id)));
-                    await batch.commit();
-                    setDripTestResults(null);
-                    setDripTestStep("");
-                    setDripTestError("");
-                    setExpandedTestLead(null);
-                    alert("Sandbox cleaned successfully!");
-                  } catch (e) {
-                    setDripTestError("Failed to clean sandbox: " + e.message);
-                  }
-                }}
-                className="form-btn" 
-                style={{ 
-                  margin: 0, 
-                  width: "auto", 
-                  padding: "12px 24px", 
-                  background: "transparent", 
-                  border: "1px solid var(--line-strong)",
-                  color: "var(--fg)"
-                }}
-              >
-                🧹 Clean Sandbox
-              </button>
-            )}
-
-            {dripTestLoading && dripTestStep && (
-              <span style={{ fontSize: "13px", color: "var(--fg-dim)", fontFamily: "monospace" }}>
-                ⏳ {dripTestStep}
-              </span>
-            )}
-          </div>
-
-          {dripTestError && (
-            <div style={{
-              background: "rgba(244, 63, 94, 0.1)",
-              border: "1px solid rgba(244, 63, 94, 0.25)",
-              color: "var(--c-rose, #fb7185)",
-              borderRadius: "8px",
-              padding: "12px",
-              marginTop: "16px",
-              fontSize: "13px"
-            }}>
-              ⚠️ <b>Error:</b> {dripTestError}
-            </div>
-          )}
-
-          {dripTestResults && (
-            <div style={{ marginTop: "24px" }}>
-              <div style={{ 
-                background: "rgba(138,92,246, 0.05)",
-                border: "1px solid var(--line)",
-                borderRadius: "10px",
-                padding: "16px",
-                marginBottom: "20px"
-              }}>
-                <h3 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700" }}>Execution Results</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
-                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Getting Started Sent</div>
-                    <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--c-violet)", marginTop: "4px" }}>{dripTestResults.stats.gettingStartedSent}</div>
-                  </div>
-                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Invite Sent</div>
-                    <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--c-pink)", marginTop: "4px" }}>{dripTestResults.stats.inviteSent}</div>
-                  </div>
-                  <div style={{ background: "var(--bg-elev)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", textTransform: "uppercase" }}>Execution Errors</div>
-                    <div style={{ fontSize: "20px", fontWeight: "700", color: dripTestResults.stats.errors > 0 ? "var(--c-rust)" : "var(--c-emerald)", marginTop: "4px" }}>{dripTestResults.stats.errors}</div>
-                  </div>
-                </div>
-              </div>
-
-              <h3 className="form-label" style={{ marginBottom: "12px" }}>Seeded Lead Statuses</h3>
-              <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: "8px" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
-                  <thead>
-                    <tr style={{ background: "var(--bg-elev)", borderBottom: "1px solid var(--line)" }}>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Lead Name / Email</th>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Seeded Age</th>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 1 (Welcome)</th>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 2 (Checklist)</th>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Email 3 (Invite)</th>
-                      <th style={{ padding: "10px 14px", fontWeight: "600" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { key: 'fresh', name: 'Fresh Lead', desc: 'Created now', age: '0 hours old' },
-                      { key: 'oneday', name: '1-Day-Old Lead', desc: 'Created 25h ago', age: '25 hours old' },
-                      { key: 'fourday', name: '4-Day-Old Lead', desc: 'Created 4d ago', age: '4 days old' }
-                    ].map(item => {
-                      const data = dripTestResults[item.key];
-                      if (!data) {
-                        return (
-                          <tr key={item.key}>
-                            <td colSpan="6" style={{ padding: "10px 14px", color: "var(--fg-faint)" }}>
-                              Missing document `{item.key}`
-                            </td>
-                          </tr>
-                        );
-                      }
-                      
-                      const emailLogs = data.sentEmails || [];
-                      const isExpanded = expandedTestLead === item.key;
-
-                      return (
-                        <React.Fragment key={item.key}>
-                          <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                            <td style={{ padding: "12px 14px" }}>
-                              <b>{data.name}</b>
-                              <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>{data.email}</div>
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{item.age}</span>
-                              <div style={{ fontSize: "10px", color: "var(--fg-faint)" }}>{item.desc}</div>
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <span style={{ 
-                                display: "inline-block",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                fontSize: "10px",
-                                fontWeight: "700",
-                                background: data.welcomeEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
-                                color: data.welcomeEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
-                              }}>
-                                {data.welcomeEmailSent ? "✅ Sent" : "❌ Pending"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <span style={{ 
-                                display: "inline-block",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                fontSize: "10px",
-                                fontWeight: "700",
-                                background: data.gettingStartedEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
-                                color: data.gettingStartedEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
-                              }}>
-                                {data.gettingStartedEmailSent ? "✅ Sent" : "❌ Pending"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <span style={{ 
-                                display: "inline-block",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                fontSize: "10px",
-                                fontWeight: "700",
-                                background: data.inviteEmailSent ? "rgba(90,141,118,0.12)" : "rgba(194,83,60,0.12)",
-                                color: data.inviteEmailSent ? "var(--c-emerald)" : "var(--c-rust)"
-                              }}>
-                                {data.inviteEmailSent ? "✅ Sent" : "❌ Pending"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <button
-                                onClick={() => setExpandedTestLead(isExpanded ? null : item.key)}
-                                style={{
-                                  padding: "4px 8px",
-                                  fontSize: "11px",
-                                  fontWeight: "600",
-                                  background: isExpanded ? "var(--line-strong)" : "transparent",
-                                  border: "1px solid var(--line-strong)",
-                                  color: "var(--fg)",
-                                  borderRadius: "4px",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                {isExpanded ? "▲ Hide Emails" : `👁 View (${emailLogs.length})`}
-                              </button>
-                            </td>
-                          </tr>
-                          
-                          {isExpanded && (
-                            <tr>
-                              <td colSpan="6" style={{ background: "rgba(0, 0, 0, 0.15)", padding: "16px" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                  <h4 style={{ margin: 0, fontSize: "12px", color: "var(--fg-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                    Simulated Email Dispatch Log ({emailLogs.length})
-                                  </h4>
-                                  {emailLogs.length === 0 ? (
-                                    <div style={{ color: "var(--fg-faint)", fontSize: "13px" }}>No simulated emails recorded on this lead document.</div>
-                                  ) : (
-                                    emailLogs.map((log, index) => (
-                                      <div key={index} style={{
-                                        background: "var(--bg-elev)",
-                                        border: "1px solid var(--line)",
-                                        borderRadius: "6px",
-                                        padding: "12px",
-                                        fontSize: "13px"
-                                      }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "11px", color: "var(--fg-faint)" }}>
-                                          <span style={{ fontWeight: "700", color: "var(--c-violet)" }}>{log.type}</span>
-                                          <span>⏰ {new Date(log.sentAt).toLocaleTimeString()}</span>
-                                        </div>
-                                        <div style={{ marginBottom: "8px" }}>
-                                          <b>Subject:</b> <span style={{ color: "var(--fg)" }}>{log.subject}</span>
-                                        </div>
-                                        <div style={{
-                                          whiteSpace: "pre-wrap",
-                                          fontFamily: "monospace",
-                                          fontSize: "11px",
-                                          color: "var(--fg-dim)",
-                                          background: "rgba(0, 0, 0, 0.2)",
-                                          padding: "10px",
-                                          borderRadius: "4px",
-                                          border: "1px solid rgba(255, 255, 255, 0.05)"
-                                        }}>
-                                          {log.body}
-                                        </div>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Roadmap Video Linker (Admin) ── */}
+{/* ── Roadmap Video Linker (Admin) ── */}
       {isAdmin && (
         <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
           <h2 className="dashboard__panel-title">Roadmap Videos</h2>
@@ -3857,7 +3790,8 @@ ${mcRawSyllabus}`;
         </div>
       )}
 
-      {/* ── Per-video "Link to code" manager (Admins only) ── */}
+      
+{/* ── Per-video "Link to code" manager (Admins only) ── */}
       {isAdmin && (
         <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
           <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
@@ -4625,6 +4559,179 @@ ${mcRawSyllabus}`;
             </div>
           )}
         </div>
+
+        {/* ── Bulk Email from Spreadsheet (Name / Email / Phone upload) ── */}
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: "24px", marginTop: "24px" }}>
+          <h3 className="form-label" style={{ marginBottom: "6px" }}>📤 Bulk Email from Spreadsheet</h3>
+          <p style={{ margin: "0 0 16px", fontSize: "13px", color: "var(--fg-dim)", lineHeight: 1.5 }}>
+            Upload an Excel/CSV file with <b>Name</b>, <b>Email</b>, and <b>Phone number</b> columns, then email everyone in one click. Sends go out in batches from a secure Cloud Function — use <code style={{ fontFamily: "JetBrains Mono", fontSize: "12px", color: "var(--c-amber)" }}>{"{{name}}"}</code> in the body to personalize.
+          </p>
+
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
+            <label className="form-btn" style={{ width: "auto", margin: 0, padding: "12px 20px", background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", cursor: bulkParsing ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              {bulkRows.length > 0 ? "➕ Add another file" : "📎 Choose .xlsx / .csv"}
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleBulkFile} disabled={bulkParsing || bulkSending} style={{ display: "none" }} />
+            </label>
+            {bulkParsing && <span style={{ fontSize: "13px", color: "var(--fg-dim)" }}>Parsing…</span>}
+            {bulkRows.length > 0 && !bulkParsing && (
+              <button type="button" onClick={handleClearBulkList} disabled={bulkSending} style={{ background: "transparent", border: "none", color: "var(--fg-faint)", fontSize: "13px", cursor: bulkSending ? "not-allowed" : "pointer", textDecoration: "underline", padding: 0 }}>
+                Clear list
+              </button>
+            )}
+          </div>
+
+          {bulkFiles.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
+              {bulkFiles.map((f, i) => (
+                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", fontFamily: "JetBrains Mono", color: "var(--fg-dim)", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "6px", padding: "4px 10px" }}>
+                  📄 {f.name} <span style={{ color: "var(--c-emerald)" }}>+{f.added}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {bulkNote && (
+            <p style={{ marginTop: "12px", fontSize: "13px", color: "var(--fg-dim)" }}>ℹ {bulkNote}</p>
+          )}
+
+          {bulkParseError && (
+            <p style={{ marginTop: "12px", fontSize: "13px", color: "var(--c-rust)" }}>⚠ {bulkParseError}</p>
+          )}
+
+          {bulkRows.length > 0 && (
+            <div style={{ marginTop: "20px" }}>
+              <div style={{ fontSize: "13px", color: "var(--fg-dim)", marginBottom: "10px" }}>
+                <b style={{ color: "var(--c-emerald)" }}>{bulkRows.length}</b> valid recipient{bulkRows.length === 1 ? "" : "s"} ready{bulkFiles.length > 1 ? ` across ${bulkFiles.length} files` : ""}
+              </div>
+
+              <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+                <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left" }}>
+                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Name</th>
+                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Email</th>
+                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkRows.slice(0, 1000).map((r, i) => (
+                        <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
+                          <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{r.name || "—"}</td>
+                          <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.email}</td>
+                          <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.phone || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {bulkRows.length > 1000 && (
+                  <div style={{ padding: "8px 14px", fontSize: "12px", color: "var(--fg-faint)", borderTop: "1px solid var(--line)", background: "var(--bg-elev)" }}>
+                    Showing the first 1,000 — all {bulkRows.length.toLocaleString()} recipients will be emailed.
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Subject</label>
+                <input className="form-input" value={bulkSubject} onChange={(e) => setBulkSubject(e.target.value)} placeholder="e.g. A new AI Engineering cohort is opening 🚀" disabled={bulkSending} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Body (plain text · use {"{{name}}"} to personalize)</label>
+                <textarea className="form-input" value={bulkBody} onChange={(e) => setBulkBody(e.target.value)} rows={8} placeholder={"Hi {{name}},\n\nWe just opened enrollment for…"} disabled={bulkSending} style={{ resize: "vertical", fontFamily: "inherit" }} />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendBulkEmail}
+                disabled={bulkSending || !bulkSubject.trim() || !bulkBody.trim()}
+                className="form-btn form-btn--accent"
+                style={{ width: "auto", margin: 0, padding: "14px 28px", background: bulkSending ? "var(--bg-faint)" : "var(--c-pink)", cursor: (bulkSending || !bulkSubject.trim() || !bulkBody.trim()) ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                {bulkSending
+                  ? (<><span className="ai-status__spinner"></span> Queuing…</>)
+                  : (<>✉ Send to {bulkRows.length} recipient{bulkRows.length === 1 ? "" : "s"}</>)}
+              </button>
+            </div>
+          )}
+
+          {bulkError && (
+            <p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-rust)" }}>⚠ {bulkError}</p>
+          )}
+          {bulkSuccess && (
+            <p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-emerald)", lineHeight: 1.5 }}>✓ {bulkSuccess}</p>
+          )}
+        </div>
+
+        {/* ── Saved Contacts (reusable audience built from spreadsheet sends) ── */}
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: "24px", marginTop: "24px" }}>
+          <h3 className="form-label" style={{ marginBottom: "6px" }}>💾 Saved Contacts</h3>
+          <p style={{ fontSize: "13px", color: "var(--fg-dim)", margin: "0 0 14px" }}>
+            Every recipient you email via spreadsheet upload is saved here (deduped by email). Re-email the whole list anytime — no re-upload needed.
+          </p>
+
+          {savedContacts.length === 0 ? (
+            <p style={{ fontSize: "13px", color: "var(--fg-faint)" }}>No saved contacts yet. Send a spreadsheet campaign above and its recipients will appear here.</p>
+          ) : (
+            <React.Fragment>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "13px", color: "var(--fg-dim)" }}><b style={{ color: "var(--c-emerald)" }}>{savedContacts.length}</b> saved contact{savedContacts.length === 1 ? "" : "s"}</span>
+                <input className="form-input" style={{ maxWidth: "240px", padding: "8px 12px" }} placeholder="Search name / email…" value={savedSearch} onChange={(e) => setSavedSearch(e.target.value)} />
+              </div>
+
+              <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+                <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left" }}>
+                        {["Name", "Email", "Phone", "Source", ""].map((h, i) => (
+                          <th key={i} style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {savedContacts
+                        .filter((c) => { const q = savedSearch.trim().toLowerCase(); if (!q) return true; return (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q); })
+                        .slice(0, 1000)
+                        .map((c) => (
+                          <tr key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
+                            <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{c.name || "—"}</td>
+                            <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.email}</td>
+                            <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.phone || "—"}</td>
+                            <td style={{ padding: "10px 14px", color: "var(--fg-faint)", fontSize: "12px" }}>{c.source || "—"}</td>
+                            <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                              <button type="button" onClick={() => handleRemoveSavedContact(c.id)} title="Remove contact" style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", fontSize: "14px" }}>✕</button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Subject</label>
+                <input className="form-input" value={savedSubject} onChange={(e) => setSavedSubject(e.target.value)} placeholder="Re-engage your saved audience…" disabled={savedSending} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Body (plain text · use {"{{name}}"} to personalize)</label>
+                <textarea className="form-input" value={savedBody} onChange={(e) => setSavedBody(e.target.value)} rows={7} placeholder={"Hi {{name}},\n\nWe just opened a new cohort…"} disabled={savedSending} style={{ resize: "vertical", fontFamily: "inherit" }} />
+              </div>
+              <button
+                type="button"
+                onClick={handleEmailSavedContacts}
+                disabled={savedSending || !savedSubject.trim() || !savedBody.trim()}
+                className="form-btn form-btn--accent"
+                style={{ width: "auto", margin: 0, padding: "14px 28px", background: savedSending ? "var(--bg-faint)" : "var(--c-pink)", cursor: (savedSending || !savedSubject.trim() || !savedBody.trim()) ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                {savedSending ? (<><span className="ai-status__spinner"></span> Queuing…</>) : (<>✉ Email all {savedContacts.length} saved contact{savedContacts.length === 1 ? "" : "s"}</>)}
+              </button>
+
+              {savedError && (<p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-rust)" }}>⚠ {savedError}</p>)}
+              {savedSuccess && (<p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-emerald)", lineHeight: 1.5 }}>✓ {savedSuccess}</p>)}
+            </React.Fragment>
+          )}
+        </div>
       </div>
       )}
 
@@ -5144,6 +5251,10 @@ function App() {
       return next;
     });
   }, []);
+  // Titles of classes the signed-in user has actually booked (from Firestore).
+  // Lets us recognise a reservation even when the featured masterclass is a
+  // duplicate doc with a different id but the same class.
+  const [reservedMcTitles, setReservedMcTitles] = useState([]);
   
   // Checkout mock sandbox screen state
   const [mockCheckoutData, setMockCheckoutData] = useState(null);
@@ -5369,6 +5480,17 @@ function App() {
     return () => unsub();
   }, [user]);
 
+  // Mirror the account-synced video watch state to a window global so the
+  // roadmap video components (v2.jsx) render the SAME ✓ "Watched" markers in
+  // every tab and on every device for a signed-in account — not just whatever
+  // this browser's localStorage happens to hold. Firing an event lets any
+  // already-mounted playlist refresh its badges the moment Firestore syncs.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__VIDEO_PROGRESS = (roadmapProgress && roadmapProgress.videoProgress) || {};
+    window.dispatchEvent(new Event('roadmap-progress-sync'));
+  }, [roadmapProgress]);
+
   const handleStartTracking = async () => {
     if (!db || !user || user.isAnonymous) return;
     const ref = db.collection('users').doc(user.uid).collection('roadmapProgress').doc('default');
@@ -5456,6 +5578,43 @@ function App() {
       });
     return () => unsub();
   }, []);
+
+  // Reflect the user's ACTUAL reservations (Firestore) in the reserve/booked
+  // CTA state — not just the localStorage cache that markReserved() writes.
+  // Without this, a student who registered on another device, cleared storage,
+  // or whose booking was created server-side still saw "Reserve" on the nav/
+  // hero even though My Account listed the session. Source + cancel filter
+  // mirror V2StudentDashboard's bookings loader.
+  useEffect(() => {
+    if (!db || !user) { setReservedMcTitles([]); return; }
+    const unsub = db.collection('users').doc(user.uid).collection('bookings')
+      .onSnapshot((snap) => {
+        const ids = [];
+        const titles = [];
+        snap.forEach((doc) => {
+          const b = doc.data() || {};
+          if (b.status === 'cancelled' || b.deleted === true) return;
+          if (b.masterclassId) ids.push(b.masterclassId);
+          if (b.sessionId) ids.push(b.sessionId);
+          const t = (b.masterclassTitle || b.sessionTitle || '').trim().toLowerCase();
+          if (t) titles.push(t);
+        });
+        setReservedMcTitles(titles);
+        if (ids.length) {
+          setReservedMcIds((prev) => {
+            const set = new Set(prev);
+            let changed = false;
+            ids.forEach((id) => { if (!set.has(id)) { set.add(id); changed = true; } });
+            return changed ? Array.from(set) : prev;
+          });
+        }
+      }, (err) => {
+        // Clients can't read the staff-only registrations collection, so the
+        // bookings subcollection above is the source of truth; ignore denials.
+        console.debug('reserved-seat sync skipped:', err?.code || err);
+      });
+    return () => unsub();
+  }, [user]);
 
 
   useEffect(() => {
@@ -5701,10 +5860,14 @@ function App() {
 
     try {
       if (isRegistering) {
-        // Validation check for new fields
-        if (!regName || !regPhone || !regUserType) {
-          throw new Error("Please fill in all required fields (Name, Phone, and User Type).");
-        }
+        // Validate name / email / phone with the shared rules (defined in v2.jsx).
+        const VV = window.V2_VALIDATE;
+        const nameErr = VV ? VV.nameError(regName) : (!regName ? 'Please enter your name.' : '');
+        if (nameErr) throw new Error(nameErr);
+        if (VV && !VV.isEmail(loginEmail)) throw new Error('Please enter a valid email address.');
+        const phoneErr = VV ? VV.phoneError(regPhone, true) : (!regPhone ? 'Please enter your phone number.' : '');
+        if (phoneErr) throw new Error(phoneErr);
+        if (!regUserType) throw new Error('Please select what describes you best.');
 
         // Create user in Auth
         const userCredential = await auth.createUserWithEmailAndPassword(loginEmail, loginPassword);
@@ -5712,9 +5875,9 @@ function App() {
 
         // Immediately write standard client profile fields to Firestore
         await db.collection('users').doc(newUser.uid).set({
-          name: regName,
-          email: loginEmail,
-          phone: regPhone,
+          name: regName.trim(),
+          email: loginEmail.trim().toLowerCase(),
+          phone: VV ? VV.toE164(regPhone) : regPhone,
           userType: regUserType,
           role: 'client'
         });
@@ -5753,19 +5916,21 @@ function App() {
       setLoginError("No authenticated user session found.");
       return;
     }
-    if (!regName || !regPhone || !regUserType) {
-      setLoginError("Please fill in all required fields (Name, Phone, and User Type).");
-      return;
-    }
+    const VV = window.V2_VALIDATE;
+    const nameErr = VV ? VV.nameError(regName) : (!regName ? 'Please enter your name.' : '');
+    if (nameErr) { setLoginError(nameErr); return; }
+    const phoneErr = VV ? VV.phoneError(regPhone, true) : (!regPhone ? 'Please enter your phone number.' : '');
+    if (phoneErr) { setLoginError(phoneErr); return; }
+    if (!regUserType) { setLoginError('Please select what describes you best.'); return; }
     setLoginError("");
     setLoginLoading(true);
 
     try {
       // Update Firestore user document with missing profile fields
       await db.collection('users').doc(user.uid).set({
-        name: regName,
+        name: regName.trim(),
         email: user.email,
-        phone: regPhone,
+        phone: VV ? VV.toE164(regPhone) : regPhone,
         userType: regUserType,
         role: 'client'
       }, { merge: true });
@@ -5814,6 +5979,7 @@ function App() {
       // Reserved-seat state is a per-visitor cache; clear it on sign-out so a
       // signed-out visitor no longer sees "Seat booked ✓" / upcoming-session UI.
       setReservedMcIds([]);
+      setReservedMcTitles([]);
       try { localStorage.removeItem('reserved_mc_ids'); } catch (e) {}
     }
   };
@@ -5833,7 +5999,11 @@ function App() {
     if (session && session.id) markReserved(session.id);
     if (user && !user.isAnonymous && db && session) {
       try {
-        await db.collection('users').doc(user.uid).collection('bookings').add({
+        // Use the class id as the booking doc id so re-booking the same class
+        // overwrites the single doc instead of piling up duplicates (.add()
+        // created a new doc every time, which showed the class twice in
+        // My Account). Fall back to .add() if the id isn't a valid doc id.
+        const bookingPayload = {
           masterclassId: session.id,
           masterclassTitle: session.title,
           tier: tier.name,
@@ -5847,9 +6017,18 @@ function App() {
           prepPdfUrl: session.prepPdfUrl || '',
           recordingUrl: session.recordingUrl || '',
           slidesUrl: session.slidesUrl || '',
-        });
+        };
+        const bookingsCol = db.collection('users').doc(user.uid).collection('bookings');
+        const safeId = typeof session.id === 'string' && session.id && !session.id.includes('/');
+        if (safeId) {
+          await bookingsCol.doc(session.id).set(bookingPayload, { merge: true });
+        } else {
+          await bookingsCol.add(bookingPayload);
+        }
         await db.collection('users').doc(user.uid).set({
-          name: bookingName, phone: bookingPhone, email: user.email,
+          name: bookingName,
+          phone: window.V2_VALIDATE ? window.V2_VALIDATE.toE164(bookingPhone) : bookingPhone,
+          email: user.email,
         }, { merge: true });
       } catch (err) {
         console.warn('Client-side booking write failed (webhook may have handled it):', err);
@@ -5858,11 +6037,17 @@ function App() {
   };
 
   const handleBookingSubmit = async () => {
-    if (!bookingName || !bookingEmail) {
-      setBookingError('Please fill in name and email.');
-      return;
-    }
+    const VV = window.V2_VALIDATE;
+    const nameErr = VV ? VV.nameError(bookingName) : (!bookingName ? 'Please enter your name.' : '');
+    if (nameErr) { setBookingError(nameErr); return; }
+    const emailErr = VV ? VV.emailError(bookingEmail) : (!bookingEmail ? 'Please enter your email.' : '');
+    if (emailErr) { setBookingError(emailErr); return; }
+    const phoneErr = VV ? VV.phoneError(bookingPhone, false) : '';
+    if (phoneErr) { setBookingError(phoneErr); return; }
     if (!bookingSession) return;
+
+    // Normalize to E.164 so international numbers keep their country code on save.
+    const phoneE164 = VV ? VV.toE164(bookingPhone) : bookingPhone;
 
     setBookingError('');
     setBookingLoading(true);
@@ -5901,8 +6086,8 @@ function App() {
           const regPayload = {
             sessionId,
             sessionTitle: bookingSession.title,
-            studentName: bookingName,
-            studentEmail: bookingEmail,
+            studentName: bookingName.trim(),
+            studentEmail: bookingEmail.trim().toLowerCase(),
             studentPhone: bookingPhone || '',
             amount: 0,
             tier: tier.name || 'Free',
@@ -5923,10 +6108,18 @@ function App() {
             bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           };
-          const ref = await db.collection('registrations').add(regPayload);
+          // Idempotent doc id (session + email) so re-registering for the same
+          // class overwrites one doc instead of creating duplicate roster rows.
+          // merge:true preserves the email-sent flags set later by the reminder
+          // pipeline. Falls back to an auto id if we somehow have no email.
+          const emailKey = (bookingEmail || '').trim().toLowerCase();
+          const regRef = emailKey
+            ? db.collection('registrations').doc((sessionId + '__' + emailKey).replace(/[^A-Za-z0-9._@+-]/g, '_').slice(0, 400))
+            : db.collection('registrations').doc();
+          await regRef.set(regPayload, { merge: true });
           setBookingLoading(false);
           await completeBookingSuccess({
-            paymentId: `free_${ref.id}`,
+            paymentId: `free_${regRef.id}`,
             orderId: regPayload.orderId,
           });
         } else {
@@ -5962,7 +6155,7 @@ function App() {
           sessionId,
           name: bookingName,
           email: bookingEmail,
-          phone: bookingPhone || '',
+          phone: phoneE164 || '',
           userId: effectiveUser.uid,
           tier: tier.name,
           tierPrice: payPrice,
@@ -5983,7 +6176,7 @@ function App() {
               session: bookingSession,
               name: bookingName,
               email: bookingEmail,
-              phone: bookingPhone || '',
+              phone: phoneE164 || '',
               tier: tier.name,
               userId: effectiveUser.uid,
             });
@@ -6002,7 +6195,7 @@ function App() {
             name: 'The Agent Engineer',
             description: `${bookingSession.title} · ${tier.name}`,
             order_id: orderData.orderId,
-            prefill: { name: bookingName, email: bookingEmail, contact: bookingPhone },
+            prefill: { name: bookingName, email: bookingEmail, contact: phoneE164 },
             theme: { color: '#e0664c' },
             handler: function (response) {
               completeBookingSuccess({
@@ -6169,8 +6362,21 @@ function App() {
   // popup, curriculum, booking, sticky bar, closing CTA) sees the SAME object.
   // mergeMcWithConfig makes site.config.js win for content; Firestore only
   // contributes runtime state (seatsBooked, zoomLink, etc).
+  // A class is "reserved" if its id is cached/derived OR the signed-in user has
+  // a booking with the same title (covers duplicate docs for the same class).
+  const isMcReserved = (mc) => !!(mc && (
+    reservedMcIds.includes(mc.id) ||
+    (mc.title && reservedMcTitles.includes(mc.title.trim().toLowerCase()))
+  ));
   const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions), masterclasses, sessions);
-  const nextMcReserved = !!(nextMasterclass && reservedMcIds.includes(nextMasterclass.id));
+  const nextMcReserved = isMcReserved(nextMasterclass);
+  // IDs of masterclasses/sessions an admin has deleted — used to hide them from
+  // students who had already reserved (their booking snapshot is otherwise stale).
+  const deletedSessionIds = React.useMemo(() => new Set(
+    [...(masterclasses || []), ...(sessions || [])]
+      .filter((s) => s && (s.deleted || s.status === 'deleted'))
+      .map((s) => s.id)
+  ), [masterclasses, sessions]);
   const goToAccount = () => { if (isUserStaff) switchMainTab('dashboard'); else switchMainTab('mybookings'); };
   const bookingCtx = {
     setBookingSession, setBookingStep, setBookingSuccess, setSelectedTier,
@@ -6621,7 +6827,7 @@ function App() {
                         idx={idx}
                         user={user}
                         onBook={openBooking}
-                        reserved={reservedMcIds.includes(mc.id)}
+                        reserved={isMcReserved(mc)}
                         onManage={goToAccount}
                       />
                     ))}
@@ -6677,9 +6883,9 @@ function App() {
 
                           <ShimmerButton
                             variant="dark"
-                            onClick={() => reservedMcIds.includes(s.id) ? goToAccount() : openBooking(s)}
+                            onClick={() => isMcReserved(s) ? goToAccount() : openBooking(s)}
                           >
-                            {reservedMcIds.includes(s.id) ? 'You’re registered ✓' : (isMcFree(s) ? <>Reserve · <V2McPrice mc={s} /></> : 'Book Seat')}
+                            {isMcReserved(s) ? 'You’re registered ✓' : (isMcFree(s) ? <>Reserve · <V2McPrice mc={s} /></> : 'Book Seat')}
                           </ShimmerButton>
                         </article>
                       ))}
@@ -6743,6 +6949,7 @@ function App() {
           user={user}
           db={db}
           roadmapProgress={roadmapProgress}
+          deletedSessionIds={deletedSessionIds}
           onGoToRoadmap={handleGoToRoadmap}
           onReserve={() => { setActiveMainTab('home'); openBooking(nextMasterclass); }}
         />
@@ -6872,7 +7079,8 @@ function App() {
                     className="form-input" 
                     placeholder="Enter your full name" 
                     value={regName}
-                    onChange={e => setRegName(e.target.value)}
+                    onChange={e => setRegName(window.V2_VALIDATE ? window.V2_VALIDATE.cleanName(e.target.value) : e.target.value)}
+                    maxLength={60}
                     autoComplete="name"
                     required
                   />
@@ -6880,11 +7088,13 @@ function App() {
               )}
 
               <div className="form-group">
-                <label className="form-label">Email address <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                <input 
-                  type="email" 
-                  className="form-input" 
-                  placeholder="Enter your full email address" 
+                <label className="form-label" htmlFor="signin-email">Email address <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                <input
+                  type="email"
+                  id="signin-email"
+                  name="email"
+                  className="form-input"
+                  placeholder="Enter your full email address"
                   value={loginEmail}
                   onChange={e => setLoginEmail(e.target.value)}
                   autoComplete="email"
@@ -6894,10 +7104,12 @@ function App() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Password <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                <input 
-                  type="password" 
-                  className="form-input" 
+                <label className="form-label" htmlFor="signin-password">Password <span style={{ color: "var(--c-pink)" }}>*</span></label>
+                <input
+                  type="password"
+                  id="signin-password"
+                  name="password"
+                  className="form-input"
                   placeholder="Enter password"
                   value={loginPassword}
                   onChange={e => setLoginPassword(e.target.value)}
@@ -6910,16 +7122,17 @@ function App() {
                 <React.Fragment>
                   <div className="form-group">
                     <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                    <input 
-                      type="tel" 
-                      className="form-input" 
-                      placeholder="Enter your phone number" 
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="e.g. 9876543210 or +1 415 555 0132"
                       value={regPhone}
-                      onChange={e => setRegPhone(e.target.value)}
+                      onChange={e => setRegPhone(window.V2_VALIDATE ? window.V2_VALIDATE.cleanPhone(e.target.value) : e.target.value)}
                       autoComplete="tel"
                       inputMode="tel"
-                      pattern="[0-9+\-\s()]{7,}"
-                      title="Enter a valid phone number"
+                      maxLength={16}
+                      pattern="\+?[0-9]{7,15}"
+                      title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
                       required
                     />
                   </div>
@@ -7065,16 +7278,17 @@ function App() {
 
               <div className="form-group">
                 <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                <input 
-                  type="tel" 
-                  className="form-input" 
-                  placeholder="Enter your phone number" 
+                <input
+                  type="tel"
+                  className="form-input"
+                  placeholder="e.g. 9876543210 or +1 415 555 0132"
                   value={regPhone}
-                  onChange={e => setRegPhone(e.target.value)}
+                  onChange={e => setRegPhone(window.V2_VALIDATE ? window.V2_VALIDATE.cleanPhone(e.target.value) : e.target.value)}
                   autoComplete="tel"
                   inputMode="tel"
-                  pattern="[0-9+\-\s()]{7,}"
-                  title="Enter a valid phone number"
+                  maxLength={16}
+                  pattern="\+?[0-9]{7,15}"
+                  title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
                   required
                 />
               </div>

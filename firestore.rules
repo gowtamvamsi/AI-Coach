@@ -209,6 +209,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Marketing contacts saved from spreadsheet uploads (reusable audience).
+    // Created/updated only by Cloud Functions (admin SDK bypasses rules);
+    // admins read the list and may delete a contact. Contains PII — no public.
+    match /marketingContacts/{email} {
+      allow read, delete: if isAdmin() || isBootstrapUser();
+      allow create, update: if false;
+    }
+
     // Per-video "Link to code" map (videoId -> codeUrl). Public read (shown on
     // the player); admin-managed writes.
     match /videoCodeLinks/{videoId} {
