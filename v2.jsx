@@ -776,7 +776,7 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
     items.slice(0, 10).forEach((v) => {
       if (!v.videoId) return;
       const img = new Image();
-      img.src = H.youtubePoster ? H.youtubePoster(v.videoId) : (H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/sddefault.jpg`);
+      img.src = H.youtubePoster ? H.youtubePoster(v.videoId) : (H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`);
     });
   }, [items]);
 
@@ -808,7 +808,7 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
   };
 
   const posterUrl = active?.videoId
-    ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/hqdefault.jpg`)
+    ? (H.youtubePoster ? H.youtubePoster(active.videoId) : `https://i.ytimg.com/vi/${active.videoId}/maxresdefault.jpg`)
     : '';
 
   return (
@@ -898,7 +898,7 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
               >
                 <img
                   className="v2-playlist-track-thumb"
-                  src={H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`}
+                  src={H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`}
                   alt=""
                   loading={i < 8 ? 'eager' : 'lazy'}
                   decoding="async"
@@ -1038,7 +1038,7 @@ function V2ClickToPlayVideoInner({ videoId, playlistId, title, caption, startSec
 // it watched and completes the linked module(s) — used for all module videos.
 function V2RedirectVideo({ videoId, title, caption, startSec, onVideoProgress, mappingId, modules, codeUrl }) {
   const H = window.ROADMAP_VIDEO_HELPERS || {};
-  const thumbUrl = H.youtubePoster ? H.youtubePoster(videoId) : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  const thumbUrl = H.youtubePoster ? H.youtubePoster(videoId) : `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
   const watchUrl = H.youtubeWatchUrl
     ? H.youtubeWatchUrl(videoId, startSec || 0)
     : `https://www.youtube.com/watch?v=${videoId}${startSec ? `&t=${startSec}s` : ''}`;
@@ -1135,7 +1135,7 @@ function V2TrackableVideo({ videoId, title, caption, startSec, onVideoProgress, 
   const H = window.ROADMAP_VIDEO_HELPERS || {};
   const thumbUrl = H.youtubePoster
     ? H.youtubePoster(videoId)
-    : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    : `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
   const watchUrl = H.youtubeWatchUrl ? H.youtubeWatchUrl(videoId, startSec || 0) : `https://www.youtube.com/watch?v=${videoId}`;
   const threshold = H.PROGRESS_THRESHOLD || 0.8;
   const canTrack = Boolean(onVideoProgress && modules && modules.length);

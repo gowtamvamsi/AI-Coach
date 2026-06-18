@@ -7385,11 +7385,7 @@ body.has-promo-banner .nav { top: calc(var(--top-banner-h) + 10px); }
   overflow: hidden;
 }
 .v2-video-frame--playlist {
-  padding-bottom: 0;
-  height: 360px;
-}
-@media (min-width: 768px) {
-  .v2-video-frame--playlist { height: 400px; }
+  /* Inherits responsive aspect-ratio from .v2-video-frame */
 }
 .v2-video-frame--playlist iframe {
   position: absolute;
