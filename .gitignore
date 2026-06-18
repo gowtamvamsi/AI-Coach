@@ -4,3 +4,9 @@
 .firebase/
 .claude/
 node_modules/
+
+# Firebase service-account keys — NEVER commit these
+serviceAccountKey.json
+**/serviceAccountKey.json
+*-service-account*.json
+*-firebase-adminsdk-*.json

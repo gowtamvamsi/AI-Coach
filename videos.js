@@ -493,9 +493,14 @@ window.ROADMAP_VIDEO_HELPERS = (function () {
     return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '';
   }
 
-  /** Hero / click-to-play poster — sddefault (640×480) avoids maxres 404 placeholders */
+  /**
+   * Hero / click-to-play poster. Must be 16:9 to fill the 16:9 .v2-video-frame
+   * without cropping — sddefault/hqdefault are 4:3 and got top/bottom-cropped by
+   * `background-size: cover` (clipped the thumbnail's title text). maxresdefault
+   * is 1280×720 (16:9) and exists for every custom-thumbnail video on the channel.
+   */
   function youtubePoster(videoId) {
-    return videoId ? `https://i.ytimg.com/vi/${videoId}/sddefault.jpg` : '';
+    return videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : '';
   }
 
   function getPlaylistItemsSync(playlistId) {
@@ -535,7 +540,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Full Roadmap Walkthrough (2026)',
     kind: 'overview',
     mappings: [
-      { phaseId: 1, modules: ['1.1', '1.2', '1.3', '1.4', '1.5', '1.6'], startSec: 607 },
+      { phaseId: 1, modules: ['1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7'], startSec: 607 },
       { phaseId: 2, modules: ['2.1', '2.2', '2.3', '2.4', '2.5'], startSec: 686 },
       { phaseId: 3, modules: ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7'], startSec: 788 },
       { phaseId: 4, modules: ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9'], startSec: 878 },
@@ -547,12 +552,21 @@ window.ROADMAP_VIDEOS = [
     ],
   },
   {
+    id: 'phase1-genai-vs-agents',
+    youtubeId: 'u-glihrL-Ko',
+    title: 'Generative AI vs AI Agents vs Agentic AI',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 1, modules: ['1.1'], startSec: 0 },
+    ],
+  },
+  {
     id: 'phase1-core-python-playlist',
     playlistId: 'PL8qeqP57-QAZz8wi1x7toEWzPC_mW5NfO',
     title: 'Python For Data Science',
     kind: 'playlist',
     mappings: [
-      { phaseId: 1, modules: ['1.1'] },
+      { phaseId: 1, modules: ['1.2'] },
     ],
   },
   {
@@ -561,7 +575,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Python OOP for Agentic AI',
     kind: 'playlist',
     mappings: [
-      { phaseId: 1, modules: ['1.2'] },
+      { phaseId: 1, modules: ['1.3'] },
     ],
   },
   {
@@ -570,7 +584,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Working with HTTP APIs',
     kind: 'deep-dive',
     mappings: [
-      { phaseId: 1, modules: ['1.3'], startSec: 0 },
+      { phaseId: 1, modules: ['1.4'], startSec: 0 },
     ],
   },
   {
@@ -579,7 +593,43 @@ window.ROADMAP_VIDEOS = [
     title: 'Async Programming',
     kind: 'deep-dive',
     mappings: [
-      { phaseId: 1, modules: ['1.6'], startSec: 1007 },
+      { phaseId: 1, modules: ['1.7'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase3-prompt-engineering',
+    youtubeId: 'w_iQBSDewxI',
+    title: 'Prompt Engineering',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 3, modules: ['3.3'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase3-context-engineering',
+    youtubeId: 'fGfTj5NoM7k',
+    title: 'Context Engineering',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 3, modules: ['3.4'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase5-function-calling',
+    youtubeId: 'g_A9hNZ3eok',
+    title: 'Function Calling & Tool Use',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 5, modules: ['5.1'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase5-tool-design',
+    youtubeId: 'yx67tBxJwrs',
+    title: 'Tool Design Principles',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 5, modules: ['5.2'], startSec: 0 },
     ],
   },
   {

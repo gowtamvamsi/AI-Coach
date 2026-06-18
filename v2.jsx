@@ -18,6 +18,36 @@ const V2_VALIDATE = {
   NAME_RE: /^\p{L}[\p{L} .'-]{1,59}$/u,
   // Mirrors isValidEmail() in firestore.rules so client + server agree.
   EMAIL_RE: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  // Throwaway / temp-mail providers — people use these to dodge real signup.
+  DISPOSABLE_EMAIL_DOMAINS: [
+    'mailinator.com', '10minutemail.com', 'guerrillamail.com', 'guerrillamail.info',
+    'guerrillamailblock.com', 'sharklasers.com', 'grr.la', 'spam4.me', 'yopmail.com',
+    'tempmail.com', 'temp-mail.org', 'trashmail.com', 'getnada.com', 'maildrop.cc',
+    'dispostable.com', 'throwawaymail.com', 'fakeinbox.com', 'mailnesia.com',
+    'mintemail.com', 'mohmal.com', 'spamgourmet.com', 'tempinbox.com', 'emailondeck.com',
+    'moakt.com', 'mailcatch.com', '33mail.com', 'tempr.email', 'discard.email',
+  ],
+  // Obvious placeholder / "test" domains that look valid but aren't real inboxes.
+  JUNK_EMAIL_DOMAINS: [
+    'example.com', 'example.org', 'example.net', 'example.edu',
+    'test.com', 'testing.com', 'test.test', 'tester.com', 'mailtest.com',
+    'yourdomain.com', 'yourmail.com', 'sample.com', 'fake.com', 'nomail.com',
+    'noemail.com', 'none.com', 'na.com', 'asdf.com', 'qwerty.com', 'abc.com',
+  ],
+  // Common misspellings of popular providers → the intended domain (used to
+  // suggest a correction rather than silently accept an undeliverable address).
+  EMAIL_DOMAIN_TYPOS: {
+    'gmail.con': 'gmail.com', 'gmail.co': 'gmail.com', 'gmail.cm': 'gmail.com',
+    'gmail.om': 'gmail.com', 'gmail.comm': 'gmail.com', 'gmial.com': 'gmail.com',
+    'gmai.com': 'gmail.com', 'gmaill.com': 'gmail.com', 'gnail.com': 'gmail.com',
+    'gmail.in': 'gmail.com', 'gamil.com': 'gmail.com',
+    'yahoo.con': 'yahoo.com', 'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com',
+    'yahoo.co': 'yahoo.com', 'ymail.con': 'ymail.com',
+    'hotmail.con': 'hotmail.com', 'hotmial.com': 'hotmail.com', 'hotmai.com': 'hotmail.com',
+    'hotmil.com': 'hotmail.com', 'hotmail.co': 'hotmail.com',
+    'outlook.con': 'outlook.com', 'outlok.com': 'outlook.com', 'outloo.com': 'outlook.com',
+    'rediffmail.con': 'rediffmail.com', 'rediff.con': 'rediff.com',
+  },
   // We accept two shapes:
   //   • a bare 10-digit Indian mobile (first digit 6–9) — the common case, and
   //   • any international number written in E.164 with a leading '+'
@@ -66,11 +96,66 @@ const V2_VALIDATE = {
     if (!this.NAME_RE.test(s)) return 'Name can only contain letters, spaces, hyphens and apostrophes.';
     return '';
   },
+  // Synchronous email check: format + common typos + disposable/placeholder
+  // domains. Returns '' when the address looks legitimate, else a message.
   emailError(v) {
-    const s = String(v == null ? '' : v).trim();
+    const s = String(v == null ? '' : v).trim().toLowerCase();
     if (!s) return 'Please enter your email address.';
-    if (!this.isEmail(s)) return 'Please enter a valid email address.';
+    if (!this.EMAIL_RE.test(s)) return 'Please enter a valid email address.';
+    if (/\.{2,}/.test(s) || s.startsWith('.') || s.includes('.@') || s.includes('@.')) {
+      return 'Please enter a valid email address.';
+    }
+    const domain = s.slice(s.lastIndexOf('@') + 1);
+    if (this.EMAIL_DOMAIN_TYPOS[domain]) {
+      return `Did you mean @${this.EMAIL_DOMAIN_TYPOS[domain]}? Please double-check your email.`;
+    }
+    // RFC 2606 reserved TLDs — these can never receive real mail.
+    if (/\.(test|example|invalid|localhost|local)$/.test(domain)) {
+      return 'Please enter a real email address — that domain can’t receive mail.';
+    }
+    if (this.JUNK_EMAIL_DOMAINS.includes(domain)) {
+      return 'That looks like a placeholder address. Please enter your real email.';
+    }
+    if (this.DISPOSABLE_EMAIL_DOMAINS.includes(domain)) {
+      return 'Temporary / disposable email addresses aren’t allowed — please use your real email.';
+    }
     return '';
+  },
+  // Async deliverability check: confirms the domain actually exists and can
+  // receive mail, using DNS-over-HTTPS (no backend needed). FAIL-OPEN — if the
+  // lookup is blocked, offline, or inconclusive we return '' so a real user is
+  // never turned away by a transient DNS issue. Catches typo'd / made-up domains
+  // (e.g. user@asdkjh.com) that pass the format + blocklist checks.
+  async emailDeliverableError(v) {
+    try {
+      const s = String(v == null ? '' : v).trim().toLowerCase();
+      const at = s.lastIndexOf('@');
+      if (at < 0) return '';
+      const domain = s.slice(at + 1);
+      if (!domain || domain.indexOf('.') < 0) return '';
+      const NXDOMAIN = 'This email domain doesn’t exist — please check the spelling.';
+      const NOMAIL = 'This email domain can’t receive mail — please use a real email.';
+      const lookup = (type) => fetch(
+        `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${type}`,
+        { headers: { accept: 'application/dns-json' } },
+      ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+      const mx = await lookup('MX');
+      if (!mx) return ''; // lookup failed → fail open
+      if (mx.Status === 3) return NXDOMAIN; // NXDOMAIN: domain not registered
+      if (Array.isArray(mx.Answer) && mx.Answer.some((a) => a.type === 15)) return ''; // has MX → deliverable
+
+      // No MX record → a domain may still accept mail via its A record (RFC 5321).
+      const a = await lookup('A');
+      if (!a) return '';
+      if (a.Status === 3) return NXDOMAIN;
+      if (Array.isArray(a.Answer) && a.Answer.length) return '';
+      // Domain resolves but has neither MX nor A → cannot receive mail.
+      if (mx.Status === 0 && a.Status === 0) return NOMAIL;
+      return '';
+    } catch (e) {
+      return ''; // never block a real user on an unexpected error
+    }
   },
   // required=false → empty is OK (optional field); any entered value must still be valid.
   phoneError(v, required) {
@@ -365,28 +450,31 @@ function formatMcPriceShort(mc) {
   return isMcFree(mc) ? 'Free' : `₹${getMcPrice(mc).toLocaleString()}`;
 }
 
-// Anchor ("was") price shown struck-through next to "Free", so a free class
-// reads as a discount (e.g. ₹599 → Free) rather than just "Free".
-// Per-class override: set `originalPrice` on the masterclass (site.config.js
-// `nextMasterclass.originalPrice`, or the Firestore doc). Falls back to this
-// default when none is set. To offer a ₹599 course for free: price: 0,
-// originalPrice: 599.
+// "Actual" anchor price shown struck-through next to the offering price, so the
+// class reads as a discount (e.g. ₹299 → Free, or ₹999 → ₹499). Set per class in
+// the dashboard "Actual Price" field → `originalPrice` on the masterclass doc
+// (or site.config.js `nextMasterclass.originalPrice`). For a FREE class with no
+// explicit actual price we fall back to this default so "Free" still reads as a
+// discount rather than just "Free".
 const V2_FREE_STRIKE_PRICE = 299;
 function getMcStrikePrice(mc) {
-  return (mc && typeof mc.originalPrice === 'number' && mc.originalPrice > 0)
-    ? mc.originalPrice
-    : V2_FREE_STRIKE_PRICE;
+  // Explicit "Actual Price" set by the admin always wins.
+  if (mc && typeof mc.originalPrice === 'number' && mc.originalPrice > 0) return mc.originalPrice;
+  // Free class with no explicit anchor → default discount anchor.
+  if (isMcFree(mc)) return V2_FREE_STRIKE_PRICE;
+  // Paid class with no anchor → nothing to strike through.
+  return 0;
 }
 function V2McPrice({ mc }) {
-  if (isMcFree(mc)) {
-    return (
-      <span className="v2-mc-price">
-        <s className="v2-mc-price-was">₹{getMcStrikePrice(mc).toLocaleString()}</s>
-        <span className="v2-mc-price-free">Free</span>
-      </span>
-    );
-  }
-  return <span className="v2-mc-price">₹{getMcPrice(mc).toLocaleString()}</span>;
+  const offered = getMcPrice(mc);          // "Offering Price" — what they pay
+  const actual = getMcStrikePrice(mc);     // "Actual Price" — struck-through anchor
+  const showStrike = actual > offered;     // only strike a genuinely higher price
+  return (
+    <span className="v2-mc-price">
+      {showStrike ? <s className="v2-mc-price-was">₹{actual.toLocaleString()}</s> : null}
+      <span className="v2-mc-price-free">{offered === 0 ? 'Free' : `₹${offered.toLocaleString()}`}</span>
+    </span>
+  );
 }
 
 function padIcs(n) { return String(n).padStart(2, '0'); }
@@ -1231,7 +1319,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                     className="v2-hero-cta v2-hero-cta--ghost"
                     onClick={onExploreCurriculum || onRoadmap}
                   >
-                    <span className="v2-hero-cta-text">Explore the curriculum</span>
+                    <span className="v2-hero-cta-text">Explore the Masterclass</span>
                     <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
                   </button>
                 )}
@@ -1263,7 +1351,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                     className="v2-hero-cta v2-hero-cta--ghost"
                     onClick={onExploreCurriculum || onRoadmap}
                   >
-                    <span className="v2-hero-cta-text">Explore the curriculum</span>
+                    <span className="v2-hero-cta-text">Explore the Masterclass</span>
                     <span className="v2-hero-cta-icon" aria-hidden="true">→</span>
                   </button>
                 )}
@@ -1465,7 +1553,7 @@ function V2BookingWizard({
             if (nameErr) { setStepError(nameErr); return; }
             const emailErr = V2_VALIDATE.emailError(bookingEmail);
             if (emailErr) { setStepError(emailErr); return; }
-            const phoneErr = V2_VALIDATE.phoneError(bookingPhone, false);
+            const phoneErr = V2_VALIDATE.phoneError(bookingPhone, true);
             if (phoneErr) { setStepError(phoneErr); return; }
             if (free && !ytSubscribed) {
               setStepError('Please subscribe on YouTube to reserve your free seat.');
@@ -1500,7 +1588,7 @@ function V2BookingWizard({
                 className="form-input"
                 value={bookingEmail}
                 onChange={(e) => setBookingEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="you@gmail.com"
                 autoComplete="email"
                 inputMode="email"
                 maxLength={120}
@@ -1510,7 +1598,7 @@ function V2BookingWizard({
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Phone <span className="form-label-hint">(optional · for WhatsApp reminders)</span></label>
+              <label className="form-label">Phone <span className="form-label-hint">(for WhatsApp reminders &amp; Zoom link)</span></label>
               <input
                 type="tel"
                 className="form-input"
@@ -1522,6 +1610,7 @@ function V2BookingWizard({
                 maxLength={16}
                 pattern="\+?[0-9]{7,15}"
                 title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
+                required
               />
             </div>
 

@@ -3969,7 +3969,10 @@ body.modal-open {
   display: block;
 }
 .dashboard .form-input, .dashboard .form-select {
-  background: rgba(255, 255, 255, 0.04);
+  /* Use background-color (not the `background` shorthand) so we don't reset the
+     .form-select chevron's background-image/repeat/position — that reset made
+     the dropdown arrow tile across the whole control in light mode. */
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 14px 16px;
@@ -3980,7 +3983,7 @@ body.modal-open {
   width: 100%;
 }
 .dashboard .form-input:focus, .dashboard .form-select:focus {
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
   border-color: var(--c-violet);
   box-shadow: 0 0 0 3px rgba(138, 92, 246, 0.2);
   outline: none;
@@ -5023,9 +5026,16 @@ body.modal-open {
 }
 .v2-mc-price-was {
   text-decoration: line-through;
-  /* Explicit accessible muted colour (was opacity:0.55, which dropped contrast
-     below 4.5:1 against every base colour it was layered on). */
-  color: var(--fg-dim);
+  /* Inherit the PARENT's text colour (currentColor) instead of the page
+     foreground. The struck price renders inside inverted buttons (the nav
+     "Reserve" pill flips dark/light per theme) and the coloured promo banner /
+     hero CTA (white text on rust) — each already picks a colour that contrasts
+     with its own background, so currentColor stays legible everywhere, in both
+     themes. (var(--fg-dim) tracked the page fg and disappeared on those
+     inverted/coloured surfaces.) opacity:0.85 gives a subtle "old price" mute
+     while keeping contrast well clear of the 4.5:1 floor in those contexts. */
+  color: currentColor;
+  opacity: 0.85;
   font-weight: 500;
 }
 .v2-mc-price-free {

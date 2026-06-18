@@ -1135,6 +1135,128 @@ exports.onRegistrationCompleted = functions.firestore
     }
   });
 
+// Bootstrap administrator emails — these accounts must always be role=admin,
+// enforced server-side (see enforceBootstrapAdminRole) so admin status never
+// depends on the deployed client bundle recognising the email list.
+const BOOTSTRAP_ADMIN_EMAILS = [
+  "gowtamsbh1234@gmail.com",
+  "balajichippada.20@gmail.com",
+  "mayupatil199@gmail.com",
+];
+
+// ===============================================================
+// Welcome email on account sign-up
+// ---------------------------------------------------------------
+// Fires once when a user's profile doc first gains BOTH an email and a name.
+// This covers:
+//   • email/password sign-up — the name is written with the doc, so it fires
+//     on the create write.
+//   • Google sign-in — a baseline {email, role} doc is created first (no name,
+//     skipped), then the name is added at profile completion, which fires it.
+// Anonymous guest-checkout users never get a name, so they're excluded. We also
+// require that the name was NOT already present before this write, so existing
+// users editing their profile never receive a spurious "welcome". Idempotent
+// via the welcomeEmailSent flag.
+// ===============================================================
+exports.onUserSignupWelcome = functions.firestore
+  .document("users/{userId}")
+  .onWrite(async (change, context) => {
+    try {
+      const after = change.after.exists ? change.after.data() : null;
+      if (!after) return null; // doc deleted
+      const before = change.before.exists ? change.before.data() : null;
+
+      const email = (after.email || "").trim();
+      const name = (after.name || "").trim();
+      const role = after.role || "client";
+
+      if (!email || !name) return null;          // need a named account we can email
+      if (after.welcomeEmailSent === true) return null; // already welcomed
+      if (role !== "client") return null;        // don't email staff / admin accounts
+      if (BOOTSTRAP_ADMIN_EMAILS.includes(email.toLowerCase())) return null; // never "welcome" an admin
+
+      // Only the moment the account first becomes "named" — not later edits to
+      // an already-named account (which would otherwise re-welcome people).
+      const beforeHadName = !!(before && (before.name || "").toString().trim());
+      if (beforeHadName) return null;
+
+      const firstName = name.split(" ")[0] || name;
+      const subject = `Welcome to the Agentic AI Engineer community, ${firstName}! 🚀`;
+      const body = `Hi ${firstName},\n\n` +
+        `Welcome aboard — your account is all set! I'm thrilled to have you here.\n\n` +
+        `Here's how to get the most out of it:\n\n` +
+        `• Follow the full 26-week Agentic AI Engineer roadmap and track your progress as you go:\n` +
+        `  https://balajichippada.com/\n\n` +
+        `• Reserve your seat for the next live masterclass — the first one is free:\n` +
+        `  https://balajichippada.com/\n\n` +
+        `• Explore the open-source roadmap on GitHub:\n` +
+        `  https://github.com/ch-balaji/ai-engineer-roadmap\n\n` +
+        `Have a question or just want to say hi? Reply directly to this email, or join our WhatsApp community:\n` +
+        `https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t\n\n` +
+        `Let's build some amazing agentic systems together!\n\n` +
+        `Best,\n` +
+        `Balaji Chippada\n` +
+        `team@balajichippada.com`;
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const smtpEmail = process.env.SMTP_EMAIL;
+      const smtpPass = process.env.SMTP_PASSWORD;
+
+      console.log(`[WELCOME] Sending sign-up welcome email to ${email} (${name})`);
+      await sendEmailHelper({
+        email,
+        name,
+        subject,
+        body,
+        resendApiKey,
+        smtpEmail,
+        smtpPass,
+        from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+      });
+
+      // Stamp only after a successful send so a transient failure can retry on
+      // the next write. (Setting the flag re-triggers onWrite, which then exits
+      // early on the welcomeEmailSent check — no loop.)
+      await change.after.ref.update({
+        welcomeEmailSent: true,
+        welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return null;
+    } catch (err) {
+      console.error("[WELCOME ERROR] onUserSignupWelcome failed:", err);
+      return null;
+    }
+  });
+
+// ===============================================================
+// Enforce admin role for bootstrap administrators
+// ---------------------------------------------------------------
+// The client promotes bootstrap-admin emails to role=admin, but that relies on
+// the deployed bundle knowing the email list — a stale hosting deploy (or the
+// complete-profile flow) could recreate the account as role=client and strip
+// admin access. This server-side guard is authoritative: whenever a bootstrap-
+// admin email's user doc is written as anything other than admin, we set it back
+// to admin. Idempotent — the corrective write re-fires onWrite, which then exits
+// on the role check (no loop).
+// ===============================================================
+exports.enforceBootstrapAdminRole = functions.firestore
+  .document("users/{userId}")
+  .onWrite(async (change, context) => {
+    try {
+      const after = change.after.exists ? change.after.data() : null;
+      if (!after) return null; // doc deleted
+      const email = (after.email || "").trim().toLowerCase();
+      if (!email || !BOOTSTRAP_ADMIN_EMAILS.includes(email)) return null;
+      if (after.role === "admin") return null; // already correct
+      await change.after.ref.update({ role: "admin" });
+      console.log(`[ADMIN ENFORCE] Promoted bootstrap admin ${email} to role=admin`);
+      return null;
+    } catch (err) {
+      console.error("[ADMIN ENFORCE] enforceBootstrapAdminRole failed:", err);
+      return null;
+    }
+  });
+
 // ===============================================================
 // Scheduled masterclass reminders
 // Sends a reminder every day for the 2 days before each session

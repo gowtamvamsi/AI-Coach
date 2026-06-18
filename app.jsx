@@ -123,6 +123,18 @@ function consumeGoogleAuthIntent() {
 const isMac = typeof navigator !== 'undefined'
   && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
 
+// Sort Firestore docs by createdAt (newest first) on the CLIENT. We must NOT use
+// Firestore's .orderBy('createdAt') for this, because that query silently drops
+// any document missing the createdAt field — which hid hand-seeded masterclasses
+// (e.g. the featured class) from the dashboard list AND the home page. Docs with
+// no createdAt sort last but are always included.
+function sortByCreatedAtDesc(list) {
+  const ms = (t) => (t && typeof t.toMillis === 'function') ? t.toMillis()
+    : (t && typeof t.seconds === 'number') ? t.seconds * 1000
+    : (typeof t === 'number') ? t : 0;
+  return list.sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
+}
+
 
 // ===============================================================
 // HELPER COMPONENTS
@@ -2277,7 +2289,8 @@ function DashboardView({ user, role, onLogout }) {
   // Form fields (sessions)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState("");            // "Offering Price" — what attendees pay (0 = Free)
+  const [originalPrice, setOriginalPrice] = useState(""); // "Actual Price" — struck-through anchor
   const [dateTime, setDateTime] = useState("");
   const [instructor, setInstructor] = useState("Balaji Chippada");
   const [videoUrl, setVideoUrl] = useState("");
@@ -2889,20 +2902,13 @@ function DashboardView({ user, role, onLogout }) {
   // Load sessions for management panel
   useEffect(() => {
     if (!db) return;
-    // Try ordered fetch, fall back to unordered if index is missing
-    let unsubscribe = db.collection("sessions")
-      .orderBy("createdAt", "desc")
+    // Fetch unordered and sort on the client — orderBy('createdAt') would drop
+    // any session doc missing that field. (See sortByCreatedAtDesc note above.)
+    const unsubscribe = db.collection("sessions")
       .onSnapshot(snap => {
         const list = [];
         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setSessions(list);
-      }, () => {
-        // Fallback: fetch without ordering if createdAt field/index missing
-        unsubscribe = db.collection("sessions").onSnapshot(snap => {
-          const list = [];
-          snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-          setSessions(list);
-        });
+        setSessions(sortByCreatedAtDesc(list));
       });
     return () => unsubscribe();
   }, []);
@@ -2940,17 +2946,10 @@ function DashboardView({ user, role, onLogout }) {
   useEffect(() => {
     if (!db) return;
     const unsubscribe = db.collection('masterclasses')
-      .orderBy('createdAt', 'desc')
       .onSnapshot(snap => {
         const list = [];
         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setMasterclasses(list);
-      }, () => {
-        db.collection('masterclasses').onSnapshot(snap => {
-          const list = [];
-          snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-          setMasterclasses(list);
-        });
+        setMasterclasses(sortByCreatedAtDesc(list));
       });
     return () => unsubscribe();
   }, []);
@@ -3102,6 +3101,7 @@ function DashboardView({ user, role, onLogout }) {
       setTitle("");
       setDescription("");
       setPrice("");
+      setOriginalPrice("");
       setDateTime("");
       setVideoUrl("");
       return;
@@ -3115,16 +3115,18 @@ function DashboardView({ user, role, onLogout }) {
       session = {
         title: V2_CONFIG_MASTERCLASS.title,
         price: V2_CONFIG_MASTERCLASS.price,
+        originalPrice: V2_CONFIG_MASTERCLASS.originalPrice,
         dateTime: V2_CONFIG_MASTERCLASS.dateTime,
         description: V2_CONFIG_MASTERCLASS.about || V2_CONFIG_MASTERCLASS.subtitle || "",
         videoUrl: V2_CONFIG_MASTERCLASS.videoUrl || "",
       };
     }
-      
+
     if (session) {
       setTitle(session.title || "");
       setDescription(session.description || session.rawSyllabus || "");
       setPrice(session.price !== undefined ? session.price : "");
+      setOriginalPrice(session.originalPrice !== undefined ? session.originalPrice : "");
       setVideoUrl(session.videoUrl || session.youtubeVideoId || session.videoId || "");
       
       // format to datetime-local expected string 'YYYY-MM-DDTHH:MM'
@@ -3150,7 +3152,9 @@ function DashboardView({ user, role, onLogout }) {
       return;
     }
 
-    if (!title || !description || !price || !dateTime) {
+    // NB: a free masterclass has price 0 — don't treat 0 as "missing" (!0 === true).
+    const priceEmpty = price === "" || price === null || price === undefined;
+    if (!title || !description || priceEmpty || !dateTime) {
       setStatus({ type: "error", message: "Please fill in all required fields." });
       return;
     }
@@ -3161,7 +3165,15 @@ function DashboardView({ user, role, onLogout }) {
     try {
       const priceNum = parseFloat(price);
       if (isNaN(priceNum) || priceNum < 0) {
-        throw new Error("Price must be a valid non-negative number.");
+        throw new Error("Offering price must be a valid non-negative number.");
+      }
+
+      // "Actual Price" is optional — empty means "no anchor" (stored as 0, so
+      // nothing is struck through). When set it must be a non-negative number.
+      const originalPriceEmpty = originalPrice === "" || originalPrice === null || originalPrice === undefined;
+      const originalPriceNum = originalPriceEmpty ? 0 : parseFloat(originalPrice);
+      if (isNaN(originalPriceNum) || originalPriceNum < 0) {
+        throw new Error("Actual price must be a valid non-negative number.");
       }
 
       // Convert date to generic ISO string format
@@ -3173,6 +3185,7 @@ function DashboardView({ user, role, onLogout }) {
         const updatePayload = {
           title,
           price: priceNum,
+          originalPrice: originalPriceNum,
           dateTime: formattedDate,
           instructor,
           videoUrl: videoUrl.trim()
@@ -3211,22 +3224,27 @@ function DashboardView({ user, role, onLogout }) {
           title,
           description,
           price: priceNum,
+          originalPrice: originalPriceNum,
           dateTime: formattedDate,
           instructor,
           videoUrl: videoUrl.trim(),
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         setStatus({ type: "success", message: "New Masterclass scheduled successfully!" });
-        
+
         // Reset form
         setTitle("");
         setDescription("");
         setPrice("");
+        setOriginalPrice("");
         setDateTime("");
         setVideoUrl("");
       }
     } catch (err) {
-      setStatus({ type: "error", message: err.message || "Failed to commit session to database." });
+      // Surface the raw error to the console so the exact Firestore/permission
+      // reason is visible when debugging a failed save.
+      console.error("Masterclass save failed:", err);
+      setStatus({ type: "error", message: (err && err.message) || "Failed to commit session to database." });
     } finally {
       setLoading(false);
     }
@@ -4023,27 +4041,42 @@ ${mcRawSyllabus}`;
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                 <div className="form-group">
-                  <label className="form-label">Price (INR) *</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="e.g. 1999"
+                  <label className="form-label">Actual Price (INR)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 999"
+                    min="0"
+                    value={originalPrice}
+                    onChange={(e) => setOriginalPrice(e.target.value)}
+                  />
+                  <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>Shown struck-through on the homepage.</small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Offering Price (INR) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 499 (or 0 for Free)"
+                    min="0"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     required
                   />
+                  <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>What attendees pay. 0 shows as “Free”.</small>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label">Date & Time *</label>
-                  <input 
-                    type="datetime-local" 
-                    className="form-input" 
-                    value={dateTime}
-                    onChange={(e) => setDateTime(e.target.value)}
-                    required
-                  />
-                </div>
+              <div className="form-group">
+                <label className="form-label">Date & Time *</label>
+                <input
+                  type="datetime-local"
+                  className="form-input"
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
+                  required
+                />
               </div>
 
               <div className="form-group">
@@ -4056,6 +4089,13 @@ ${mcRawSyllabus}`;
                   onChange={(e) => setVideoUrl(e.target.value)}
                 />
               </div>
+
+              {status.message && (
+                <div className={`status-box status-box--${status.type}`} style={{ marginBottom: "12px" }}>
+                  <span>{status.type === 'success' ? '✔' : '⚠'}</span>
+                  <span>{status.message}</span>
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: "10px" }}>
                 <button type="submit" className="form-btn" disabled={loading} style={{ flex: 1 }}>
@@ -5371,7 +5411,7 @@ function App() {
         try {
           const userDoc = await db.collection('users').doc(u.uid).get();
           const emailLower = (u.email || '').toLowerCase();
-          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com';
+          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com';
           
           let role = 'client';
           let hasProfile = false;
@@ -5387,6 +5427,11 @@ function App() {
             userTypeVal = userData.userType || '';
             hasProfile = !!(phoneVal && userTypeVal);
 
+            if (isBootstrapAdmin && role !== 'admin') {
+              await db.collection('users').doc(u.uid).update({ role: 'admin' });
+              role = 'admin';
+            }
+
             if (isBootstrapAdmin) {
               setUserRole('admin');
             } else {
@@ -5398,7 +5443,7 @@ function App() {
               await db.collection('users').doc(u.uid).set({
                 email: u.email,
                 role: 'admin',
-                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' ? 'Balaji Chippada' : 'Gowtam Singulur')
+                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' ? 'Balaji Chippada' : 'Gowtam Singulur')
               });
               setUserRole('admin');
               role = 'admin';
@@ -5426,7 +5471,7 @@ function App() {
         } catch (err) {
           console.error("Error reading role document:", err);
           const emailLower = (u.email || '').toLowerCase();
-          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com') {
+          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com') {
             setUserRole('admin');
           } else {
             setUserRole('client');
@@ -5535,13 +5580,12 @@ function App() {
       return;
     }
     const unsubscribe = db.collection('sessions')
-      .orderBy('createdAt', 'desc')
       .onSnapshot((snapshot) => {
         const list = [];
         snapshot.forEach(doc => {
           list.push({ id: doc.id, ...doc.data() });
         });
-        setSessions(list);
+        setSessions(sortByCreatedAtDesc(list));
         setLoadingSessions(false);
       }, (err) => {
         console.error('Could not fetch sessions from firestore:', err);
@@ -5560,21 +5604,15 @@ function App() {
   // automatically adapts to free copy + skips Razorpay.
   useEffect(() => {
     if (!db) { setLoadingMasterclasses(false); return; }
-    let unsub = db.collection('masterclasses')
-      .orderBy('createdAt', 'desc')
+    const unsub = db.collection('masterclasses')
       .onSnapshot(snap => {
         const list = [];
         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setMasterclasses(list);
+        setMasterclasses(sortByCreatedAtDesc(list));
         setLoadingMasterclasses(false);
-      }, () => {
-        // Fallback: no ordering
-        unsub = db.collection('masterclasses').onSnapshot(snap => {
-          const list = [];
-          snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-          setMasterclasses(list);
-          setLoadingMasterclasses(false);
-        }, () => setLoadingMasterclasses(false));
+      }, (err) => {
+        console.error('Could not fetch masterclasses from firestore:', err);
+        setLoadingMasterclasses(false);
       });
     return () => unsub();
   }, []);
@@ -5864,10 +5902,15 @@ function App() {
         const VV = window.V2_VALIDATE;
         const nameErr = VV ? VV.nameError(regName) : (!regName ? 'Please enter your name.' : '');
         if (nameErr) throw new Error(nameErr);
-        if (VV && !VV.isEmail(loginEmail)) throw new Error('Please enter a valid email address.');
+        const emailErr = VV ? VV.emailError(loginEmail) : (!loginEmail ? 'Please enter your email.' : '');
+        if (emailErr) throw new Error(emailErr);
         const phoneErr = VV ? VV.phoneError(regPhone, true) : (!regPhone ? 'Please enter your phone number.' : '');
         if (phoneErr) throw new Error(phoneErr);
         if (!regUserType) throw new Error('Please select what describes you best.');
+        if (VV && VV.emailDeliverableError) {
+          const deliverErr = await VV.emailDeliverableError(loginEmail);
+          if (deliverErr) throw new Error(deliverErr);
+        }
 
         // Create user in Auth
         const userCredential = await auth.createUserWithEmailAndPassword(loginEmail, loginPassword);
@@ -6042,9 +6085,17 @@ function App() {
     if (nameErr) { setBookingError(nameErr); return; }
     const emailErr = VV ? VV.emailError(bookingEmail) : (!bookingEmail ? 'Please enter your email.' : '');
     if (emailErr) { setBookingError(emailErr); return; }
-    const phoneErr = VV ? VV.phoneError(bookingPhone, false) : '';
+    const phoneErr = VV ? VV.phoneError(bookingPhone, true) : (!bookingPhone ? 'Please enter your phone number.' : '');
     if (phoneErr) { setBookingError(phoneErr); return; }
     if (!bookingSession) return;
+
+    // Confirm the email domain can actually receive mail (fail-open on errors).
+    if (VV && VV.emailDeliverableError) {
+      setBookingLoading(true);
+      const deliverErr = await VV.emailDeliverableError(bookingEmail);
+      setBookingLoading(false);
+      if (deliverErr) { setBookingError(deliverErr); return; }
+    }
 
     // Normalize to E.164 so international numbers keep their country code on save.
     const phoneE164 = VV ? VV.toE164(bookingPhone) : bookingPhone;
