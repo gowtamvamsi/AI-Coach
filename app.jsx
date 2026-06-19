@@ -2796,7 +2796,7 @@ function DashboardView({ user, role, onLogout }) {
               `https://balajichippada.com/\n\n` +
               `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
               `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
-              `https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t\n\n` +
+              `https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP\n\n` +
               `Let's build some amazing agentic systems together!\n\n` +
               `Best,\n` +
               `Balaji Chippada\n` +

@@ -58,7 +58,7 @@ https://balajichippada.com/
 Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.
 
 If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:
-https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t
+https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP
 
 Let's build some amazing agentic systems together!
 

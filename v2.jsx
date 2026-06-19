@@ -253,7 +253,7 @@ const V2_BRAND = Object.assign({
   youtubeChannel: 'https://www.youtube.com/@balajichippada',
   roadmapVideoId: 'Eze6D8jAMjI',
   roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
-  whatsappCommunity: 'https://chat.whatsapp.com/KbBr6JNlToy4e5M34MrOsY?mode=gi_t',
+  whatsappCommunity: 'https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP',
   linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
   instagram: 'https://www.instagram.com/balajichippada',
   github: 'https://github.com/ch-balaji',
