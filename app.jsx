@@ -47,11 +47,29 @@ if (typeof firebase !== 'undefined') {
   }
   auth = firebase.auth();
   db = firebase.firestore();
+  // Offline cache: on reload, onSnapshot serves locally-cached data instantly
+  // (then syncs), so the dashboard shows real numbers immediately instead of
+  // flashing zeros while the network round-trip completes. Must run before any
+  // Firestore read. Rejections (multi-tab/unsupported browser) are non-fatal.
+  try {
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+  } catch (e) { /* persistence unavailable — falls back to network-only */ }
   functions = firebase.functions();
   const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   if (!isLocalHost && firebaseConfig.measurementId && typeof firebase.analytics === 'function') {
     firebase.analytics();
   }
+}
+
+// Each signed-in/account view gets its own URL so a reload restores the tab the
+// user was on (instead of every account view collapsing to /account).
+const ACCOUNT_TAB_PATHS = { mybookings: '/account', dashboard: '/dashboard', emailtasks: '/email-tasks', courses: '/courses' };
+function accountTabForPath(pathname) {
+  const p = String(pathname || '/').replace(/\/+$/, '') || '/';
+  for (const tab in ACCOUNT_TAB_PATHS) {
+    if (ACCOUNT_TAB_PATHS[tab] === p) return tab;
+  }
+  return null;
 }
 
 function loadRazorpaySdk() {
@@ -213,6 +231,13 @@ function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoPro
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {section.note && (
+            <div className="tabbox__note-card" role="note">
+              <span className="tabbox__note-icon" aria-hidden="true">🛠️</span>
+              <span className="tabbox__note-text">{section.note}</span>
             </div>
           )}
 
@@ -561,7 +586,7 @@ function RoadmapView({
 
           <div className="hero__video">
             <V2ClickToPlayVideo
-              videoId={V2_BRAND.roadmapVideoId}
+              videoId="Eze6D8jAMjI"
               title="Agentic AI Engineer Roadmap 2026 — Balaji Chippada"
               caption={`${V2_SOCIAL.roadmapViews} views · Full 26-week walkthrough · Watch on YouTube`}
             />
@@ -2852,7 +2877,7 @@ function DashboardView({ user, role, onLogout }) {
             const subject = "Live Cohort: Build a production-grade Claude Code agent with me!";
             const body = `Hi ${name || "there"},\n\n` +
               `By now, you should have your local development environment ready.\n\n` +
-              `The best way to solidify your learning is to build in real time. I'm hosting an exclusive live masterclass where we will configure Claude Code, set up Model Context Protocol (MCP) servers, and build a self-correcting repository agent from scratch in 3 hours.\n\n` +
+              `The best way to solidify your learning is to build in real time. I'm hosting an exclusive live masterclass where we will configure Claude Code, set up Model Context Protocol (MCP) servers, and build a self-correcting repository agent from scratch in 2 hours.\n\n` +
               `Secure your seat here:\n` +
               `https://balajichippada.com/\n\n` +
               `Looking forward to seeing you there!\n\n` +
@@ -3914,8 +3939,8 @@ ${mcRawSyllabus}`;
                         <button
                           onClick={() => {
                             handleSelectSessionToEdit(isEditing ? "" : s.id, s.isMc);
-                            // Scroll to form
-                            document.querySelector('.dashboard__grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            // Scroll to the Schedule/Edit form (not the first grid on the page)
+                            if (!isEditing) document.getElementById('mc-schedule-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           }}
                           style={{
                             flex: 1,
@@ -3997,7 +4022,7 @@ ${mcRawSyllabus}`;
         );
       })()}
 
-      <div className="dashboard__grid">
+      <div className="dashboard__grid" id="mc-schedule-form">
         {/* Left Panel: Form (Only visible to Administrators) */}
         {isAdmin ? (
           <div className="dashboard__panel">
@@ -4943,6 +4968,147 @@ ${mcRawSyllabus}`;
 
 
 // ===============================================================
+// ADMIN — Courses tab. Static preview of the paid course's public
+// page: intro hero, overview copy, collapsible curriculum (from
+// window.COURSE_CURRICULUM / window.COURSE_INFO in data.js), and
+// the instructor bio card also used on the roadmap page.
+// ===============================================================
+// Cosmetic-only duration text — the curriculum data has no real lesson
+// lengths, so this just cycles a small set of plausible values by index.
+const COURSES_DURATION_CYCLE = ['12 mins', '18 mins', '24 mins', '9 mins', '15 mins'];
+
+function CoursesCurriculumSubmodule({ sm, modNum, startIndex }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="courses-submodule">
+      <button
+        type="button"
+        className="courses-submodule__head"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="courses-submodule__icon" aria-hidden="true" />
+        <span className="courses-submodule__title">{sm.title}</span>
+        <span className="courses-submodule__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <ul className="courses-submodule__lessons">
+          {sm.lessons.map((l, i) => (
+            <li key={i} className="courses-lesson">
+              <span className="courses-lesson__play" aria-hidden="true">▶</span>
+              <span className="courses-lesson__num">{modNum}.{startIndex + i + 1}</span>
+              <span className="courses-lesson__title">{l}</span>
+              <span className="courses-lesson__duration">{COURSES_DURATION_CYCLE[(startIndex + i) % COURSES_DURATION_CYCLE.length]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CoursesCurriculumModule({ mod }) {
+  const [open, setOpen] = useState(false);
+  let lessonCounter = 0;
+  return (
+    <div className="courses-module">
+      <button
+        type="button"
+        className="courses-module__head"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div className="courses-module__headtext">
+          <div className="courses-module__title">Module {mod.n}: {mod.title}</div>
+          <div className="courses-module__meta">
+            <span className="courses-module__meta-item">📘 Chapters : {mod.submodules.length}</span>
+            <span className="courses-module__meta-item">📎 Assignments : 0</span>
+            <span className="courses-module__meta-item">✔ Completed : 0%</span>
+          </div>
+        </div>
+        <span className="courses-module__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <div className="courses-module__body">
+          {mod.tagline && <p className="courses-module__tagline">{mod.tagline}</p>}
+          {mod.submodules.map((sm) => {
+            const startIndex = lessonCounter;
+            lessonCounter += sm.lessons.length;
+            return <CoursesCurriculumSubmodule key={sm.n} sm={sm} modNum={mod.n} startIndex={startIndex} />;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CoursesTabView() {
+  const info = window.COURSE_INFO || {};
+  const modules = window.COURSE_CURRICULUM || [];
+
+  return (
+    <div className="courses-page">
+      {/* SECTION 1 — Course intro (full-bleed, same as the homepage hero) */}
+      <header className="coaching-home__hero v2-hero hero--split">
+        <div className="v2-hero-grid">
+          <div className="v2-hero-left">
+            <h1 className="v2-hero-title">
+              <span className="v2-hero-title-line">{info.title}</span>
+            </h1>
+            <p className="v2-hero-sub">{info.intro}</p>
+            <p className="v2-hero-sub">
+              Course Instructor: <em>{V2_BRAND.name}</em>
+            </p>
+            <div className="v2-hero-actions">
+              <span className="v2-mc-price">
+                <s className="v2-mc-price-was">₹35,000</s>
+                <span className="v2-mc-price-free">₹29,999</span>
+              </span>
+            </div>
+            <div className="v2-hero-actions">
+              <button type="button" className="v2-hero-cta" disabled>
+                <span className="v2-hero-cta-text">Enroll now</span>
+              </button>
+            </div>
+          </div>
+          <div className="v2-hero-right">
+            <V2ClickToPlayVideo
+              videoId={V2_BRAND.roadmapVideoId}
+              title={`${info.title} — ${V2_BRAND.name}`}
+              caption="Watch on YouTube"
+            />
+          </div>
+        </div>
+      </header>
+
+      <div className="courses-page-body">
+        {/* SECTION 2 — Course Overview */}
+        <section className="courses-overview">
+          <h2 className="courses-overview__title">Course Overview</h2>
+          {(info.overview || []).map((p, i) => (
+            <p key={i} className="courses-overview__para">{p}</p>
+          ))}
+        </section>
+
+        {/* SECTION 3 — Curriculum */}
+        <section className="courses-curriculum">
+          <h2 className="courses-curriculum__title">Course Curriculum</h2>
+          <p className="courses-curriculum__stats">
+            {info.moduleCount} modules · {info.submoduleCount} sub-modules · {info.lessonCount} lessons
+          </p>
+          <div className="courses-curriculum__list">
+            {modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
+          </div>
+        </section>
+
+        {/* SECTION 4 — Instructor */}
+        <InstructorBio />
+      </div>
+    </div>
+  );
+}
+
+// ===============================================================
 // ADMIN — Email send-task viewer. Lists every bulk-email job
 // (emailJobs collection, written by Cloud Functions) with live
 // progress; click one to see counts and who it went to.
@@ -5216,10 +5382,11 @@ function App() {
   // Main navigation tabs routing state: 'home' | 'roadmap' | 'dashboard'
   const [activeMainTab, setActiveMainTab] = useState(() => {
     try {
+      const acct = accountTabForPath(window.location.pathname);
+      if (acct) return acct;
       const meta = window.SEO_CONFIG && window.SEO_CONFIG.getRouteMeta
         ? window.SEO_CONFIG.getRouteMeta(window.location.pathname)
         : null;
-      if (window.location.pathname.replace(/\/+$/, '') === '/account') return 'mybookings';
       return (meta && meta.tab) || 'home';
     } catch (e) { return 'home'; }
   });
@@ -5269,6 +5436,7 @@ function App() {
   const [bookingName, setBookingName] = useState("");
   const [bookingEmail, setBookingEmail] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
+  const [userProfilePhone, setUserProfilePhone] = useState(""); // saved phone from the account, used to prefill booking
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingStep, setBookingStep] = useState(1);
   const [bookingSuccess, setBookingSuccess] = useState(null);
@@ -5325,6 +5493,19 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  // Sign-up email verification (OTP): once a code is sent, show the code-entry step.
+  const [signupOtpSent, setSignupOtpSent] = useState(false);
+  const [signupOtp, setSignupOtp] = useState("");
+  // Forgot-password (OTP) flow: null → closed, 'email' → enter email, 'otp' → enter code + new password.
+  const [forgotStep, setForgotStep] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPw, setForgotNewPw] = useState("");
+  const [forgotNewPw2, setForgotNewPw2] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotMsg, setForgotMsg] = useState("");
+  const [forgotForce, setForgotForce] = useState(false); // Google user chose to set a password anyway
 
   // New student registration fields
   const [regName, setRegName] = useState("");
@@ -5426,6 +5607,7 @@ function App() {
             phoneVal = userData.phone || '';
             userTypeVal = userData.userType || '';
             hasProfile = !!(phoneVal && userTypeVal);
+            setUserProfilePhone(phoneVal); // for auto-filling the masterclass booking form
 
             if (isBootstrapAdmin && role !== 'admin') {
               await db.collection('users').doc(u.uid).update({ role: 'admin' });
@@ -5480,6 +5662,7 @@ function App() {
       } else {
         setUserRole(null);
         setShowCompleteProfile(false);
+        setUserProfilePhone(""); // signed out → don't leak the phone into a guest booking
       }
     });
     return () => unsubscribe();
@@ -5680,12 +5863,13 @@ function App() {
       // Always prefill from the account.
       setBookingName(user.displayName || bookingName);
       setBookingEmail(user.email || bookingEmail);
+      if (userProfilePhone) setBookingPhone(userProfilePhone);
       // Only skip to the payment step for PAID sessions. Free sessions have no
       // step 2 — keep them on step 1 (which holds the form + "Confirm free seat"),
       // otherwise logged-in users get an empty modal.
       if (!isMcFree(bookingSession)) setBookingStep(2);
     }
-  }, [user, bookingSession, bookingStep]);
+  }, [user, bookingSession, bookingStep, userProfilePhone]);
 
   // Scroll driven dock observer (Runs only if Roadmap view is active)
   useEffect(() => {
@@ -5886,6 +6070,56 @@ function App() {
     color: ['pink', 'mustard', 'teal-deep'][i]
   }));
 
+  // ── Forgot-password (6-digit OTP) flow ──
+  const closeForgot = () => {
+    setForgotStep(null); setForgotEmail(""); setForgotOtp(""); setForgotForce(false);
+    setForgotNewPw(""); setForgotNewPw2(""); setForgotError(""); setForgotMsg(""); setForgotLoading(false);
+  };
+  // Ask the backend to email a code. `force` skips the "you signed up with Google"
+  // hint and sends a code anyway (so a Google user can set a password if they want).
+  const requestCode = async (force) => {
+    setForgotLoading(true); setForgotError("");
+    try {
+      const res = await functions.httpsCallable("requestPasswordReset")({ email: forgotEmail.trim().toLowerCase(), force: !!force });
+      if (!force && res && res.data && res.data.provider === "google") {
+        setForgotStep("google"); // show the Google-sign-in prompt instead of a code
+      } else {
+        if (force) setForgotForce(true); // remember it for resends
+        setForgotMsg("If an account exists for that email, a 6-digit code is on its way. It expires in 10 minutes.");
+        setForgotStep("otp");
+      }
+    } catch (err) {
+      setForgotError((err && err.message) || "Could not send the code. Please try again.");
+    } finally { setForgotLoading(false); }
+  };
+  const handleRequestReset = (e) => {
+    if (e) e.preventDefault();
+    const VV = window.V2_VALIDATE;
+    const emailErr = VV ? VV.emailError(forgotEmail) : (!forgotEmail ? "Please enter your email." : "");
+    if (emailErr) { setForgotError(emailErr); return; }
+    requestCode(false);
+  };
+  const handleResetAnyway = () => requestCode(true);
+  const handleConfirmReset = async (e) => {
+    if (e) e.preventDefault();
+    if (!/^\d{6}$/.test(forgotOtp.trim())) { setForgotError("Enter the 6-digit code from your email."); return; }
+    if (forgotNewPw.length < 6) { setForgotError("Password must be at least 6 characters."); return; }
+    if (forgotNewPw !== forgotNewPw2) { setForgotError("Passwords do not match."); return; }
+    setForgotLoading(true); setForgotError("");
+    try {
+      await functions.httpsCallable("confirmPasswordReset")({
+        email: forgotEmail.trim().toLowerCase(), otp: forgotOtp.trim(), newPassword: forgotNewPw,
+      });
+      // Password changed → sign them straight in with the new password.
+      const em = forgotEmail.trim().toLowerCase(), pw = forgotNewPw;
+      closeForgot();
+      try { await auth.signInWithEmailAndPassword(em, pw); }
+      catch (_) { setStaffLoginOpen(true); } // fall back to the login screen
+    } catch (err) {
+      setForgotError((err && err.message) || "Could not reset your password. Please try again.");
+    } finally { setForgotLoading(false); }
+  };
+
   // Handle staff login submit
   const handleStaffLogin = async (e) => {
     e.preventDefault();
@@ -5907,37 +6141,21 @@ function App() {
         const phoneErr = VV ? VV.phoneError(regPhone, true) : (!regPhone ? 'Please enter your phone number.' : '');
         if (phoneErr) throw new Error(phoneErr);
         if (!regUserType) throw new Error('Please select what describes you best.');
+        if ((loginPassword || '').length < 6) throw new Error('Password must be at least 6 characters.');
         if (VV && VV.emailDeliverableError) {
           const deliverErr = await VV.emailDeliverableError(loginEmail);
           if (deliverErr) throw new Error(deliverErr);
         }
 
-        // Create user in Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(loginEmail, loginPassword);
-        const newUser = userCredential.user;
-
-        // Immediately write standard client profile fields to Firestore
-        await db.collection('users').doc(newUser.uid).set({
-          name: regName.trim(),
-          email: loginEmail.trim().toLowerCase(),
-          phone: VV ? VV.toE164(regPhone) : regPhone,
-          userType: regUserType,
-          role: 'client'
-        });
-
-        // Set Auth Display Name
-        try {
-          await newUser.updateProfile({ displayName: regName });
-        } catch (err) {
-          console.warn("Could not set firebase Auth displayName:", err);
+        // Verify-first: email a 6-digit code; the account is created server-side
+        // only after the code is confirmed (handleVerifySignup).
+        const res = await functions.httpsCallable('requestSignupOtp')({ email: loginEmail.trim().toLowerCase() });
+        if (res && res.data && res.data.exists) {
+          setIsRegistering(false);
+          throw new Error('An account already exists for this email. Please sign in.');
         }
-
-        setLoginEmail("");
-        setLoginPassword("");
-        setRegName("");
-        setRegPhone("");
-        setRegUserType("");
-        setStaffLoginOpen(false);
+        setSignupOtp("");
+        setSignupOtpSent(true);
       } else {
         // Standard login
         await auth.signInWithEmailAndPassword(loginEmail, loginPassword);
@@ -5950,6 +6168,42 @@ function App() {
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  // Verify the sign-up code → server creates the account → sign in.
+  const handleVerifySignup = async (e) => {
+    if (e) e.preventDefault();
+    if (!/^\d{6}$/.test(signupOtp.trim())) { setLoginError("Enter the 6-digit code from your email."); return; }
+    const VV = window.V2_VALIDATE;
+    setLoginError(""); setLoginLoading(true);
+    try {
+      await functions.httpsCallable('verifySignupOtpAndCreate')({
+        email: loginEmail.trim().toLowerCase(),
+        otp: signupOtp.trim(),
+        password: loginPassword,
+        name: regName.trim(),
+        phone: VV ? VV.toE164(regPhone) : regPhone,
+        userType: regUserType,
+      });
+      // Account created (email verified) → sign in with the chosen password.
+      await auth.signInWithEmailAndPassword(loginEmail.trim().toLowerCase(), loginPassword);
+      setLoginEmail(""); setLoginPassword(""); setRegName(""); setRegPhone(""); setRegUserType("");
+      setSignupOtp(""); setSignupOtpSent(false); setIsRegistering(false); setStaffLoginOpen(false);
+    } catch (err) {
+      if (err && /already exists/i.test(err.message || "")) {
+        setSignupOtpSent(false); setIsRegistering(false);
+      }
+      setLoginError((err && err.message) || "Could not verify the code. Please try again.");
+    } finally { setLoginLoading(false); }
+  };
+  const handleResendSignupOtp = async () => {
+    setLoginError(""); setLoginLoading(true);
+    try {
+      await functions.httpsCallable('requestSignupOtp')({ email: loginEmail.trim().toLowerCase() });
+      setLoginError("");
+    } catch (err) {
+      setLoginError((err && err.message) || "Could not resend the code.");
+    } finally { setLoginLoading(false); }
   };
 
   // Submit profile completion details for users (such as Google Sign-in users)
@@ -5970,13 +6224,15 @@ function App() {
 
     try {
       // Update Firestore user document with missing profile fields
+      const completedPhone = VV ? VV.toE164(regPhone) : regPhone;
       await db.collection('users').doc(user.uid).set({
         name: regName.trim(),
         email: user.email,
-        phone: VV ? VV.toE164(regPhone) : regPhone,
+        phone: completedPhone,
         userType: regUserType,
         role: 'client'
       }, { merge: true });
+      setUserProfilePhone(completedPhone); // so the booking form auto-fills this session
 
       // Update Auth Display Name
       try {
@@ -6036,6 +6292,7 @@ function App() {
       orderId: paymentData.orderId,
       session,
       tier,
+      alreadyRegistered: !!paymentData.alreadyRegistered,
     });
     setMockCheckoutData(null);
     setBookingStep('success');
@@ -6183,8 +6440,16 @@ function App() {
         }
       } catch (err) {
         console.error('Free booking error:', err);
-        setBookingError('Could not save your registration. Please try again.');
         setBookingLoading(false);
+        // The registration doc id is deterministic (session__email) and only staff
+        // can UPDATE registrations. So a permission-denied here means the doc already
+        // exists → this email is already registered. Show that instead of an error.
+        if (err && (err.code === 'permission-denied' || /permission|insufficient/i.test(err.message || ''))) {
+          setBookingError('');
+          await completeBookingSuccess({ paymentId: 'free_existing', orderId: 'free_existing', alreadyRegistered: true });
+          return;
+        }
+        setBookingError('Could not save your registration. Please try again.');
       }
       return;
     }
@@ -6444,7 +6709,7 @@ function App() {
   // ── Path-based routing (crawlable URLs for /roadmap, /masterclasses, /about) ──
   const tabToPath = (tab) => {
     if (tab === 'roadmap') return '/roadmap';
-    if (tab === 'mybookings' || tab === 'dashboard' || tab === 'emailtasks') return '/account';
+    if (ACCOUNT_TAB_PATHS[tab]) return ACCOUNT_TAB_PATHS[tab];
     return '/';
   };
 
@@ -6471,7 +6736,8 @@ function App() {
     const onPop = () => {
       try {
         const path = window.location.pathname.replace(/\/+$/, '') || '/';
-        if (path === '/account') { setActiveMainTab('mybookings'); return; }
+        const acct = accountTabForPath(path);
+        if (acct) { setActiveMainTab(acct); return; }
         const meta = window.SEO_CONFIG.getRouteMeta(path);
         setActiveMainTab(meta.tab || 'home');
         if (meta.title) document.title = meta.title;
@@ -6513,7 +6779,7 @@ function App() {
       >
         Full Roadmap
       </button>
-      {user && !user.isAnonymous && !isUserStaff && (
+      {user && !user.isAnonymous && (
         <button
           role="tab"
           aria-selected={activeMainTab === 'mybookings'}
@@ -6541,6 +6807,16 @@ function App() {
           onClick={() => switchMainTab('emailtasks')}
         >
           Email Tasks
+        </button>
+      )}
+      {userRole === 'admin' && (
+        <button
+          role="tab"
+          aria-selected={activeMainTab === 'courses'}
+          className={`nav__tab-btn ${activeMainTab === 'courses' ? 'active' : ''}`}
+          onClick={() => switchMainTab('courses')}
+        >
+          Courses
         </button>
       )}
     </React.Fragment>
@@ -6574,6 +6850,15 @@ function App() {
           >
             {isUserStaff ? 'Dashboard' : 'My Account'}
           </button>
+          {isUserStaff && (
+            <button
+              type="button"
+              className="nav__drawer-auth"
+              onClick={() => { setNavMenuOpen(false); switchMainTab('mybookings'); }}
+            >
+              My Account
+            </button>
+          )}
           <button
             type="button"
             className="nav__drawer-auth nav__drawer-logout"
@@ -6995,7 +7280,7 @@ function App() {
         />
       )}
 
-      {activeMainTab === 'mybookings' && user && !user.isAnonymous && !isUserStaff && (
+      {activeMainTab === 'mybookings' && user && !user.isAnonymous && (
         <V2StudentDashboard
           user={user}
           db={db}
@@ -7018,6 +7303,10 @@ function App() {
         <div className="email-tasks-page">
           <AdminEmailTasks />
         </div>
+      )}
+
+      {activeMainTab === 'courses' && userRole === 'admin' && (
+        <CoursesTabView />
       )}
 
 
@@ -7102,9 +7391,9 @@ function App() {
 
       {/* 3. Staff/Client Registration & Login Modal */}
       {staffLoginOpen && (
-        <div className="modal-overlay" onClick={() => setStaffLoginOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setStaffLoginOpen(false); setSignupOtpSent(false); setSignupOtp(""); }}>
           <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={isRegistering ? 'Create an account' : 'Sign in'}>
-            <button className="modal-close" onClick={() => setStaffLoginOpen(false)} aria-label="Close">×</button>
+            <button className="modal-close" onClick={() => { setStaffLoginOpen(false); setSignupOtpSent(false); setSignupOtp(""); }} aria-label="Close">×</button>
             <h2 className="modal-title">
               {isRegistering ? "Create an account" : <>Sign in to <em>Account</em></>}
             </h2>
@@ -7121,6 +7410,37 @@ function App() {
               </div>
             )}
 
+            {isRegistering && signupOtpSent ? (
+              <form onSubmit={handleVerifySignup}>
+                <p className="modal-desc" style={{ marginTop: "-8px", marginBottom: "20px" }}>
+                  We sent a 6-digit code to <strong>{loginEmail}</strong>. Enter it to verify your email and finish creating your account.
+                </p>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="signup-otp">6-digit code</label>
+                  <input
+                    type="text" id="signup-otp" name="otp" className="form-input" placeholder="••••••"
+                    value={signupOtp}
+                    onChange={e => setSignupOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric" maxLength={6} autoComplete="one-time-code" required autoFocus
+                    style={{ letterSpacing: "0.3em", fontFamily: "'JetBrains Mono', monospace" }}
+                  />
+                </div>
+                <button type="submit" className="form-btn form-btn--accent" disabled={loginLoading} style={{ background: "var(--c-pink)", color: "#fff" }}>
+                  {loginLoading ? "Verifying…" : "Verify & create account"}
+                </button>
+                <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px", color: "var(--fg-dim)" }}>
+                  <button type="button" onClick={handleResendSignupOtp} disabled={loginLoading}
+                    style={{ background: "none", border: "none", color: "var(--c-pink)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}>
+                    Resend code
+                  </button>
+                  {" · "}
+                  <button type="button" onClick={() => { setSignupOtpSent(false); setSignupOtp(""); setLoginError(""); }}
+                    style={{ background: "none", border: "none", color: "var(--fg-dim)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}>
+                    Edit details
+                  </button>
+                </div>
+              </form>
+            ) : (
             <form onSubmit={handleStaffLogin}>
               {isRegistering && (
                 <div className="form-group">
@@ -7169,23 +7489,23 @@ function App() {
                 />
               </div>
 
+              {!isRegistering && (
+                <div style={{ textAlign: "right", marginTop: "-10px", marginBottom: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setForgotEmail(loginEmail); setForgotError(""); setForgotMsg(""); setForgotStep("email"); setStaffLoginOpen(false); }}
+                    style={{ background: "none", border: "none", color: "var(--c-pink)", cursor: "pointer", font: "inherit", fontSize: "13px", textDecoration: "underline" }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
               {isRegistering && (
                 <React.Fragment>
                   <div className="form-group">
                     <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      placeholder="e.g. 9876543210 or +1 415 555 0132"
-                      value={regPhone}
-                      onChange={e => setRegPhone(window.V2_VALIDATE ? window.V2_VALIDATE.cleanPhone(e.target.value) : e.target.value)}
-                      autoComplete="tel"
-                      inputMode="tel"
-                      maxLength={16}
-                      pattern="\+?[0-9]{7,15}"
-                      title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
-                      required
-                    />
+                    <V2PhoneField value={regPhone} onChange={setRegPhone} required />
                   </div>
 
                   <div className="form-group">
@@ -7259,12 +7579,127 @@ function App() {
                   onClick={() => {
                     setIsRegistering(!isRegistering);
                     setLoginError("");
+                    setSignupOtpSent(false);
+                    setSignupOtp("");
                   }}
                 >
                   {isRegistering ? "Sign in" : "Register now"}
                 </button>
               </div>
             </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Forgot-password (OTP) modal */}
+      {forgotStep && (
+        <div className="modal-overlay" onClick={closeForgot} style={{ zIndex: 1100 }}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reset your password">
+            <button className="modal-close" onClick={closeForgot} aria-label="Close">×</button>
+            <h2 className="modal-title">Reset <em>password</em></h2>
+            <p className="modal-desc" style={{ marginBottom: "20px" }}>
+              {forgotStep === "email"
+                ? "Enter your account email and we'll send you a 6-digit code."
+                : forgotStep === "google"
+                ? "This account uses Google sign-in."
+                : "Enter the 6-digit code we emailed you, then choose a new password."}
+            </p>
+
+            {forgotMsg && (
+              <div className="status-box status-box--success" style={{ padding: "12px 16px", marginBottom: "16px" }}>
+                <span>✔</span><span>{forgotMsg}</span>
+              </div>
+            )}
+            {forgotError && (
+              <div className="status-box status-box--error" style={{ padding: "12px 16px", marginBottom: "16px" }}>
+                <span>⚠</span><span>{forgotError}</span>
+              </div>
+            )}
+
+            {forgotStep === "email" ? (
+              <form onSubmit={handleRequestReset}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="forgot-email">Email address</label>
+                  <input
+                    type="email" id="forgot-email" name="email" className="form-input"
+                    placeholder="you@gmail.com" value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    autoComplete="email" inputMode="email" required autoFocus
+                  />
+                </div>
+                <button type="submit" className="form-btn form-btn--accent" disabled={forgotLoading}>
+                  {forgotLoading ? "Sending…" : "Send code"}
+                </button>
+              </form>
+            ) : forgotStep === "google" ? (
+              <div>
+                <p style={{ fontSize: "14px", color: "var(--fg-dim)", lineHeight: 1.5, marginBottom: "20px" }}>
+                  You signed up with <strong>Google</strong>, so there's no password to reset — just use the
+                  button below. If you'd prefer to set a password as well, you can do that instead.
+                </p>
+                <button
+                  type="button"
+                  className="form-btn"
+                  style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}
+                  onClick={() => { closeForgot(); handleGoogleLogin(); }}
+                  disabled={forgotLoading}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  Sign in with Google
+                </button>
+                <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px", color: "var(--fg-dim)" }}>
+                  <button type="button" onClick={handleResetAnyway} disabled={forgotLoading}
+                    style={{ background: "none", border: "none", color: "var(--c-pink)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}>
+                    {forgotLoading ? "Sending…" : "Reset my password anyway"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmReset}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="forgot-otp">6-digit code</label>
+                  <input
+                    type="text" id="forgot-otp" name="otp" className="form-input"
+                    placeholder="••••••" value={forgotOtp}
+                    onChange={e => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric" maxLength={6} autoComplete="one-time-code" required autoFocus
+                    style={{ letterSpacing: "0.3em", fontFamily: "'JetBrains Mono', monospace" }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="forgot-newpw">New password</label>
+                  <input
+                    type="password" id="forgot-newpw" name="new-password" className="form-input"
+                    placeholder="At least 6 characters" value={forgotNewPw}
+                    onChange={e => setForgotNewPw(e.target.value)} autoComplete="new-password" required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="forgot-newpw2">Confirm new password</label>
+                  <input
+                    type="password" id="forgot-newpw2" name="confirm-password" className="form-input"
+                    placeholder="Re-enter new password" value={forgotNewPw2}
+                    onChange={e => setForgotNewPw2(e.target.value)} autoComplete="new-password" required
+                  />
+                </div>
+                <button type="submit" className="form-btn form-btn--accent" disabled={forgotLoading}>
+                  {forgotLoading ? "Resetting…" : "Reset password"}
+                </button>
+                <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px", color: "var(--fg-dim)" }}>
+                  Didn't get the code?{" "}
+                  <button type="button" onClick={() => requestCode(forgotForce)} disabled={forgotLoading}
+                    style={{ background: "none", border: "none", color: "var(--c-pink)", cursor: "pointer", textDecoration: "underline", font: "inherit" }}>
+                    Resend
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -7329,19 +7764,7 @@ function App() {
 
               <div className="form-group">
                 <label className="form-label">Phone Number <span style={{ color: "var(--c-pink)" }}>*</span></label>
-                <input
-                  type="tel"
-                  className="form-input"
-                  placeholder="e.g. 9876543210 or +1 415 555 0132"
-                  value={regPhone}
-                  onChange={e => setRegPhone(window.V2_VALIDATE ? window.V2_VALIDATE.cleanPhone(e.target.value) : e.target.value)}
-                  autoComplete="tel"
-                  inputMode="tel"
-                  maxLength={16}
-                  pattern="\+?[0-9]{7,15}"
-                  title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
-                  required
-                />
+                <V2PhoneField value={regPhone} onChange={setRegPhone} required />
               </div>
 
               <div className="form-group">

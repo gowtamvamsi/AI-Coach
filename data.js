@@ -16,9 +16,9 @@ window.ROADMAP = [
       { n: "1.2", title: "Core Python", items: ["Variables, types, control flow", "Functions, *args/**kwargs, decorators", "List & dict comprehensions", "Generator expressions", "Type hints (you'll need these for Pydantic later)"] },
       { n: "1.3", title: "Object-Oriented Python", items: ["Classes, __init__, instance vs class methods", "Inheritance, encapsulation, polymorphism", "Dataclasses", "Pydantic models — every agent framework uses them for tool schemas"] },
       { n: "1.4", title: "Working with HTTP APIs", items: ["The requests library", "HTTP verbs, headers, status codes", "Authentication (Bearer tokens, API keys)", "Rate limits, retries, exponential backoff with tenacity"] },
-      { n: "1.5", title: "Database Connectivity", items: ["psycopg2 for raw PostgreSQL", "SQLAlchemy ORM basics", "Connection pooling and why it matters under load", "Raw SQL when the ORM gets in the way"] },
-      { n: "1.6", title: "FastAPI", items: ["First /chat endpoint", "Pydantic request/response models", "Dependency injection", "Automatic OpenAPI docs", "Running with uvicorn"] },
-      { n: "1.7", title: "Async Programming", items: ["asyncio fundamentals — event loop, coroutines", "async/await syntax", "asyncio.gather for parallel LLM calls", "asyncio.wait_for for timeout protection", "asyncio.create_task for fire-and-forget logging"] }
+      { n: "1.5", title: "Async Programming", items: ["asyncio fundamentals — event loop, coroutines", "async/await syntax", "asyncio.gather for parallel LLM calls", "asyncio.wait_for for timeout protection", "asyncio.create_task for fire-and-forget logging"] },
+      { n: "1.6", title: "FastAPI", note: "We will cover this during the projects.", items: ["First /chat endpoint", "Pydantic request/response models", "Dependency injection", "Automatic OpenAPI docs", "Running with uvicorn"] },
+      { n: "1.7", title: "Database Connectivity", note: "We will cover this during the projects.", items: ["psycopg2 for raw PostgreSQL", "SQLAlchemy ORM basics", "Connection pooling and why it matters under load", "Raw SQL when the ORM gets in the way"] }
     ]
   },
   {
@@ -36,7 +36,7 @@ window.ROADMAP = [
       { n: "2.2", title: "How an LLM thinks", items: ["BPE tokenization — why \"hello\" is 1 token but \"antidisestablishmentarianism\" is 6", "Context windows — what fits, what gets silently truncated", "Sampling parameters: temperature, top-p, top-k — when to set what", "Transformer at 30,000 feet — attention preserves position, no math, no multi-head diagrams", "Why long context degrades (\"lost in the middle\")"] },
       { n: "2.3", title: "Reasoning models vs base models", items: ["The 2025 split: o1 / o3, Claude 3.7 thinking, Gemini 2.5 thinking, DeepSeek R1, Qwen QwQ", "What \"thinking tokens\" actually are and why they're billed", "When reasoning models are worth the latency and cost", "Reasoning effort knobs (low / medium / high) and how to budget them", "When a base model + good prompting beats a thinking model"] },
       { n: "2.4", title: "Reading model evals & benchmarks", items: ["The benchmarks worth knowing — MMLU, GSM8K, HumanEval, SWE-bench, GPQA, MMMU, BFCL (function calling)", "Why benchmarks lie — contamination, prompt sensitivity, eval gaming", "How to read a leaderboard skeptically (LMArena, Artificial Analysis, Vellum, Aider)", "Building your own micro-eval for the task you actually care about"] },
-      { n: "2.5", title: "Comparing the major models", items: ["GPT family, Claude family, Gemini, Llama, Mistral, DeepSeek, Qwen", "Cost vs quality vs speed vs context-length tradeoffs", "When model choice matters vs when it really doesn't"] }
+      { n: "2.5", title: "How to choose the models for your task", items: ["GPT family, Claude family, Gemini, Llama, Mistral, DeepSeek, Qwen", "Cost vs quality vs speed vs context-length tradeoffs", "When model choice matters vs when it really doesn't"] }
     ]
   },
   {
@@ -45,18 +45,17 @@ window.ROADMAP = [
     short: "Prompt Engineering",
     color: "purple",
     weeks: "Weeks 5–7",
-    weeksDetail: "3 weeks · 7 modules",
+    weeksDetail: "3 weeks · 6 modules",
     difficulty: 2,
     summary: "The pivot from \"ChatGPT user\" to \"engineer who controls LLMs.\"",
     endState: "You can take a flaky prompt that works \"sometimes\" and systematically make it reliable — and cut its cost in half with caching while you're at it.",
     sections: [
-      { n: "3.1", title: "UI vs API — the hinge moment", items: ["Same prompt, same model, different output — why?", "System prompts you don't see", "Skills/tools the chat UI calls silently", "Why production work happens via API"] },
-      { n: "3.2", title: "Calling LLMs via API", items: ["OpenAI SDK, Anthropic SDK", "Message format (system / user / assistant)", "Streaming responses", "Structured output (JSON mode, tool-call schemas, XML tags)"] },
-      { n: "3.3", title: "Prompt Engineering", items: ["Prompt anatomy — system prompt vs user turn vs assistant prefill", "Role & persona assignment; positive framing over negative constraints", "Structuring prompts — Markdown vs XML, and when each wins", "Zero-shot vs few-shot with curated examples", "COSTAR framework (Context, Objective, Style, Tone, Audience, Response) + iterative refinement loop"] },
-      { n: "3.4", title: "Context Engineering", items: ["Context engineering vs prompt engineering — supplying the right info, not just better wording", "What goes in the window — retrieved docs, tool outputs, memory, system state", "Token budgeting & ordering — avoiding \"lost in the middle\"", "Compression, summarization, and selective inclusion to stay in budget"] },
-      { n: "3.5", title: "Applied prompt patterns", items: ["Extraction (entities, dates, relationships)", "Classification (intent, sentiment, routing)", "Transformation (summarize, translate, reformat)", "Generation (reports, SQL, code)", "Decomposition (break complex queries into sub-prompts)"] },
-      { n: "3.6", title: "Advanced reasoning techniques", items: ["Chain of Thought — \"think step by step\"", "Self-Consistency — sample multiple paths, majority vote", "Self-Refine — generate, critique, refine loop", "Least-to-Most — decompose hard problems into ordered sub-problems", "Tree of Thought (research-flavoured; mention but don't drill)"] },
-      { n: "3.7", title: "Prompt management & cost in production", items: ["Versioning prompts in code vs as managed resources", "A/B testing prompt variants", "AWS Bedrock Prompt Management for the lifecycle without code deploys", "Prompt caching — Anthropic cache_control and OpenAI's automatic cached input pricing (5–10× cost cuts on long system prompts)", "DSPy — programmatic prompt optimisation when you want the framework to tune your prompts for you (mention; depth is optional)"] }
+      { n: "3.1", title: "UI vs API - Calling LLM's via API", items: ["Why the chat UI and the API give different output — hidden system prompts & silent tools, and why production runs on the API", "Calling LLMs via the OpenAI & Anthropic SDKs", "Message format — system / user / assistant turns", "Streaming responses", "Structured output — JSON mode, tool-call schemas, XML tags"] },
+      { n: "3.2", title: "Prompt Engineering", items: ["Prompt anatomy — system prompt vs user turn vs assistant prefill", "Role & persona assignment; positive framing over negative constraints", "Structuring prompts — Markdown vs XML, and when each wins", "Zero-shot vs few-shot with curated examples", "COSTAR framework (Context, Objective, Style, Tone, Audience, Response) + iterative refinement loop"] },
+      { n: "3.3", title: "Context Engineering", items: ["Context engineering vs prompt engineering — supplying the right info, not just better wording", "What goes in the window — retrieved docs, tool outputs, memory, system state", "Token budgeting & ordering — avoiding \"lost in the middle\"", "Compression, summarization, and selective inclusion to stay in budget"] },
+      { n: "3.4", title: "Applied prompt patterns", items: ["Extraction (entities, dates, relationships)", "Classification (intent, sentiment, routing)", "Transformation (summarize, translate, reformat)", "Generation (reports, SQL, code)", "Decomposition (break complex queries into sub-prompts)"] },
+      { n: "3.5", title: "Advanced reasoning techniques", items: ["Chain of Thought — \"think step by step\"", "Self-Consistency — sample multiple paths, majority vote", "Self-Refine — generate, critique, refine loop", "Least-to-Most — decompose hard problems into ordered sub-problems", "Tree of Thought (research-flavoured; mention but don't drill)"] },
+      { n: "3.6", title: "Prompt management & cost in production", items: ["Versioning prompts in code vs as managed resources", "A/B testing prompt variants", "AWS Bedrock Prompt Management for the lifecycle without code deploys", "Prompt caching — Anthropic cache_control and OpenAI's automatic cached input pricing (5–10× cost cuts on long system prompts)", "DSPy — programmatic prompt optimisation when you want the framework to tune your prompts for you (mention; depth is optional)"] }
     ]
   },
   {
@@ -292,3 +291,201 @@ window.NEXT_STEPS = [
     body: "Anthropic's \"Building effective agents\" essay, the Latent Space podcast, the LangChain blog, Eugene Yan's writing on production ML, and the original papers when something keeps confusing you (Self-RAG, RAG-as-judge, ReAct). Skim, don't drown."
   }
 ];
+
+// Generative & Agentic AI Engineering course curriculum (paid course, distinct from the
+// free public ROADMAP above). 15 modules, 73 submodules, 144 lessons — from Course_Curriculum_v2.pdf.
+// Module order swapped vs the source PDF: RAG before MCP, Evaluation before Multi-Agent Orchestration.
+window.COURSE_CURRICULUM = [
+  {
+    n: "00",
+    title: "Build a Full Working Agent",
+    tagline: "Ship a working agent on day one — before the fundamentals grind.",
+    submodules: [
+      { n: "0.1", title: "What You'll Build: Meet Atlas, the Course's Running Agent", lessons: ["Meet Atlas: The AI Assistant You'll Build, Deploy & Monitor"] },
+      { n: "0.2", title: "Build Your First Working Agent in 40 Lines (No Frameworks)", lessons: ["Build a Working AI Agent in 40 Lines (No Frameworks, No Magic)"] }
+    ]
+  },
+  {
+    n: "01",
+    title: "NLP Basics, Intuition-First",
+    tagline: "Understand what text becomes before an LLM ever sees it.",
+    submodules: [
+      { n: "1.1", title: "How Machines Learned to Understand Language (Deep Learning, No Math)", lessons: ["Deep Learning Explained Without a Single Equation"] },
+      { n: "1.2", title: "Tokens: How AI Actually Reads Text", lessons: ["Tokens: Why AI Doesn't See Words the Way You Do"] },
+      { n: "1.3", title: "Embeddings: Turning Meaning Into Numbers", lessons: ["Embeddings: How a Computer Learns That “King” and “Queen” Are Close"] },
+      { n: "1.4", title: "Vector Similarity: Measuring How Close Two Meanings Are", lessons: ["Cosine Similarity: How Machines Measure That Two Things Mean the Same"] },
+      { n: "1.5", title: "Neural Networks: What They Are & How They Learn", lessons: ["What Is a Neural Network? The Building Block of Modern AI", "Backpropagation & Gradient Descent: How a Network Actually Learns"] },
+      { n: "1.6", title: "Transformers & Attention: How a Model Decides What Matters", lessons: ["Attention, Explained for Humans: How a Model Decides What Matters", "Self-Attention: How a Sentence Understands Itself"] },
+      { n: "1.7", title: "Positional Encoding, NER & the Classic NLP Tasks You Still Need", lessons: ["Word Order, Names & the Classic NLP Tasks You Still Need in 2026"] },
+      { n: "1.8", title: "Your First Build: Semantic Search Over Your Own Notes", lessons: ["Build It: Semantic Search Over Your Own Notes"] }
+    ]
+  },
+  {
+    n: "02",
+    title: "LLMs: Internals, Parameters, Benchmarking & Cost",
+    tagline: "Pick and control the right model for a job — and predict its cost.",
+    submodules: [
+      { n: "2.1", title: "What an LLM Is: Training, Next-Token Prediction, Context & Limits", lessons: ["What Is an LLM, Really? A Short History & How They're Trained", "Next-Token Prediction, Explained From Scratch", "How to Communicate With LLMs Using an API Key", "What Is a Context Window? Why a Model Can Only “See” So Much at Once", "The Brain in a Windowless Room: Cutoffs, Hallucination & What LLMs Can't Know"] },
+      { n: "2.2", title: "Controlling Model Output: Decoding Dials & Reasoning vs Base Models", lessons: ["Temperature, Top-p, Max Tokens, Stop Sequences & Frequency/Presence Penalties: The Dials That Change Everything", "Reasoning vs Base Models: When “Thinking” Models Actually Win"] },
+      { n: "2.3", title: "Benchmarking LLMs: What the Numbers Really Mean", lessons: ["MMLU, Benchmarks & Lies: How to Actually Judge an LLM"] },
+      { n: "2.4", title: "Choosing & Pricing an LLM (Incl. Open-Source Models)", lessons: ["Picking the Right LLM: Quality vs Speed vs Cost (The Real Tradeoff)", "Open-Source & Open-Weight Models: The Landscape & Running Them Locally"] },
+      { n: "2.5", title: "Frameworks & a Provider-Agnostic Model Wrapper (LangChain + OpenAI SDK)", lessons: ["LangChain & OpenAI Frameworks: Do You Even Need One?", "LangChain Basics: Chains, Prompts & Models", "Build It: A Provider-Agnostic LLM Client (Cloud + Local via Ollama)", "Curated Resources to Keep Learning (Docs, Courses & Repositories)"] },
+      { n: "2.6", title: "Responsible AI: Bias, Safety & India-Specific Models", lessons: ["Bias, Safety & What “Responsible AI” Means in Practice — incl. Sarvam AI for India-Specific Use-Cases"] }
+    ]
+  },
+  {
+    n: "03",
+    title: "Prompt Engineering",
+    tagline: "Reliably get the behavior you want — the skill every agent call depends on.",
+    submodules: [
+      { n: "3.1", title: "Core Prompting Techniques: From Prompt Anatomy to Meta-Prompting", lessons: ["Anatomy of a Prompt: Instruction, Context, Input & Format", "Interview-Style Prompting: Drawing the Best Answer Out of a Model", "Chain-of-Thought: Making a Model Show Its Work", "Structured Output: Forcing Clean JSON With Pydantic Schemas", "Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)", "A Look Ahead: Context & Loop Engineering (Coming Later in the Course)"] }
+    ]
+  },
+  {
+    n: "04",
+    title: "Foundations of Agentic Systems",
+    tagline: "Understand the agent loop deeply — because you built it by hand.",
+    submodules: [
+      { n: "4.1", title: "What Is an Agent? Autonomy Levels, the Agent Loop & ReAct", lessons: ["From Rule-Based to Fully Autonomous: The 5 Levels of Agent Autonomy", "LLMs vs Agents vs Workflows: The Difference Nobody Explains Clearly", "The Agent Loop: Reason → Act → Observe → Repeat (ReAct)", "Build It: Give Atlas a ReAct Brain"] },
+      { n: "4.2", title: "Giving an Agent Tools: Function Calling & Tool Use", lessons: ["Give Your LLM Hands: Tool Calling From Scratch (Include more examples)", "Build It: Atlas Gets Its First Tools (Live Search + Calculator)", "More Examples of Tool Use"] },
+      { n: "4.3", title: "Real APIs, Tool Sandboxing & Self-Correction", lessons: ["Using an Actual API as a Tool", "Tool Sandboxing: Letting an AI Run Code Without Burning Your House Down", "When Tools Fail: Retries, Backoff & the Self-Correction Loop", "Hard-Stops & Max Steps: Stopping Runaway Self-Correction"] },
+      { n: "4.4", title: "Why Tools Fall Short: An Intro to MCP", lessons: ["The Drawbacks of Tools & Why We Need MCP — The USB-C Port for AI Agents", "The Zomato Example: Plugging a Real API Into an Agent via MCP"] },
+      { n: "4.5", title: "Cognitive Framework: Plan-and-Solve", lessons: ["Plan-and-Solve: Breaking a Hard Goal Into Steps an Agent Can Do", "Build It: Atlas Plans a Multi-Step Research Task"] },
+      { n: "4.6", title: "Cognitive Framework: Self-Reflection Loop", lessons: ["Self-Reflection: How an Agent Catches Its Own Mistakes", "Build It: Atlas Critiques and Fixes Its Own Output"] }
+    ]
+  },
+  {
+    n: "05",
+    title: "RAG — Retrieval-Augmented Generation",
+    tagline: "Answer from your own documents — grounded and cited, not from memory.",
+    submodules: [
+      { n: "5.1", title: "Naive RAG", lessons: ["RAG Architecture: The Anatomy of a Pipeline", "Chunking Strategies", "Vector Databases", "Retrieval"] },
+      { n: "5.2", title: "Advanced RAG", lessons: ["Advanced RAG Architecture", "Search Algorithms: HNSW & IVF", "Retrieval Reranking", "LLM as a Judge", "HyDE: Hypothetical Document Embeddings", "FLARE: Forward-Looking Active Retrieval"] },
+      { n: "5.3", title: "Graph RAG", lessons: ["Graph RAG: Reasoning Over Connected Knowledge", "Vectorless RAG"] },
+      { n: "5.4", title: "Agentic RAG", lessons: ["Agentic RAG: Letting the Agent Decide When & What to Retrieve", "RAG as a Tool"] },
+      { n: "5.5", title: "Multimodal RAG", lessons: ["Multimodal RAG: Retrieving Across Text, Images & More"] },
+      { n: "5.6", title: "Evaluation", lessons: ["Is Your RAG Actually Good? Faithfulness & Relevance Metrics"] }
+    ]
+  },
+  {
+    n: "06",
+    title: "MCP — Model Context Protocol",
+    tagline: "Connect your agent to anything through one universal standard.",
+    submodules: [
+      { n: "6.1", title: "What Exactly Is an MCP — and Why We Need Them", lessons: ["The M×N Problem: Why MCP Exists", "Tools vs MCP vs Prompts: What Goes Where", "Host, Client & Server: The MCP Architecture"] },
+      { n: "6.2", title: "Build Your Own MCP Server From Scratch", lessons: ["Build It: An MCP Server From Scratch (Host, Client & Server)"] },
+      { n: "6.3", title: "Build an MCP for Google (Gmail & Calendar)", lessons: ["Build It: A Gmail & Calendar MCP for Atlas"] },
+      { n: "6.4", title: "Plugging In Third-Party MCP Servers", lessons: ["How to Plug In & Use Third-Party MCP Servers"] },
+      { n: "6.5", title: "Where MCP Falls Short: Context Bloat & Limitations", lessons: ["Too Many MCPs: How Context Bloat Confuses Your Agent", "MCP Limitations: Where the Protocol Falls Short"] },
+      { n: "6.6", title: "Securing an MCP Server: Auth, Config & Secrets", lessons: ["Securing MCP: Auth, JSON Config & Environment Variables"] }
+    ]
+  },
+  {
+    n: "07",
+    title: "Memory & Optimization",
+    tagline: "Remember across sessions without blowing the context window.",
+    submodules: [
+      { n: "7.1", title: "Short-Term Memory & the Context Window", lessons: ["The Context Window: Why Your Agent Forgets Mid-Conversation", "Build It: Conversation Memory for Atlas"] },
+      { n: "7.2", title: "Long-Term Memory (Vector DBs, Profiling)", lessons: ["Long-Term Memory: How Production Agents Remember You", "Build It: Atlas Remembers Your Preferences Across Sessions"] },
+      { n: "7.3", title: "Episodic vs Semantic Memory", lessons: ["Episodic vs Semantic Memory: Specific Logs vs Learned Facts", "Build It: Atlas Recalls Past Research and Generalizes From It"] },
+      { n: "7.4", title: "Context Optimization & Token Budgeting", lessons: ["Lost in the Middle: Why Long Context Degrades & How to Fight It", "Build It: Trim, Summarize & Budget Atlas's Context for Cost"] },
+      { n: "7.5", title: "Context Engineering & Loop Engineering", lessons: ["Context Engineering: Designing Exactly What the Agent Sees", "Loop Engineering: Controlling How an Agent Iterates", "Build It: Apply Context & Loop Engineering to Atlas"] }
+    ]
+  },
+  {
+    n: "08",
+    title: "State Machines & DAGs (LangGraph)",
+    tagline: "Control an agent's flow deterministically — and pause for a human.",
+    submodules: [
+      { n: "8.1", title: "From Loops to State: Why Agents Need a Single Source of Truth", lessons: ["Why Loops Aren't Enough: State as the Single Source of Truth — and the Drawbacks of Context & Loop Engineering"] },
+      { n: "8.2", title: "Modeling Agents as Graphs: Nodes, Edges & State in LangGraph", lessons: ["Agents as Graphs: The Mental Model Behind LangGraph", "Build It: Re-Architect Atlas on LangGraph"] },
+      { n: "8.3", title: "Deterministic Routing: Letting Code Decide the Path", lessons: ["Conditional Routing: Letting Code Decide When the AI Shouldn't", "Build It: Add Smart Routing to Atlas"] },
+      { n: "8.4", title: "Human-in-the-Loop: Pausing for Approval Before Risky Actions", lessons: ["Human-in-the-Loop: Pausing an Agent for Approval Before It Acts", "Build It: An Approval Checkpoint Before Atlas Takes Risky Actions"] }
+    ]
+  },
+  {
+    n: "09",
+    title: "Evaluation",
+    tagline: "Prove your agent works and catch regressions before users do.",
+    submodules: [
+      { n: "9.1", title: "Why Agents Are Hard to Evaluate", lessons: ["Non-Deterministic Nightmares: Why You Can't Unit-Test an Agent"] },
+      { n: "9.2", title: "Success-Rate Evaluation: Scoring Non-Deterministic Agents", lessons: ["Success Rate: Scoring an Agent That Answers Differently Every Time", "Build It: A Success-Rate Eval Harness for Atlas"] },
+      { n: "9.3", title: "Trajectory Benchmarking: Did the Agent Take the Efficient Path?", lessons: ["Trajectory Benchmarking: Did the Agent Take the Efficient Path?", "Build It: Measure How Atlas Gets to the Answer, Not Just the Answer"] },
+      { n: "9.4", title: "LLM-as-Judge, Eval Datasets & Regression Suites", lessons: ["LLM-as-Judge & Eval Datasets: Building a Test Set for Agents", "Build It: A Regression Suite That Blocks Bad Atlas Changes"] }
+    ]
+  },
+  {
+    n: "10",
+    title: "Multi-Agent Orchestration",
+    tagline: "Make specialized agents collaborate without burning $400 in a loop.",
+    submodules: [
+      { n: "10.1", title: "Specialized Agents: When a Team Beats One Generalist", lessons: ["One Genius vs a Team: When Multiple Agents Beat One"] },
+      { n: "10.2", title: "Orchestration Patterns: Hierarchical vs Peer-to-Peer Teams", lessons: ["Hierarchical vs Peer-to-Peer: How Agent Teams Are Organized", "Build It: Turn Atlas Into a Researcher + Writer + Critic Team"] },
+      { n: "10.3", title: "How Agents Communicate: Message Passing vs Shared Memory (A2A / M2M)", lessons: ["How Agents Talk: Message Passing vs Shared Memory (A2A / M2M)", "Build It: Wire Up Communication Between Atlas's Agents"] },
+      { n: "10.4", title: "Choosing a Multi-Agent Framework: LangGraph vs OpenAI SDK vs CrewAI", lessons: ["LangGraph vs OpenAI Agents SDK vs CrewAI: When to Use Which", "Build It: The Same Atlas Team, Rebuilt in the OpenAI Agents SDK"] }
+    ]
+  },
+  {
+    n: "11",
+    title: "Security & Guardrails",
+    tagline: "Survive malicious users and handle sensitive data safely.",
+    submodules: [
+      { n: "11.1", title: "Input & Output Guardrails: The First Line of Defense", lessons: ["Input & Output Guardrails: The First Line of Defense", "Build It: Input & Output Guardrails for Atlas"] },
+      { n: "11.2", title: "Tool Guardrails: Constraining What an Agent Can Do", lessons: ["Tool Guardrails: Constraining What an Agent Is Allowed to Do", "Build It: Guardrails Around Atlas's Tools"] },
+      { n: "11.3", title: "Human-in-the-Loop Guardrails: Approval Gates for Risky Actions", lessons: ["Human-in-the-Loop Guardrails: Approval Gates for Risky Actions", "Build It: A Human Approval Guardrail for Atlas"] },
+      { n: "11.4", title: "Prompt Injection: How to Break Agents", lessons: ["Prompt Injection: How One Sentence Hijacks Your Agent", "Breaking Agents: Jailbreaks, Adversarial Inputs & Red-Teaming"] },
+      { n: "11.5", title: "Sandboxing & Least Privilege: Don't Hand Over the Master Key", lessons: ["Least Privilege for Agents: Don't Give the AI the Master Key", "Build It: Lock Down Atlas's Tools and Permissions"] },
+      { n: "11.6", title: "Secrets, PII & Data Handling: What an Agent Must Never Leak", lessons: ["Secrets, PII & Compliance: What an Agent Must Never Leak", "Build It: Safe Secrets & PII Redaction in Atlas"] }
+    ]
+  },
+  {
+    n: "12",
+    title: "Deployment (incl. FastAPI)",
+    tagline: "Real users can use your agent over the internet.",
+    submodules: [
+      { n: "12.1", title: "Serving an Agent as an API With FastAPI", lessons: ["From Notebook to API: Serving an Agent With FastAPI", "Build It: Wrap Atlas in a FastAPI Service"] },
+      { n: "12.2", title: "Containerizing Your Agent With Docker", lessons: ["Docker for AI Apps: “It Works on My Machine” Is Not a Deploy", "Build It: Dockerize Atlas"] },
+      { n: "12.3", title: "Async for Agents: Don't Let One Call Freeze Everything", lessons: ["Why Agents Need Async: One Hanging LLM Call Shouldn't Freeze Everything", "Build It: Make Atlas's API Async & Streaming"] },
+      { n: "12.4", title: "Shipping to the Cloud With CI/CD", lessons: ["From Localhost to the Internet: Deploying Agents to the Cloud", "Build It: Deploy Atlas to the Cloud With CI/CD"] },
+      { n: "12.5", title: "Reliability: Retries, Timeouts, Queues & Scaling", lessons: ["Reliability for Agents: Timeouts, Queues & Surviving Traffic", "Build It: A Chat UI + Reliability Layer for Atlas"] }
+    ]
+  },
+  {
+    n: "13",
+    title: "Monitoring & Operations",
+    tagline: "See what your live agent is doing, what it costs, and how to improve it.",
+    submodules: [
+      { n: "13.1", title: "Tracing Every Step of a Live Agent", lessons: ["You Can't Fix What You Can't See: Tracing Every Agent Step", "Build It: Full-Trace Logging for Live Atlas"] },
+      { n: "13.2", title: "Observability Tooling: Langfuse & LangSmith", lessons: ["Observability for Agents: Traces, Dashboards & Alerts", "Langfuse vs LangSmith: Choosing Your Observability Stack", "Build It: Instrument Atlas With Langfuse & LangSmith"] },
+      { n: "13.3", title: "Token & Cost Optimization in Production", lessons: ["The 3 AM Bill: Cutting Agent Token Costs in Production", "Build It: A Cost & Quality Dashboard for Atlas"] },
+      { n: "13.4", title: "Feedback Loops & Continuous Improvement", lessons: ["Closing the Loop: Turning Live Feedback Into a Better Agent", "Build It: A Feedback → Eval → Improve Loop for Atlas"] }
+    ]
+  },
+  {
+    n: "14",
+    title: "Capstone Projects & Portfolio",
+    tagline: "Ship and monitor your OWN agentic product — portfolio-ready.",
+    submodules: [
+      { n: "14.1", title: "Choosing & Scoping Your Capstone", lessons: ["How to Scope an Agentic Project That Actually Ships"] },
+      { n: "14.2", title: "Capstone A — Customer-Support Agent", lessons: ["Build, Deploy & Monitor a Support Agent End-to-End"] },
+      { n: "14.3", title: "Capstone B — Coding / Dev Agent", lessons: ["Build, Deploy & Monitor a Coding Agent End-to-End"] },
+      { n: "14.4", title: "Capstone C — Personal-Finance Agent", lessons: ["Build, Deploy & Monitor a Finance Agent End-to-End"] },
+      { n: "14.5", title: "Portfolio, Resume & Interview Prep", lessons: ["From Project to Job: Portfolio, Resume & Agent-Engineer Interview Prep"] },
+      { n: "14.6", title: "Bonus Capstone — Voice-to-Voice Agent", lessons: ["A Voice-to-Voice Atlas (STT → Agent → TTS)"] }
+    ]
+  }
+];
+
+window.COURSE_INFO = {
+  title: "Generative & Agentic AI Engineering",
+  intro: "is a hands-on course that takes learners from building their first 40-line AI agent to deploying, monitoring, and optimizing a production-grade agentic system. Through the course, learners build Atlas, a running AI assistant project, while learning LLM fundamentals, prompt engineering, tool use, MCP, RAG, memory, LangGraph, multi-agent orchestration, evaluation, guardrails, deployment, monitoring, and capstone projects. The curriculum includes 15 modules, 73 sub-modules, and 144 lessons, designed to help learners understand the theory and immediately apply it through real-world builds",
+  moduleCount: 15,
+  submoduleCount: 73,
+  lessonCount: 144,
+  overview: [
+    "Generative & Agentic AI Engineering is a hands-on, build-first program designed to take you from AI curiosity to engineering production-ready intelligent systems.",
+    "Instead of only learning concepts, you will build Atlas—your own evolving AI assistant—from a simple 40-line agent into a deployed, monitored, secure, and scalable agentic product. Along the way, you will learn how modern LLMs work, how to make them reason and use tools, connect them to real-world services through MCP, retrieve trusted information with RAG, remember users across sessions, collaborate through multi-agent systems, and operate reliably in production.",
+    "The course is structured for learners who want practical clarity, not framework magic. You will first build core systems from scratch to understand what happens under the hood, then level up using industry-relevant tools such as LangChain, LangGraph, FastAPI, Docker, Langfuse, LangSmith, and cloud deployment workflows.",
+    "By the end, you will have the skills and portfolio needed to design, build, evaluate, secure, deploy, and improve real AI agents—whether for customer support, coding assistance, research, finance, or voice-based applications. With 15 modules, 73 sub-modules, and 144 lessons, this course gives you a complete path from your first agent to a production-grade Agentic AI Engineer."
+  ]
+};

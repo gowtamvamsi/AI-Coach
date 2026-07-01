@@ -13,7 +13,7 @@ window.SEO_CONFIG = {
 
   title: 'Balaji Chippada · Agentic AI Engineer Roadmap & Live Masterclasses (2026)',
   description:
-    'Free 26-week Agentic AI Engineer roadmap (150K+ YouTube views) plus live demo-first masterclasses from Balaji Chippada. Learn Python, RAG, LangGraph, MCP, multi-agent systems, guardrails, and AWS deployment — production-grade, not tutorial fluff.',
+    'Free 26-week Agentic AI Engineer roadmap (170K+ YouTube views) plus live demo-first masterclasses from Balaji Chippada. Learn Python, RAG, LangGraph, MCP, multi-agent systems, guardrails, and AWS deployment — production-grade, not tutorial fluff.',
   keywords: [
     'agentic AI',
     'AI engineer roadmap 2026',
@@ -76,9 +76,9 @@ window.SEO_CONFIG = {
     '/about': {
       tab: 'home',
       scrollTo: 'instructor',
-      title: 'About Balaji Chippada — The Agent Engineer (150K+ roadmap views)',
+      title: 'About Balaji Chippada — The Agent Engineer (170K+ roadmap views)',
       description:
-        'Balaji Chippada is an AI engineer and educator behind the 150K+-view 2026 Agentic AI Engineer roadmap. He teaches production RAG, LangGraph, MCP, and multi-agent systems — demo-first on YouTube (22K+ subscribers) and in live masterclasses.',
+        'Balaji Chippada is an AI engineer and educator behind the 170K+-view 2026 Agentic AI Engineer roadmap. He teaches production RAG, LangGraph, MCP, and multi-agent systems — demo-first on YouTube (26K+ subscribers) and in live masterclasses.',
     },
   },
 
@@ -115,8 +115,8 @@ window.SEO_CONFIG = {
     const mc = (window.SITE_CONFIG && window.SITE_CONFIG.nextMasterclass) || {};
     const url = this.siteUrl;
     const routePath = (route && route.path) || '/';
-    const views = stats.roadmapViews || '150K+';
-    const subs = stats.youtubeSubs || '22K+';
+    const views = stats.roadmapViews || '170K+';
+    const subs = stats.youtubeSubs || '26K+';
 
     const graph = [
       {

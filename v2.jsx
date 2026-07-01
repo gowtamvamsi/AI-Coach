@@ -161,11 +161,303 @@ const V2_VALIDATE = {
   phoneError(v, required) {
     const c = this.cleanPhone(v);
     if (!c) return required ? 'Please enter your phone number.' : '';
-    if (!this.isPhone(v)) return 'Enter a 10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132).';
+    if (!this.isPhone(v)) return 'Please enter a valid phone number for the selected country code.';
     return '';
   },
 };
 if (typeof window !== 'undefined') window.V2_VALIDATE = V2_VALIDATE;
+
+// ===============================================================
+// Country-code dropdown + phone input — used by EVERY phone field
+// (booking, profile, sign-up). Stores the full E.164 value
+// ("+<dial><number>") in the parent's phone state. Defaults to India
+// (+91) so a country code is always selected; the user must pick theirs.
+// ===============================================================
+// India first (default selection); the rest alphabetical by name for findability.
+// `max` overrides the default 10-digit national-number cap where a country runs
+// longer (e.g. China/Germany mobiles can be 11).
+const V2_DIAL_CODES = [
+  { iso: 'IN', dial: '+91', name: 'India' },
+  { iso: 'AF', dial: '+93', name: 'Afghanistan' },
+  { iso: 'AL', dial: '+355', name: 'Albania' },
+  { iso: 'DZ', dial: '+213', name: 'Algeria' },
+  { iso: 'AD', dial: '+376', name: 'Andorra' },
+  { iso: 'AO', dial: '+244', name: 'Angola' },
+  { iso: 'AG', dial: '+1268', name: 'Antigua and Barbuda' },
+  { iso: 'AR', dial: '+54', name: 'Argentina' },
+  { iso: 'AM', dial: '+374', name: 'Armenia' },
+  { iso: 'AW', dial: '+297', name: 'Aruba' },
+  { iso: 'AU', dial: '+61', name: 'Australia' },
+  { iso: 'AT', dial: '+43', name: 'Austria', max: 13 },
+  { iso: 'AZ', dial: '+994', name: 'Azerbaijan' },
+  { iso: 'BS', dial: '+1242', name: 'Bahamas' },
+  { iso: 'BH', dial: '+973', name: 'Bahrain' },
+  { iso: 'BD', dial: '+880', name: 'Bangladesh' },
+  { iso: 'BB', dial: '+1246', name: 'Barbados' },
+  { iso: 'BY', dial: '+375', name: 'Belarus' },
+  { iso: 'BE', dial: '+32', name: 'Belgium' },
+  { iso: 'BZ', dial: '+501', name: 'Belize' },
+  { iso: 'BJ', dial: '+229', name: 'Benin' },
+  { iso: 'BM', dial: '+1441', name: 'Bermuda' },
+  { iso: 'BT', dial: '+975', name: 'Bhutan' },
+  { iso: 'BO', dial: '+591', name: 'Bolivia' },
+  { iso: 'BA', dial: '+387', name: 'Bosnia and Herzegovina' },
+  { iso: 'BW', dial: '+267', name: 'Botswana' },
+  { iso: 'BR', dial: '+55', name: 'Brazil' },
+  { iso: 'BN', dial: '+673', name: 'Brunei' },
+  { iso: 'BG', dial: '+359', name: 'Bulgaria' },
+  { iso: 'BF', dial: '+226', name: 'Burkina Faso' },
+  { iso: 'BI', dial: '+257', name: 'Burundi' },
+  { iso: 'KH', dial: '+855', name: 'Cambodia' },
+  { iso: 'CM', dial: '+237', name: 'Cameroon' },
+  { iso: 'CA', dial: '+1', name: 'Canada' },
+  { iso: 'CV', dial: '+238', name: 'Cape Verde' },
+  { iso: 'KY', dial: '+1345', name: 'Cayman Islands' },
+  { iso: 'CF', dial: '+236', name: 'Central African Republic' },
+  { iso: 'TD', dial: '+235', name: 'Chad' },
+  { iso: 'CL', dial: '+56', name: 'Chile' },
+  { iso: 'CN', dial: '+86', name: 'China', max: 11 },
+  { iso: 'CO', dial: '+57', name: 'Colombia' },
+  { iso: 'KM', dial: '+269', name: 'Comoros' },
+  { iso: 'CD', dial: '+243', name: 'Congo (DRC)' },
+  { iso: 'CG', dial: '+242', name: 'Congo (Republic)' },
+  { iso: 'CR', dial: '+506', name: 'Costa Rica' },
+  { iso: 'CI', dial: '+225', name: "Côte d'Ivoire" },
+  { iso: 'HR', dial: '+385', name: 'Croatia' },
+  { iso: 'CU', dial: '+53', name: 'Cuba' },
+  { iso: 'CY', dial: '+357', name: 'Cyprus' },
+  { iso: 'CZ', dial: '+420', name: 'Czechia' },
+  { iso: 'DK', dial: '+45', name: 'Denmark' },
+  { iso: 'DJ', dial: '+253', name: 'Djibouti' },
+  { iso: 'DM', dial: '+1767', name: 'Dominica' },
+  { iso: 'DO', dial: '+1809', name: 'Dominican Republic' },
+  { iso: 'EC', dial: '+593', name: 'Ecuador' },
+  { iso: 'EG', dial: '+20', name: 'Egypt' },
+  { iso: 'SV', dial: '+503', name: 'El Salvador' },
+  { iso: 'GQ', dial: '+240', name: 'Equatorial Guinea' },
+  { iso: 'ER', dial: '+291', name: 'Eritrea' },
+  { iso: 'EE', dial: '+372', name: 'Estonia' },
+  { iso: 'SZ', dial: '+268', name: 'Eswatini' },
+  { iso: 'ET', dial: '+251', name: 'Ethiopia' },
+  { iso: 'FJ', dial: '+679', name: 'Fiji' },
+  { iso: 'FI', dial: '+358', name: 'Finland' },
+  { iso: 'FR', dial: '+33', name: 'France' },
+  { iso: 'GA', dial: '+241', name: 'Gabon' },
+  { iso: 'GM', dial: '+220', name: 'Gambia' },
+  { iso: 'GE', dial: '+995', name: 'Georgia' },
+  { iso: 'DE', dial: '+49', name: 'Germany', max: 11 },
+  { iso: 'GH', dial: '+233', name: 'Ghana' },
+  { iso: 'GR', dial: '+30', name: 'Greece' },
+  { iso: 'GL', dial: '+299', name: 'Greenland' },
+  { iso: 'GD', dial: '+1473', name: 'Grenada' },
+  { iso: 'GT', dial: '+502', name: 'Guatemala' },
+  { iso: 'GN', dial: '+224', name: 'Guinea' },
+  { iso: 'GW', dial: '+245', name: 'Guinea-Bissau' },
+  { iso: 'GY', dial: '+592', name: 'Guyana' },
+  { iso: 'HT', dial: '+509', name: 'Haiti' },
+  { iso: 'HN', dial: '+504', name: 'Honduras' },
+  { iso: 'HK', dial: '+852', name: 'Hong Kong' },
+  { iso: 'HU', dial: '+36', name: 'Hungary' },
+  { iso: 'IS', dial: '+354', name: 'Iceland' },
+  { iso: 'ID', dial: '+62', name: 'Indonesia' },
+  { iso: 'IR', dial: '+98', name: 'Iran' },
+  { iso: 'IQ', dial: '+964', name: 'Iraq' },
+  { iso: 'IE', dial: '+353', name: 'Ireland' },
+  { iso: 'IL', dial: '+972', name: 'Israel' },
+  { iso: 'IT', dial: '+39', name: 'Italy' },
+  { iso: 'JM', dial: '+1876', name: 'Jamaica' },
+  { iso: 'JP', dial: '+81', name: 'Japan' },
+  { iso: 'JO', dial: '+962', name: 'Jordan' },
+  { iso: 'KZ', dial: '+7', name: 'Kazakhstan' },
+  { iso: 'KE', dial: '+254', name: 'Kenya' },
+  { iso: 'KI', dial: '+686', name: 'Kiribati' },
+  { iso: 'KW', dial: '+965', name: 'Kuwait' },
+  { iso: 'KG', dial: '+996', name: 'Kyrgyzstan' },
+  { iso: 'LA', dial: '+856', name: 'Laos' },
+  { iso: 'LV', dial: '+371', name: 'Latvia' },
+  { iso: 'LB', dial: '+961', name: 'Lebanon' },
+  { iso: 'LS', dial: '+266', name: 'Lesotho' },
+  { iso: 'LR', dial: '+231', name: 'Liberia' },
+  { iso: 'LY', dial: '+218', name: 'Libya' },
+  { iso: 'LI', dial: '+423', name: 'Liechtenstein' },
+  { iso: 'LT', dial: '+370', name: 'Lithuania' },
+  { iso: 'LU', dial: '+352', name: 'Luxembourg' },
+  { iso: 'MO', dial: '+853', name: 'Macau' },
+  { iso: 'MG', dial: '+261', name: 'Madagascar' },
+  { iso: 'MW', dial: '+265', name: 'Malawi' },
+  { iso: 'MY', dial: '+60', name: 'Malaysia' },
+  { iso: 'MV', dial: '+960', name: 'Maldives' },
+  { iso: 'ML', dial: '+223', name: 'Mali' },
+  { iso: 'MT', dial: '+356', name: 'Malta' },
+  { iso: 'MH', dial: '+692', name: 'Marshall Islands' },
+  { iso: 'MR', dial: '+222', name: 'Mauritania' },
+  { iso: 'MU', dial: '+230', name: 'Mauritius' },
+  { iso: 'MX', dial: '+52', name: 'Mexico' },
+  { iso: 'FM', dial: '+691', name: 'Micronesia' },
+  { iso: 'MD', dial: '+373', name: 'Moldova' },
+  { iso: 'MC', dial: '+377', name: 'Monaco' },
+  { iso: 'MN', dial: '+976', name: 'Mongolia' },
+  { iso: 'ME', dial: '+382', name: 'Montenegro' },
+  { iso: 'MA', dial: '+212', name: 'Morocco' },
+  { iso: 'MZ', dial: '+258', name: 'Mozambique' },
+  { iso: 'MM', dial: '+95', name: 'Myanmar' },
+  { iso: 'NA', dial: '+264', name: 'Namibia' },
+  { iso: 'NR', dial: '+674', name: 'Nauru' },
+  { iso: 'NP', dial: '+977', name: 'Nepal' },
+  { iso: 'NL', dial: '+31', name: 'Netherlands' },
+  { iso: 'NZ', dial: '+64', name: 'New Zealand' },
+  { iso: 'NI', dial: '+505', name: 'Nicaragua' },
+  { iso: 'NE', dial: '+227', name: 'Niger' },
+  { iso: 'NG', dial: '+234', name: 'Nigeria' },
+  { iso: 'KP', dial: '+850', name: 'North Korea' },
+  { iso: 'MK', dial: '+389', name: 'North Macedonia' },
+  { iso: 'NO', dial: '+47', name: 'Norway' },
+  { iso: 'OM', dial: '+968', name: 'Oman' },
+  { iso: 'PK', dial: '+92', name: 'Pakistan' },
+  { iso: 'PW', dial: '+680', name: 'Palau' },
+  { iso: 'PS', dial: '+970', name: 'Palestine' },
+  { iso: 'PA', dial: '+507', name: 'Panama' },
+  { iso: 'PG', dial: '+675', name: 'Papua New Guinea' },
+  { iso: 'PY', dial: '+595', name: 'Paraguay' },
+  { iso: 'PE', dial: '+51', name: 'Peru' },
+  { iso: 'PH', dial: '+63', name: 'Philippines' },
+  { iso: 'PL', dial: '+48', name: 'Poland' },
+  { iso: 'PT', dial: '+351', name: 'Portugal' },
+  { iso: 'PR', dial: '+1787', name: 'Puerto Rico' },
+  { iso: 'QA', dial: '+974', name: 'Qatar' },
+  { iso: 'RO', dial: '+40', name: 'Romania' },
+  { iso: 'RU', dial: '+7', name: 'Russia' },
+  { iso: 'RW', dial: '+250', name: 'Rwanda' },
+  { iso: 'KN', dial: '+1869', name: 'Saint Kitts and Nevis' },
+  { iso: 'LC', dial: '+1758', name: 'Saint Lucia' },
+  { iso: 'VC', dial: '+1784', name: 'Saint Vincent and the Grenadines' },
+  { iso: 'WS', dial: '+685', name: 'Samoa' },
+  { iso: 'SM', dial: '+378', name: 'San Marino' },
+  { iso: 'ST', dial: '+239', name: 'Sao Tome and Principe' },
+  { iso: 'SA', dial: '+966', name: 'Saudi Arabia' },
+  { iso: 'SN', dial: '+221', name: 'Senegal' },
+  { iso: 'RS', dial: '+381', name: 'Serbia' },
+  { iso: 'SC', dial: '+248', name: 'Seychelles' },
+  { iso: 'SL', dial: '+232', name: 'Sierra Leone' },
+  { iso: 'SG', dial: '+65', name: 'Singapore' },
+  { iso: 'SK', dial: '+421', name: 'Slovakia' },
+  { iso: 'SI', dial: '+386', name: 'Slovenia' },
+  { iso: 'SB', dial: '+677', name: 'Solomon Islands' },
+  { iso: 'SO', dial: '+252', name: 'Somalia' },
+  { iso: 'ZA', dial: '+27', name: 'South Africa' },
+  { iso: 'KR', dial: '+82', name: 'South Korea' },
+  { iso: 'SS', dial: '+211', name: 'South Sudan' },
+  { iso: 'ES', dial: '+34', name: 'Spain' },
+  { iso: 'LK', dial: '+94', name: 'Sri Lanka' },
+  { iso: 'SD', dial: '+249', name: 'Sudan' },
+  { iso: 'SR', dial: '+597', name: 'Suriname' },
+  { iso: 'SE', dial: '+46', name: 'Sweden' },
+  { iso: 'CH', dial: '+41', name: 'Switzerland' },
+  { iso: 'SY', dial: '+963', name: 'Syria' },
+  { iso: 'TW', dial: '+886', name: 'Taiwan' },
+  { iso: 'TJ', dial: '+992', name: 'Tajikistan' },
+  { iso: 'TZ', dial: '+255', name: 'Tanzania' },
+  { iso: 'TH', dial: '+66', name: 'Thailand' },
+  { iso: 'TL', dial: '+670', name: 'Timor-Leste' },
+  { iso: 'TG', dial: '+228', name: 'Togo' },
+  { iso: 'TO', dial: '+676', name: 'Tonga' },
+  { iso: 'TT', dial: '+1868', name: 'Trinidad and Tobago' },
+  { iso: 'TN', dial: '+216', name: 'Tunisia' },
+  { iso: 'TR', dial: '+90', name: 'Turkey' },
+  { iso: 'TM', dial: '+993', name: 'Turkmenistan' },
+  { iso: 'TV', dial: '+688', name: 'Tuvalu' },
+  { iso: 'UG', dial: '+256', name: 'Uganda' },
+  { iso: 'UA', dial: '+380', name: 'Ukraine' },
+  { iso: 'AE', dial: '+971', name: 'United Arab Emirates' },
+  { iso: 'GB', dial: '+44', name: 'United Kingdom' },
+  { iso: 'US', dial: '+1', name: 'United States' },
+  { iso: 'UY', dial: '+598', name: 'Uruguay' },
+  { iso: 'UZ', dial: '+998', name: 'Uzbekistan' },
+  { iso: 'VU', dial: '+678', name: 'Vanuatu' },
+  { iso: 'VA', dial: '+379', name: 'Vatican City' },
+  { iso: 'VE', dial: '+58', name: 'Venezuela' },
+  { iso: 'VN', dial: '+84', name: 'Vietnam' },
+  { iso: 'YE', dial: '+967', name: 'Yemen' },
+  { iso: 'ZM', dial: '+260', name: 'Zambia' },
+  { iso: 'ZW', dial: '+263', name: 'Zimbabwe' },
+];
+// Flag emoji from an ISO-2 code (regional indicator letters).
+function v2Flag(iso) {
+  try { return String.fromCodePoint(...[...iso.toUpperCase()].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)); }
+  catch (e) { return ''; }
+}
+// Split a stored E.164 string into { dial, local }. Longest dial-code prefix
+// wins; bare/legacy digits (no '+') are treated as a local Indian number.
+function v2SplitE164(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.startsWith('+')) {
+    const digits = s.slice(1).replace(/\D/g, '');
+    let best = '';
+    for (const c of V2_DIAL_CODES) {
+      const d = c.dial.slice(1);
+      if (digits.startsWith(d) && d.length > best.length) best = d;
+    }
+    if (best) return { dial: '+' + best, local: digits.slice(best.length) };
+    return { dial: '+91', local: digits };
+  }
+  return { dial: '+91', local: s.replace(/\D/g, '') };
+}
+function V2PhoneField({ value, onChange, id, name, required, placeholder, inputClassName }) {
+  const parsed = v2SplitE164(value);
+  const [iso, setIso] = useState(() => {
+    const m = V2_DIAL_CODES.find((c) => c.dial === parsed.dial);
+    return m ? m.iso : 'IN';
+  });
+  const sel = V2_DIAL_CODES.find((c) => c.iso === iso) || V2_DIAL_CODES[0];
+  const dial = sel.dial;
+  const local = parsed.local;
+  // National-number length: 10 covers India/US/UK and most countries; a few
+  // differ (e.g. China mobiles = 11), set via `max` on the dial-code entry.
+  const maxLen = sel.max || 10;
+  const onPickCountry = (newIso) => {
+    const c = V2_DIAL_CODES.find((x) => x.iso === newIso) || V2_DIAL_CODES[0];
+    setIso(newIso);
+    onChange(c.dial + local.slice(0, c.max || 10));
+  };
+  const onTypeNumber = (raw) => onChange(dial + raw.replace(/\D/g, '').slice(0, maxLen));
+  return (
+    <div className="v2-phone-field">
+      <div className="v2-phone-cc-wrap">
+        {/* Short flag+code shown for the SELECTED state; the real <select> text is
+            hidden (color:transparent) so long country names don't get cut off.
+            The open dropdown still lists full "flag name (code)" labels. */}
+        <span className="v2-phone-cc-display" aria-hidden="true">{v2Flag(sel.iso)} {sel.dial}</span>
+        <select
+          className="form-input v2-phone-cc"
+          value={iso}
+          onChange={(e) => onPickCountry(e.target.value)}
+          aria-label="Country code"
+          autoComplete="tel-country-code"
+          required
+        >
+          {V2_DIAL_CODES.map((c) => (
+            <option key={c.iso} value={c.iso}>{c.name} ({c.dial})</option>
+          ))}
+        </select>
+        <span className="v2-phone-cc-caret" aria-hidden="true">▾</span>
+      </div>
+      <input
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel-national"
+        className={inputClassName || 'form-input'}
+        id={id}
+        name={name}
+        required={required}
+        maxLength={maxLen}
+        placeholder={placeholder || 'Phone number'}
+        value={local}
+        onChange={(e) => onTypeNumber(e.target.value)}
+      />
+    </div>
+  );
+}
+if (typeof window !== 'undefined') window.V2PhoneField = V2PhoneField;
 
 // ===============================================================
 // UTM Tracking & Lead Persistence Utilities
@@ -251,7 +543,7 @@ const V2_BRAND = Object.assign({
   name: 'Balaji Chippada',
   tagline: 'The Agent Engineer',
   youtubeChannel: 'https://www.youtube.com/@balajichippada',
-  roadmapVideoId: 'Eze6D8jAMjI',
+  roadmapVideoId: 'Mf_J_PVGTdA',
   roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
   whatsappCommunity: 'https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP',
   linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
@@ -260,8 +552,8 @@ const V2_BRAND = Object.assign({
 }, (_SC.brand || {}));
 
 const V2_SOCIAL = Object.assign({
-  youtubeSubs: '22K+',
-  roadmapViews: '150K+',
+  youtubeSubs: '26K+',
+  roadmapViews: '170K+',
   studentsTrained: '3000+',
 }, ((_SC.brand && _SC.brand.stats) || {}));
 
@@ -402,17 +694,20 @@ function getNextUpcomingMasterclass(masterclasses, sessions) {
   return null;
 }
 
+// Times render in the VIEWER's local timezone (no forced timeZone). The stored
+// dateTime is an absolute instant, so the browser converts correctly; the zone
+// label comes from timeZoneName:'short' (e.g. "IST", "EDT") instead of a literal.
 function formatMcShortDate(dateTime) {
   if (!dateTime) return 'Date TBA';
-  return new Date(dateTime).toLocaleDateString('en-IN', {
-    weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata',
+  return new Date(dateTime).toLocaleDateString(undefined, {
+    weekday: 'short', day: 'numeric', month: 'short',
   });
 }
 
 function formatMcFullDateTime(dateTime) {
   if (!dateTime) return 'Date TBA';
   const d = new Date(dateTime);
-  return `${d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })} · ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })} IST`;
+  return `${d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`;
 }
 
 function getMcTiers(mc) {
@@ -1417,7 +1712,6 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                 videoId={finalVideoId}
                 title={titleText}
                 caption={captionText}
-                inline
               />
             );
           })()}
@@ -1435,7 +1729,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
           <div className="hero__stat-label">Subscribers</div>
         </div>
         <div>
-          <div className="hero__stat-num">3hr</div>
+          <div className="hero__stat-num">2hr</div>
           <div className="hero__stat-label">Live session</div>
         </div>
         <div>
@@ -1485,10 +1779,12 @@ function V2BookingWizard({
           <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
           <div className="v2-booking-success">
             <div className="v2-success-icon">✅</div>
-            <h2 className="modal-title">You&apos;re in!</h2>
+            <h2 className="modal-title">{successData.alreadyRegistered ? 'Already registered ✓' : "You're in!"}</h2>
             <p className="modal-desc"><strong>{session.title}</strong><br />{formatMcFullDateTime(session.dateTime)}</p>
             <p className="v2-booking-hint" style={{ marginTop: '8px' }}>
-              Confirmation sent to <strong>{bookingEmail}</strong>. Zoom link drops 15 minutes before the session.
+              {successData.alreadyRegistered
+                ? <>You&apos;re already registered for this masterclass with <strong>{bookingEmail}</strong>. The Zoom link drops 15 minutes before the session.</>
+                : <>Confirmation sent to <strong>{bookingEmail}</strong>. Zoom link drops 15 minutes before the session.</>}
             </p>
             <div className="v2-success-actions">
               <button type="button" className="form-btn" onClick={() => generateICS({
@@ -1599,24 +1895,12 @@ function V2BookingWizard({
             </div>
             <div className="form-group">
               <label className="form-label">Phone <span className="form-label-hint">(for WhatsApp reminders &amp; Zoom link)</span></label>
-              <input
-                type="tel"
-                className="form-input"
-                placeholder="e.g. 9876543210 or +1 415 555 0132"
-                value={bookingPhone}
-                onChange={(e) => setBookingPhone(V2_VALIDATE.cleanPhone(e.target.value))}
-                autoComplete="tel"
-                inputMode="tel"
-                maxLength={16}
-                pattern="\+?[0-9]{7,15}"
-                title="10-digit Indian mobile, or an international number with country code (e.g. +1 415 555 0132)"
-                required
-              />
+              <V2PhoneField value={bookingPhone} onChange={setBookingPhone} required />
             </div>
 
             <div className="v2-order-summary">
               <div className="v2-order-summary-row">
-                <span>One live session · 3 hours · recording included</span>
+                <span>One live session · 2 hours · recording included</span>
                 <span className="v2-order-price"><V2McPrice mc={session} /></span>
               </div>
             </div>
@@ -1636,6 +1920,9 @@ function V2BookingWizard({
                 >
                   ▶ Subscribe on YouTube
                 </a>
+                <p style={{ fontSize: '12px', color: 'var(--fg-dim)', margin: '6px 0 0' }}>
+                  Click on this button even if you're subscribed.
+                </p>
                 <label className={`v2-yt-gate-check${ytVisited ? '' : ' is-disabled'}`}>
                   <input
                     type="checkbox"
@@ -1882,7 +2169,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
       <section className="v2-dash-section">
         <h2>Profile</h2>
         <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={profileName} onChange={(e) => setProfileName(V2_VALIDATE.cleanName(e.target.value))} maxLength={60} /></div>
-        <div className="form-group"><label className="form-label">Phone</label><input className="form-input" type="tel" inputMode="tel" maxLength={16} pattern="\+?[0-9]{7,15}" placeholder="e.g. 9876543210 or +1 415 555 0132" title="10-digit Indian mobile, or an international number with country code" value={profilePhone} onChange={(e) => setProfilePhone(V2_VALIDATE.cleanPhone(e.target.value))} /></div>
+        <div className="form-group"><label className="form-label">Phone</label><V2PhoneField value={profilePhone} onChange={setProfilePhone} /></div>
         {profileError && <p className="status-box status-box--error" style={{ margin: '0 0 12px', padding: '10px 14px' }}>{profileError}</p>}
         <button type="button" className="form-btn" onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save Profile'}</button>
       </section>
@@ -2769,7 +3056,7 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
           {reserved ? 'You’re in. See you live.' : 'Stop watching tutorials. Ship one with me.'}
         </h2>
         <p className="closing-cta__sub">
-          3 hours live · {free ? 'free first masterclass' : 'single price'} · recording &amp; slides included
+          2 hours live · {free ? 'free first masterclass' : 'single price'} · recording &amp; slides included
           {free ? ' · WhatsApp community access' : ' · 100% refund within 24h'}.
         </p>
         <button

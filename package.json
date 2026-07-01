@@ -9,6 +9,8 @@
     "prerender": "node scripts/prerender.mjs",
     "build": "npm run build:js && npm run prerender",
     "verify": "node scripts/verify-render.mjs",
+    "test": "node --test tests/logic.test.mjs tests/prerender.test.mjs tests/otp.test.mjs",
+    "pretest": "npm run build",
     "pdf": "node scripts/roadmap-to-pdf.mjs"
   },
   "devDependencies": {

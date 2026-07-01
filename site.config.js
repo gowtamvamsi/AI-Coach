@@ -33,15 +33,15 @@ window.SITE_CONFIG = {
     tagline: 'The Agent Engineer',
     handle: '@balajichippada',
     youtubeChannel: 'https://www.youtube.com/@balajichippada',
-    roadmapVideoId: 'Eze6D8jAMjI', // homepage hero embed
+    roadmapVideoId: 'Mf_J_PVGTdA', // homepage hero embed
     roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
     whatsappCommunity: 'https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP',
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     instagram: 'https://www.instagram.com/balajichippada',
     github: 'https://github.com/ch-balaji',
     stats: {
-      youtubeSubs: '22K+',
-      roadmapViews: '150K+',
+      youtubeSubs: '26K+',
+      roadmapViews: '170K+',
       studentsTrained: '3000+',
     },
   },
@@ -51,11 +51,11 @@ window.SITE_CONFIG = {
   // ─────────────────────────────────────────────────────────────────
   instructor: {
     name: 'Balaji Chippada',
-    title: '8 years in AI/ML · Production agentic AI · 22K+ YouTube',
+    title: '8 years in AI/ML · Production agentic AI · 26K+ YouTube',
     photo: 'uploads/balaji-chippada-avatar.webp', // optimized 256px avatar (full-res PNG kept for og:image). Leave empty for initials avatar
-    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (150K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
+    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (170K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
     quote: 'I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.',
-    chips: ['150K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
+    chips: ['170K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     youtube: 'https://www.youtube.com/@balajichippada',
   },
@@ -72,10 +72,10 @@ window.SITE_CONFIG = {
     id: 'mc-claude-architect-2026-05',     // must match Firestore doc id if used
     title: 'Mastering Claude Code: Building Agentic Systems',
     shortTitle: 'Claude Code Masterclass',  // used in compact spots (banner)
-    subtitle: 'Demo-first build of a production-grade Claude agent — in 3 hours.',
+    subtitle: 'Demo-first build of a production-grade Claude agent — in 2 hours.',
 
     // ── Schedule ──
-    dateTime: '2026-06-27T18:30:00+05:30', // ISO with IST offset → countdown reads this
+    dateTime: '2026-07-11T19:00:00+05:30', // keep in sync with the live Firestore masterclass date (else the old date flashes on load before Firestore loads)
     duration: 180,                          // minutes (shown as "180 min session")
     timezone: 'IST',
 

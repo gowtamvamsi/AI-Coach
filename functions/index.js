@@ -2,9 +2,15 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const otpLib = require("./lib/otp");
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// Firestore doc id for a password-reset record (sanitized email).
+function passwordResetDocId(email) {
+  return otpLib.normalizeEmail(email).replace(/[^a-z0-9._@+-]/g, "_").slice(0, 400) || "_";
+}
 
 function getRazorpayInstance() {
   const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_mockKeyId12345";
@@ -1189,8 +1195,6 @@ exports.onUserSignupWelcome = functions.firestore
         `  https://balajichippada.com/\n\n` +
         `• Reserve your seat for the next live masterclass — the first one is free:\n` +
         `  https://balajichippada.com/\n\n` +
-        `• Explore the open-source roadmap on GitHub:\n` +
-        `  https://github.com/ch-balaji/ai-engineer-roadmap\n\n` +
         `Have a question or just want to say hi? Reply directly to this email, or join our WhatsApp community:\n` +
         `https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP\n\n` +
         `Let's build some amazing agentic systems together!\n\n` +
@@ -1227,6 +1231,247 @@ exports.onUserSignupWelcome = functions.firestore
       return null;
     }
   });
+
+// ===============================================================
+// Password reset via 6-digit OTP (for users who forgot their password)
+// ---------------------------------------------------------------
+// Two callables, both usable while SIGNED OUT:
+//   requestPasswordReset({ email })            → emails a 6-digit code
+//   confirmPasswordReset({ email, otp, newPassword }) → verifies + resets
+// The OTP (hashed) lives in the server-only `passwordResets` collection
+// (no client rule → default-deny; only the admin SDK here can touch it).
+// Anti-abuse: no email enumeration, 10-min expiry, 5 wrong-try cap,
+// resend cooldown + per-window send cap, crypto-random codes.
+// ===============================================================
+exports.requestPasswordReset = functions.https.onCall(async (data) => {
+  const email = otpLib.normalizeEmail(data && data.email);
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw new functions.https.HttpsError("invalid-argument", "Please enter a valid email address.");
+  }
+
+  const force = !!(data && data.force);
+
+  // Look up the account. We ALWAYS return ok (never reveal whether the email
+  // exists) and only actually send/store when it does.
+  let userRecord;
+  try {
+    userRecord = await admin.auth().getUserByEmail(email);
+  } catch (e) {
+    return { ok: true };
+  }
+
+  // Google-signup users have no password to "reset". Tell the UI to point them
+  // at "Sign in with Google" — unless they explicitly choose to set a password
+  // anyway (force), in which case we fall through and email a code.
+  if (!force && otpLib.accountAuthKind(userRecord.providerData) === "google-only") {
+    return { ok: true, provider: "google" };
+  }
+
+  const ref = db.collection("passwordResets").doc(passwordResetDocId(email));
+  const now = Date.now();
+  const existing = (await ref.get()).data() || null;
+
+  const gate = otpLib.canSend(existing, now);
+  if (!gate.allow) {
+    // Throttled — still report success so attackers can't probe timing/limits.
+    return { ok: true };
+  }
+
+  const otp = otpLib.generateOtp();
+  const rec = otpLib.newResetRecord(email, otp, now);
+  rec.uid = userRecord.uid;
+  // Preserve the rolling send window so the per-hour cap actually accumulates.
+  if (existing && existing.windowStart && now - existing.windowStart < otpLib.SEND_WINDOW_MS) {
+    rec.windowStart = existing.windowStart;
+    rec.sends = (existing.sends || 0) + 1;
+  }
+  await ref.set(rec);
+
+  const firstName = (userRecord.displayName || "").split(" ")[0] || "there";
+  const subject = "Your password reset code";
+  const body = `Hi ${firstName},\n\n` +
+    `Here is your password reset code for balajichippada.com:\n\n` +
+    `    ${otp}\n\n` +
+    `Enter it on the site to set a new password. This code expires in 10 minutes.\n\n` +
+    `If you didn't request this, you can safely ignore this email — your password won't change.\n\n` +
+    `Best,\n` +
+    `Balaji Chippada\n` +
+    `team@balajichippada.com`;
+  try {
+    await sendEmailHelper({
+      email,
+      name: userRecord.displayName || "",
+      subject,
+      body,
+      resendApiKey: process.env.RESEND_API_KEY,
+      smtpEmail: process.env.SMTP_EMAIL,
+      smtpPass: process.env.SMTP_PASSWORD,
+      from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+    });
+  } catch (err) {
+    console.error("[PWRESET] failed to send code to", email, err);
+    throw new functions.https.HttpsError("internal", "Could not send the reset email. Please try again shortly.");
+  }
+  return { ok: true };
+});
+
+exports.confirmPasswordReset = functions.https.onCall(async (data) => {
+  const email = otpLib.normalizeEmail(data && data.email);
+  const otp = String((data && data.otp) || "").trim();
+  const newPassword = String((data && data.newPassword) || "");
+
+  if (!email) throw new functions.https.HttpsError("invalid-argument", "Email is required.");
+  if (!otpLib.isValidOtpFormat(otp)) {
+    throw new functions.https.HttpsError("invalid-argument", "Enter the 6-digit code from your email.");
+  }
+  const pwErr = otpLib.passwordError(newPassword);
+  if (pwErr) throw new functions.https.HttpsError("invalid-argument", pwErr);
+
+  const ref = db.collection("passwordResets").doc(passwordResetDocId(email));
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError("not-found", "No reset request found. Please request a new code.");
+  }
+  const rec = snap.data();
+
+  if (otpLib.isExpired(rec.expiresAt)) {
+    await ref.delete();
+    throw new functions.https.HttpsError("deadline-exceeded", "This code has expired. Please request a new one.");
+  }
+  if ((rec.attempts || 0) >= otpLib.MAX_ATTEMPTS) {
+    await ref.delete();
+    throw new functions.https.HttpsError("resource-exhausted", "Too many incorrect attempts. Please request a new code.");
+  }
+  if (!otpLib.verifyOtp(email, otp, rec.otpHash)) {
+    await ref.update({ attempts: (rec.attempts || 0) + 1 });
+    throw new functions.https.HttpsError("permission-denied", "Incorrect code. Please check and try again.");
+  }
+
+  // Valid → set the new password (admin SDK; the user is signed out) and burn the code.
+  await admin.auth().updateUser(rec.uid, { password: newPassword });
+  await ref.delete();
+  return { ok: true };
+});
+
+// ===============================================================
+// Email verification via 6-digit OTP at SIGN-UP
+// ---------------------------------------------------------------
+// Verify-first signup: the account is created server-side ONLY after the code
+// is confirmed, so we know the email is real and the person controls it.
+//   requestSignupOtp({ email })                                  → emails a code
+//   verifySignupOtpAndCreate({ email, otp, password, name, ... }) → verify + create
+// Codes (hashed) live in the server-only `signupVerifications` collection.
+// Same anti-abuse as password reset (expiry, attempt cap, send rate-limit).
+// ===============================================================
+exports.requestSignupOtp = functions.https.onCall(async (data) => {
+  const email = otpLib.normalizeEmail(data && data.email);
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw new functions.https.HttpsError("invalid-argument", "Please enter a valid email address.");
+  }
+
+  // Already registered → tell them to sign in (standard, expected signup UX).
+  try {
+    await admin.auth().getUserByEmail(email);
+    return { exists: true };
+  } catch (e) { /* no account yet → proceed to send a code */ }
+
+  const ref = db.collection("signupVerifications").doc(passwordResetDocId(email));
+  const now = Date.now();
+  const existing = (await ref.get()).data() || null;
+  const gate = otpLib.canSend(existing, now);
+  if (!gate.allow) return { ok: true }; // throttle silently (anti email-bomb)
+
+  const otp = otpLib.generateOtp();
+  const rec = otpLib.newResetRecord(email, otp, now);
+  if (existing && existing.windowStart && now - existing.windowStart < otpLib.SEND_WINDOW_MS) {
+    rec.windowStart = existing.windowStart;
+    rec.sends = (existing.sends || 0) + 1;
+  }
+  await ref.set(rec);
+
+  const subject = "Your verification code";
+  const body = `Hi,\n\n` +
+    `Your verification code to create your balajichippada.com account is:\n\n` +
+    `    ${otp}\n\n` +
+    `Enter it on the site to finish signing up. This code expires in 10 minutes.\n\n` +
+    `If you didn't try to sign up, you can safely ignore this email.\n\n` +
+    `Best,\n` +
+    `Balaji Chippada\n` +
+    `team@balajichippada.com`;
+  try {
+    await sendEmailHelper({
+      email, name: "", subject, body,
+      resendApiKey: process.env.RESEND_API_KEY,
+      smtpEmail: process.env.SMTP_EMAIL,
+      smtpPass: process.env.SMTP_PASSWORD,
+      from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+    });
+  } catch (err) {
+    console.error("[SIGNUP-OTP] failed to send code to", email, err);
+    throw new functions.https.HttpsError("internal", "Could not send the verification email. Please try again shortly.");
+  }
+  return { ok: true };
+});
+
+exports.verifySignupOtpAndCreate = functions.https.onCall(async (data) => {
+  const email = otpLib.normalizeEmail(data && data.email);
+  const otp = String((data && data.otp) || "").trim();
+  const password = String((data && data.password) || "");
+  const name = String((data && data.name) || "").trim();
+  const phone = String((data && data.phone) || "").trim();
+  const userType = String((data && data.userType) || "").trim();
+
+  if (!email) throw new functions.https.HttpsError("invalid-argument", "Email is required.");
+  if (!otpLib.isValidOtpFormat(otp)) {
+    throw new functions.https.HttpsError("invalid-argument", "Enter the 6-digit code from your email.");
+  }
+  const pwErr = otpLib.passwordError(password);
+  if (pwErr) throw new functions.https.HttpsError("invalid-argument", pwErr);
+  if (name.length < 2) throw new functions.https.HttpsError("invalid-argument", "Please enter your name.");
+
+  const ref = db.collection("signupVerifications").doc(passwordResetDocId(email));
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError("not-found", "No verification request found. Please start again.");
+  }
+  const rec = snap.data();
+  if (otpLib.isExpired(rec.expiresAt)) {
+    await ref.delete();
+    throw new functions.https.HttpsError("deadline-exceeded", "This code has expired. Please request a new one.");
+  }
+  if ((rec.attempts || 0) >= otpLib.MAX_ATTEMPTS) {
+    await ref.delete();
+    throw new functions.https.HttpsError("resource-exhausted", "Too many incorrect attempts. Please request a new code.");
+  }
+  if (!otpLib.verifyOtp(email, otp, rec.otpHash)) {
+    await ref.update({ attempts: (rec.attempts || 0) + 1 });
+    throw new functions.https.HttpsError("permission-denied", "Incorrect code. Please check and try again.");
+  }
+
+  // Code verified → create the account (email pre-verified) + profile.
+  let userRecord;
+  try {
+    userRecord = await admin.auth().createUser({ email, password, displayName: name, emailVerified: true });
+  } catch (err) {
+    if (err && err.code === "auth/email-already-exists") {
+      await ref.delete();
+      throw new functions.https.HttpsError("already-exists", "An account already exists for this email. Please sign in.");
+    }
+    if (err && err.code === "auth/invalid-password") {
+      throw new functions.https.HttpsError("invalid-argument", "Password must be at least 6 characters.");
+    }
+    console.error("[SIGNUP-OTP] createUser failed for", email, err);
+    throw new functions.https.HttpsError("internal", "Could not create your account. Please try again.");
+  }
+
+  // Profile doc — also triggers the welcome email (onUserSignupWelcome).
+  await db.collection("users").doc(userRecord.uid).set(
+    { name, email, phone, userType, role: "client" },
+    { merge: true },
+  );
+  await ref.delete();
+  return { ok: true };
+});
 
 // ===============================================================
 // Enforce admin role for bootstrap administrators

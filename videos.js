@@ -542,7 +542,7 @@ window.ROADMAP_VIDEOS = [
     mappings: [
       { phaseId: 1, modules: ['1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7'], startSec: 607 },
       { phaseId: 2, modules: ['2.1', '2.2', '2.3', '2.4', '2.5'], startSec: 686 },
-      { phaseId: 3, modules: ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7'], startSec: 788 },
+      { phaseId: 3, modules: ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6'], startSec: 788 },
       { phaseId: 4, modules: ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9'], startSec: 878 },
       { phaseId: 5, modules: ['5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8'], startSec: 1013 },
       { phaseId: 6, modules: ['6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '6.7'], startSec: 1100 },
@@ -593,7 +593,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Async Programming',
     kind: 'deep-dive',
     mappings: [
-      { phaseId: 1, modules: ['1.7'], startSec: 0 },
+      { phaseId: 1, modules: ['1.5'], startSec: 0 },
     ],
   },
   {
@@ -602,7 +602,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Prompt Engineering',
     kind: 'deep-dive',
     mappings: [
-      { phaseId: 3, modules: ['3.3'], startSec: 0 },
+      { phaseId: 3, modules: ['3.2'], startSec: 0 },
     ],
   },
   {
@@ -611,7 +611,7 @@ window.ROADMAP_VIDEOS = [
     title: 'Context Engineering',
     kind: 'deep-dive',
     mappings: [
-      { phaseId: 3, modules: ['3.4'], startSec: 0 },
+      { phaseId: 3, modules: ['3.3'], startSec: 0 },
     ],
   },
   {
@@ -657,6 +657,15 @@ window.ROADMAP_VIDEOS = [
     kind: 'deep-dive',
     mappings: [
       { phaseId: 2, modules: ['2.3'], startSec: 48 },
+    ],
+  },
+  {
+    id: 'phase2-evals-benchmarks',
+    youtubeId: 'm9wvHClG8vo',
+    title: 'Reading model evals & benchmarks',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 2, modules: ['2.4'], startSec: 0 },
     ],
   },
 ];

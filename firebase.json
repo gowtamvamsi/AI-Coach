@@ -32,7 +32,9 @@
       "package.json",
       "package-lock.json",
       "scripts/**",
+      "tests/**",
       "*.jsx",
+      "*.md",
       "PAYMENTS-TODO.md",
       "Prompt.md"
     ],
