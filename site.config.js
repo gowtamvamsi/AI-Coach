@@ -76,7 +76,7 @@ window.SITE_CONFIG = {
 
     // ── Schedule ──
     dateTime: '2026-07-11T19:00:00+05:30', // keep in sync with the live Firestore masterclass date (else the old date flashes on load before Firestore loads)
-    duration: 180,                          // minutes (shown as "180 min session")
+    duration: 120,                          // minutes (shown as "120 min session")
     timezone: 'IST',
 
     // ── Pricing ──
@@ -193,7 +193,7 @@ We will dive into the architectural patterns required to build autonomous, produ
     },
     {
       q: 'Is the first masterclass really free?',
-      a: 'Yes — the very first masterclass is FREE so the community can attend and try it out. Future masterclasses are paid (₹499). The recording and Zoom link are emailed instantly after you reserve your seat.',
+      a: 'Yes — the very first masterclass is FREE so the community can attend and try it out. Future masterclasses are paid (₹499). Meeting link emailed a few days before the masterclass +  Meeting reminders. The recording is emailed after the session.',
     },
     {
       q: 'What if I miss the live session?',
@@ -222,7 +222,7 @@ We will dive into the architectural patterns required to build autonomous, produ
     },
     {
       q: 'How do I join the live session?',
-      a: 'Zoom link is emailed on registration and reappears 15 minutes before start time. WhatsApp community gets reminders too.',
+      a: 'Meeting link emailed a few days before the masterclass +  Meeting reminders. Session details stay available in My Account.',
     },
   ],
 

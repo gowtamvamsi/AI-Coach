@@ -57,3 +57,48 @@ test('prerender — cache-bust versions are present on bundles', () => {
     assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=\\d+`), `${asset} has a ?v= cache-bust`);
   }
 });
+
+test('app bundle — courses tab includes polished offer and curriculum shell', () => {
+  const js = read('app.build.js');
+  assert.match(js, /courses-offers/, 'courses page has offer grid');
+  assert.match(js, /courses-curriculum-shell/, 'courses page has curriculum shell');
+});
+
+test('app bundle — my account tab includes polished dashboard shell', () => {
+  const js = read('v2.build.js');
+  assert.match(js, /v2-account-hero/, 'my account page has account hero');
+  assert.match(js, /v2-account-support-grid/, 'my account page has profile and inquiry support grid');
+});
+
+test('public site — masterclass seat scarcity copy is not shown', () => {
+  const publicText = [
+    read('index.html'),
+    read('roadmap.html'),
+    read('app.build.js'),
+    read('v2.build.js'),
+  ].join('\n');
+
+  assert.doesNotMatch(publicText, /\bseats?\s+(left|remaining)\b/i, 'no seats-left or seats-remaining copy');
+  assert.doesNotMatch(publicText, /\bof\s+\d+\s+seats?\s+left\b/i, 'no "of N seats left" copy');
+});
+
+test('public site — masterclass meeting-link timing copy is current', () => {
+  const publicText = [
+    read('index.html'),
+    read('roadmap.html'),
+    read('v2.build.js'),
+  ].join('\n');
+
+  assert.match(publicText, /Meeting link emailed a few days before the masterclass \+  Meeting reminders/, 'shows current meeting-link timing copy');
+  assert.doesNotMatch(publicText, /Zoom link emailed instantly/i, 'old instant Zoom-link copy is removed');
+  assert.doesNotMatch(publicText, /email your Zoom link instantly/i, 'old instant email promise is removed');
+  assert.doesNotMatch(publicText, /Instant Zoom link/i, 'old instant Zoom-link microcopy is removed');
+  assert.doesNotMatch(publicText, /Instant confirmation · Zoom link sent by email/i, 'old instant confirmation microcopy is removed');
+});
+
+test('homepage — masterclass duration is 120 minutes', () => {
+  const html = read('index.html');
+
+  assert.match(html, /\b120 min\b/, 'homepage shows 120 min duration');
+  assert.doesNotMatch(html, /\b180 min\b/, 'homepage no longer shows 180 min duration');
+});

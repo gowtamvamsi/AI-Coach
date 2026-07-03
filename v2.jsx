@@ -1568,7 +1568,6 @@ function V2HeroSocialProof() {
 }
 
 function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, reserved, onManage }) {
-  const seats = getSeatsRemaining(nextMc);
   const dateStr = nextMc ? formatMcShortDate(nextMc.dateTime) : 'Coming soon';
   const free = isMcFree(nextMc);
   const nextMcDate = nextMc && nextMc.dateTime ? new Date(nextMc.dateTime) : null;
@@ -1601,7 +1600,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                 {nextMcDate && !isNaN(nextMcDate) ? formatMcFullDateTime(nextMcDate) : 'Date TBA'}
               </p>
               <p className="v2-hero-upcoming-note">
-                You&apos;re registered ✓ · Zoom link sent by email
+                You&apos;re registered ✓ · Meeting link will be emailed before the masterclass
               </p>
               <div className="v2-hero-actions">
                 <button type="button" className="v2-hero-cta" onClick={onManage}>
@@ -1657,18 +1656,12 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                   {free ? (
                     <>
                       <span className="v2-hero-microcopy-lock" aria-hidden="true">🎟️</span>
-                      Free to attend · Calendar invite + Zoom link emailed instantly
+                      Free to attend · Meeting link emailed a few days before the masterclass +  Meeting reminders
                     </>
                   ) : (
                     <>
                       <span className="v2-hero-microcopy-lock" aria-hidden="true">🔒</span>
                       Razorpay · 100% refund within 24h
-                    </>
-                  )}
-                  {seats > 0 && (
-                    <>
-                      {' · '}
-                      <span className="v2-hero-microcopy-seats">{seats} of {nextMc.seatsTotal || 50} seats left</span>
                     </>
                   )}
                 </p>
@@ -1768,7 +1761,6 @@ function V2BookingWizard({
   const tier = selectedTier || tiers[0];
   const price = typeof tier?.price === 'number' ? tier.price : getMcPrice(session);
   const free = price === 0;
-  const seats = getSeatsRemaining(session);
 
   if (successData) {
     const start = session.dateTime ? new Date(session.dateTime) : new Date();
@@ -1783,13 +1775,13 @@ function V2BookingWizard({
             <p className="modal-desc"><strong>{session.title}</strong><br />{formatMcFullDateTime(session.dateTime)}</p>
             <p className="v2-booking-hint" style={{ marginTop: '8px' }}>
               {successData.alreadyRegistered
-                ? <>You&apos;re already registered for this masterclass with <strong>{bookingEmail}</strong>. The Zoom link drops 15 minutes before the session.</>
-                : <>Confirmation sent to <strong>{bookingEmail}</strong>. Zoom link drops 15 minutes before the session.</>}
+                ? <>You&apos;re already registered for this masterclass with <strong>{bookingEmail}</strong>. Meeting link emailed a few days before the masterclass +  Meeting reminders.</>
+                : <>Confirmation sent to <strong>{bookingEmail}</strong>. Meeting link emailed a few days before the masterclass +  Meeting reminders.</>}
             </p>
             <div className="v2-success-actions">
               <button type="button" className="form-btn" onClick={() => generateICS({
                 title: session.title, startDate: start, endDate: end,
-                description: `Masterclass with Balaji Chippada. Zoom link will be emailed before the session.`,
+                description: `Masterclass with Balaji Chippada. Meeting link emailed a few days before the masterclass +  Meeting reminders.`,
                 location: session.zoomLink || 'Online',
               })}>📅 Add to Calendar</button>
               <a href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer" className="form-btn v2-btn-secondary">
@@ -1829,12 +1821,6 @@ function V2BookingWizard({
           <strong>{session.title}</strong><br />
           {formatMcFullDateTime(session.dateTime)}
         </p>
-
-        {seats > 0 && seats <= 10 && (
-          <div className="v2-modal-urgency">
-            🔥 Only {seats} seats left
-          </div>
-        )}
 
         {bookingError && (
           <div className="status-box status-box--error" style={{ padding: '12px 16px', marginBottom: '16px' }}>
@@ -1894,7 +1880,7 @@ function V2BookingWizard({
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Phone <span className="form-label-hint">(for WhatsApp reminders &amp; Zoom link)</span></label>
+              <label className="form-label">Phone <span className="form-label-hint">(for WhatsApp reminders &amp; meeting link)</span></label>
               <V2PhoneField value={bookingPhone} onChange={setBookingPhone} required />
             </div>
 
@@ -1947,8 +1933,8 @@ function V2BookingWizard({
             </button>
             <p className="v2-booking-hint">
               {free
-                ? 'No payment, no account needed. We\u2019ll email your Zoom link instantly.'
-                : 'No account needed. We\u2019ll email your Zoom link instantly.'}
+                ? 'No payment, no account needed. Meeting link emailed a few days before the masterclass +  Meeting reminders.'
+                : 'No account needed. Meeting link emailed a few days before the masterclass +  Meeting reminders.'}
             </p>
           </form>
         )}
@@ -1999,6 +1985,10 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
   const updatedAt = roadmapProgress?.updatedAt?.toDate
     ? roadmapProgress.updatedAt.toDate()
     : (roadmapProgress?.updatedAt ? new Date(roadmapProgress.updatedAt) : null);
+  const accountName = (profileName || user?.displayName || '').trim();
+  const displayName = accountName || 'Learner';
+  const firstName = displayName.split(/\s+/)[0] || 'Learner';
+  const accountEmail = user?.email || 'Signed in';
 
   useEffect(() => {
     if (!db || !user) { setLoading(false); return; }
@@ -2044,6 +2034,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
     seenClass.add(key);
     return true;
   });
+  const totalClasses = liveBookings.length;
   const upcoming = liveBookings.filter((b) => {
     const d = b.sessionDate?.toDate ? b.sessionDate.toDate() : (b.sessionDate ? new Date(b.sessionDate) : null);
     return b.status === 'confirmed' || b.status === 'completed' ? (d ? d.getTime() >= now - 3600000 : true) : false;
@@ -2079,9 +2070,37 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
 
   return (
     <div className="v2-dashboard">
-      <h1 className="v2-dashboard-title">My Account</h1>
+      <header className="v2-account-hero">
+        <div className="v2-account-hero-copy">
+          <span className="v2-account-eyebrow">My Account</span>
+          <h1 className="v2-dashboard-title">Welcome back, <em>{firstName}</em>.</h1>
+          <p className="v2-account-sub">Track your roadmap, manage masterclasses, and keep your profile ready for live sessions.</p>
+        </div>
+        <div className="v2-account-identity" aria-label="Signed in account">
+          <span className="v2-account-avatar" aria-hidden="true">{firstName.slice(0, 1).toUpperCase()}</span>
+          <div>
+            <strong>{displayName}</strong>
+            <span>{accountEmail}</span>
+          </div>
+        </div>
+      </header>
 
-      <section className="v2-dash-section v2-roadmap-dash">
+      <div className="v2-account-stats" aria-label="Account summary">
+        <div className="v2-account-stat">
+          <span className="v2-account-stat-num">{progress.overallPct}%</span>
+          <span className="v2-account-stat-label">Roadmap complete</span>
+        </div>
+        <div className="v2-account-stat">
+          <span className="v2-account-stat-num">{upcoming.length}</span>
+          <span className="v2-account-stat-label">Upcoming sessions</span>
+        </div>
+        <div className="v2-account-stat">
+          <span className="v2-account-stat-num">{totalClasses}</span>
+          <span className="v2-account-stat-label">Total bookings</span>
+        </div>
+      </div>
+
+      <section className="v2-dash-section v2-roadmap-dash v2-account-card">
         <h2>My Roadmap Progress</h2>
         {roadmapProgress?.startedAt ? (
           <>
@@ -2125,7 +2144,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
       </section>
 
       <h2 className="v2-dashboard-subtitle">My Masterclasses</h2>
-      <section className="v2-dash-section">
+      <section className="v2-dash-section v2-account-card">
         <h2>Upcoming Sessions</h2>
         {upcoming.length === 0 ? (
           <p className="v2-empty">No upcoming sessions. <button type="button" className="v2-link-btn" onClick={() => { window.scrollTo({ top: 0 }); onReserve && onReserve(); }}>Browse masterclasses</button></p>
@@ -2136,6 +2155,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
           return (
             <div key={b.id} className="v2-session-card upcoming">
               {minsUntil <= 1440 && minsUntil > 0 && <div className="v2-live-badge">Starts in {Math.round(minsUntil)} min</div>}
+              <div className="v2-session-card-meta">Confirmed seat</div>
               <h3>{b.masterclassTitle || b.sessionTitle}</h3>
               <p>{sessionDate ? formatMcFullDateTime(sessionDate) : 'Date TBA'}</p>
               <div className="v2-session-actions">
@@ -2154,10 +2174,11 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
           );
         })}
       </section>
-      <section className="v2-dash-section">
+      <section className="v2-dash-section v2-account-card">
         <h2>Past Sessions</h2>
         {past.length === 0 ? <p className="v2-empty">No past sessions yet.</p> : past.map((b) => (
           <div key={b.id} className="v2-session-card">
+            <div className="v2-session-card-meta">Completed session</div>
             <h3>{b.masterclassTitle || b.sessionTitle}</h3>
             <div className="v2-session-actions">
               {b.recordingUrl && <a href={b.recordingUrl} target="_blank" rel="noopener noreferrer" className="v2-btn-secondary">Watch Recording</a>}
@@ -2166,19 +2187,21 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
           </div>
         ))}
       </section>
-      <section className="v2-dash-section">
-        <h2>Profile</h2>
-        <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={profileName} onChange={(e) => setProfileName(V2_VALIDATE.cleanName(e.target.value))} maxLength={60} /></div>
-        <div className="form-group"><label className="form-label">Phone</label><V2PhoneField value={profilePhone} onChange={setProfilePhone} /></div>
-        {profileError && <p className="status-box status-box--error" style={{ margin: '0 0 12px', padding: '10px 14px' }}>{profileError}</p>}
-        <button type="button" className="form-btn" onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save Profile'}</button>
-      </section>
-      <section className="v2-dash-section">
-        <h2>Ask a Question</h2>
-        <textarea className="form-input" rows={3} placeholder="Submit a question for an upcoming session…" value={inquiry} onChange={(e) => setInquiry(e.target.value)} />
-        <button type="button" className="form-btn" style={{ marginTop: '12px' }} onClick={submitInquiry}>Submit Inquiry</button>
-        {inquirySent && <p className="v2-success-msg">Question submitted! We&apos;ll respond before your session.</p>}
-      </section>
+      <div className="v2-account-support-grid">
+        <section className="v2-dash-section v2-account-card">
+          <h2>Profile</h2>
+          <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={profileName} onChange={(e) => setProfileName(V2_VALIDATE.cleanName(e.target.value))} maxLength={60} /></div>
+          <div className="form-group"><label className="form-label">Phone</label><V2PhoneField value={profilePhone} onChange={setProfilePhone} /></div>
+          {profileError && <p className="status-box status-box--error" style={{ margin: '0 0 12px', padding: '10px 14px' }}>{profileError}</p>}
+          <button type="button" className="form-btn" onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save Profile'}</button>
+        </section>
+        <section className="v2-dash-section v2-account-card">
+          <h2>Ask a Question</h2>
+          <textarea className="form-input" rows={3} placeholder="Submit a question for an upcoming session…" value={inquiry} onChange={(e) => setInquiry(e.target.value)} />
+          <button type="button" className="form-btn" style={{ marginTop: '12px' }} onClick={submitInquiry} disabled={!inquiry.trim()}>Submit Inquiry</button>
+          {inquirySent && <p className="v2-success-msg">Question submitted! We&apos;ll respond before your session.</p>}
+        </section>
+      </div>
     </div>
   );
 }
@@ -2795,7 +2818,7 @@ function V2HowItWorks({ nextMc }) {
       title: free ? 'Reserve free' : 'Reserve & pay',
       body: free
         ? 'Drop your name and email. We hold your seat instantly — no payment, no account needed.'
-        : 'Pay securely via Razorpay. Calendar invite + Zoom link emailed instantly.',
+        : 'Pay securely via Razorpay. Meeting link emailed a few days before the masterclass +  Meeting reminders.',
     },
     {
       n: '03',
@@ -3047,7 +3070,6 @@ function V2SuccessStories() {
 function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
   if (!nextMc) return null;
   const free = isMcFree(nextMc);
-  const seats = getSeatsRemaining(nextMc);
   return (
     <section className="closing-cta">
       <RevealOnScroll>
@@ -3069,8 +3091,8 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
         </button>
         <div className="closing-cta__microcopy">
           {reserved
-            ? 'Zoom link sent by email · Session details in My Account'
-            : `${seats > 0 ? `Only ${seats} seats left · ` : ''}Instant Zoom link · No account needed`}
+            ? 'Meeting link will be emailed before the masterclass · Session details in My Account'
+            : 'Meeting link emailed a few days before the masterclass +  Meeting reminders'}
         </div>
       </RevealOnScroll>
     </section>
@@ -3086,7 +3108,6 @@ function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   if (!nextMc) return null;
-  const seats = getSeatsRemaining(nextMc);
   const free = isMcFree(nextMc);
   // Already reserved → stop nudging; show a quiet "registered" confirmation.
   if (reserved) {
@@ -3106,9 +3127,6 @@ function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
     <div className={`v2-mobile-sticky ${visible ? 'is-visible' : ''}`}>
       <div className="v2-mobile-sticky-meta">
         <span className="v2-mobile-sticky-date">{formatMcShortDate(nextMc.dateTime)}</span>
-        {seats > 0 && seats <= 20 && (
-          <span className="v2-mobile-sticky-seats">{seats} seats left</span>
-        )}
       </div>
       <button type="button" className="hero__primary-cta v2-mobile-sticky-btn" onClick={() => onReserve(nextMc)}>
         {free ? <>Reserve · <V2McPrice mc={nextMc} /></> : `Book · ${formatMcPriceShort(nextMc)}`}

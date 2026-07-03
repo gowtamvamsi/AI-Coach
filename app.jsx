@@ -973,10 +973,9 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
   const free = isMcFree(mc);
   const hasSeatData = typeof mc.seatsBooked === 'number';
   const soldOut = hasSeatData && seatsLeft <= 0;
-  const showUrgency = hasSeatData && seatsLeft > 0 && seatsLeft <= 15;
   const priceText = free ? 'Free' : `₹${(mc.price || 0).toLocaleString()}`;
   const ctaText = soldOut ? 'Sold out' : (free ? <>Reserve seat · <V2McPrice mc={mc} /></> : `Book my seat — ${priceText}`);
-  const subcopyText = free ? 'Instant Zoom link · No sign-up needed' : 'Instant Zoom link · No account needed';
+  const subcopyText = 'Meeting link emailed a few days before the masterclass +  Meeting reminders';
 
   return (
     <div ref={cardRef} style={{ margin: isMobileViewport ? '40px 0' : '140px 0', padding: '0', overflow: 'visible' }}>
@@ -1055,25 +1054,6 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
                     : <strong>Date TBA</strong>
                   }
                 </div>
-                {showUrgency && (
-                <div className="mc-card__urgency" style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: '#A32D2D',
-                  background: '#FCEBEB',
-                  padding: '3px 10px',
-                  borderRadius: '99px',
-                  width: 'fit-content',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D85A30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                  </svg>
-                  <span>Only {seatsLeft} seats remaining</span>
-                </div>
-                )}
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -1118,7 +1098,7 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
                   textAlign: 'right',
                   marginTop: '4px'
                 }}>
-                  {reserved ? 'You\u2019re registered — check your email for the Zoom link' : subcopyText}
+                  {reserved ? 'You\u2019re registered — meeting link will be emailed before the masterclass' : subcopyText}
                 </div>
               </div>
             </div>
@@ -1187,25 +1167,6 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
                     : <strong>Date TBA</strong>
                   }
                 </div>
-                {showUrgency && (
-                <div className="mc-card__urgency" style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: '#A32D2D',
-                  background: '#FCEBEB',
-                  padding: '3px 10px',
-                  borderRadius: '99px',
-                  width: 'fit-content',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D85A30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                  </svg>
-                  <span>Only {seatsLeft} seats remaining</span>
-                </div>
-                )}
               </div>
 
               <div className="mc-card__cta-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -1250,7 +1211,7 @@ function MasterclassCard({ mc, idx, user, onBook, reserved, onManage }) {
                   textAlign: 'right',
                   marginTop: '4px'
                 }}>
-                  {reserved ? 'You\u2019re registered — check your email for the Zoom link' : subcopyText}
+                  {reserved ? 'You\u2019re registered — meeting link will be emailed before the masterclass' : subcopyText}
                 </div>
               </div>
             </div>
@@ -1477,7 +1438,7 @@ function ClosingCTA({ defaultPrice = 200, user, setBookingSession, setBookingNam
         
         {/* Micro-copy */}
         <div className="closing-cta__microcopy">
-          Instant confirmation · Zoom link sent by email
+          Meeting link emailed a few days before the masterclass +  Meeting reminders
         </div>
       </RevealOnScroll>
     </section>
@@ -4995,7 +4956,7 @@ function CoursesCurriculumSubmodule({ sm, modNum, startIndex }) {
         <ul className="courses-submodule__lessons">
           {sm.lessons.map((l, i) => (
             <li key={i} className="courses-lesson">
-              <span className="courses-lesson__play" aria-hidden="true">▶</span>
+              <span className="courses-lesson__play" aria-hidden="true" />
               <span className="courses-lesson__num">{modNum}.{startIndex + i + 1}</span>
               <span className="courses-lesson__title">{l}</span>
               <span className="courses-lesson__duration">{COURSES_DURATION_CYCLE[(startIndex + i) % COURSES_DURATION_CYCLE.length]}</span>
@@ -5019,11 +4980,12 @@ function CoursesCurriculumModule({ mod }) {
         onClick={() => setOpen((o) => !o)}
       >
         <div className="courses-module__headtext">
-          <div className="courses-module__title">Module {mod.n}: {mod.title}</div>
+          <div className="courses-module__num">Module {mod.n}</div>
+          <div className="courses-module__title">{mod.title}</div>
           <div className="courses-module__meta">
-            <span className="courses-module__meta-item">📘 Chapters : {mod.submodules.length}</span>
-            <span className="courses-module__meta-item">📎 Assignments : 0</span>
-            <span className="courses-module__meta-item">✔ Completed : 0%</span>
+            <span className="courses-module__meta-item">{mod.submodules.length} chapters</span>
+            <span className="courses-module__meta-item">Project-first lessons</span>
+            <span className="courses-module__meta-item">0% complete</span>
           </div>
         </div>
         <span className="courses-module__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
@@ -5079,29 +5041,98 @@ function CoursesTabView() {
             />
           </div>
         </div>
+
+        {/* Anchor stat row — mirrors the home/roadmap hero rhythm */}
+        <div className="hero__stats v2-hero-stats">
+          <div>
+            <div className="hero__stat-num">{info.moduleCount}</div>
+            <div className="hero__stat-label">Modules</div>
+          </div>
+          <div>
+            <div className="hero__stat-num">{info.submoduleCount}</div>
+            <div className="hero__stat-label">Sub-modules</div>
+          </div>
+          <div>
+            <div className="hero__stat-num">{info.lessonCount}</div>
+            <div className="hero__stat-label">Lessons</div>
+          </div>
+          <div>
+            <div className="hero__stat-num">4</div>
+            <div className="hero__stat-label">Capstones</div>
+          </div>
+        </div>
+
       </header>
 
       <div className="courses-page-body">
-        {/* SECTION 2 — Course Overview */}
-        <section className="courses-overview">
-          <h2 className="courses-overview__title">Course Overview</h2>
-          {(info.overview || []).map((p, i) => (
-            <p key={i} className="courses-overview__para">{p}</p>
-          ))}
-        </section>
-
-        {/* SECTION 3 — Curriculum */}
-        <section className="courses-curriculum">
-          <h2 className="courses-curriculum__title">Course Curriculum</h2>
-          <p className="courses-curriculum__stats">
-            {info.moduleCount} modules · {info.submoduleCount} sub-modules · {info.lessonCount} lessons
-          </p>
-          <div className="courses-curriculum__list">
-            {modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
+        {/* SECTION 2 — What's included */}
+        <section className="courses-offers">
+          <V2SectionHeader
+            eyebrow="What's Included"
+            plain="Everything you need"
+            em="to get hired."
+          />
+          <div className="courses-offers__grid">
+            <div className="courses-offer courses-offer--feature">
+              <span className="courses-offer__icon" aria-hidden="true">🧠</span>
+              <div className="courses-offer__text">
+                <h3 className="courses-offer__title">Production Agentic AI Course</h3>
+                <p className="courses-offer__body">15 modules, 73 sub-modules, 144 lessons — build Atlas from a 40-line agent into a deployed, monitored, production-grade agentic system.</p>
+              </div>
+            </div>
+            {[
+              ['🎤', 'Mock Interviews', 'Practice real agent-engineer interview rounds with structured feedback.'],
+              ['🤝', '1-on-1 Sessions', 'Personal guidance whenever you are stuck or planning your next step.'],
+              ['📝', 'Assignments', 'Hands-on work after every module so the concepts actually stick.'],
+              ['🚀', 'Capstone Projects', 'Build, deploy, and monitor portfolio-ready agentic products end-to-end.'],
+              ['📄', 'Resume Review', 'Get your resume sharpened for AI engineering roles.'],
+              ['⏱️', 'Doubts Cleared in 24 Hours', 'Ask anytime — every question answered within a day.'],
+            ].map(([icon, title, body]) => (
+              <div key={title} className="courses-offer">
+                <span className="courses-offer__icon" aria-hidden="true">{icon}</span>
+                <div className="courses-offer__text">
+                  <h3 className="courses-offer__title">{title}</h3>
+                  <p className="courses-offer__body">{body}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* SECTION 4 — Instructor */}
+        {/* SECTION 3 — Course Overview */}
+        <section className="courses-overview">
+          <V2SectionHeader
+            eyebrow="Course Overview"
+            plain="Build first."
+            em="Understand deeply."
+          />
+          <div className="courses-overview__prose">
+            {(info.overview || []).map((p, i) => (
+              <p key={i} className={`courses-overview__para${i === 0 ? ' courses-overview__para--lead' : ''}`}>{p}</p>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 4 — Curriculum */}
+        <section className="courses-curriculum">
+          <V2SectionHeader
+            eyebrow="Course Curriculum"
+            plain="From your first agent"
+            em="to production-grade."
+          />
+          <div className="courses-curriculum-shell">
+            <div className="courses-curriculum__stats" aria-label="Curriculum summary">
+              <span className="v2-curriculum-chip">{info.moduleCount} modules</span>
+              <span className="v2-curriculum-chip">{info.submoduleCount} sub-modules</span>
+              <span className="v2-curriculum-chip v2-curriculum-chip--accent">{info.lessonCount} lessons</span>
+            </div>
+            <div className="courses-curriculum__list">
+              {modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 5 — Instructor */}
         <InstructorBio />
       </div>
     </div>
