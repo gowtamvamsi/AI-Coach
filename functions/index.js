@@ -1,3 +1,11 @@
+// GCLOUD_PROJECT is required by firebase-functions v1 event providers
+// (firestore/pubsub) but the Cloud Functions API now rejects it as a
+// user-set env var, so deploys that touch environmentVariables lose it.
+// Derive it from FIREBASE_CONFIG (which is user-set and survives).
+if (!process.env.GCLOUD_PROJECT && process.env.FIREBASE_CONFIG) {
+  try { process.env.GCLOUD_PROJECT = JSON.parse(process.env.FIREBASE_CONFIG).projectId; } catch (e) { /* leave unset */ }
+}
+
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
@@ -192,6 +200,26 @@ function icsAttachment(ics) {
     content: ics,
     contentType: "text/calendar; method=PUBLISH; charset=UTF-8",
   }];
+}
+
+// Markdown-lite → HTML for email bodies, so **bold** and [label](url) written
+// in the admin composer render in recipients' inboxes. Everything else stays
+// plain text (escaped), with newlines as <br>. A stripped text version is sent
+// alongside as the fallback part for text-only mail clients.
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function emailBodyToHtml(body) {
+  const html = escapeHtml(body)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\r?\n/g, "<br>\n");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222">${html}</div>`;
+}
+function emailBodyToText(body) {
+  return String(body)
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, "$1 ($2)");
 }
 
 // Substitute {{placeholders}} in an admin-edited email template, per recipient.
@@ -827,7 +855,8 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
       from: defaultFrom,
       to: email,
       subject: subject,
-      text: body
+      text: emailBodyToText(body),
+      html: emailBodyToHtml(body)
     };
     if (atts.length) {
       // Resend expects base64-encoded attachment content.
@@ -857,7 +886,8 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
       from: defaultFrom,
       to: email,
       subject: subject,
-      text: body,
+      text: emailBodyToText(body),
+      html: emailBodyToHtml(body),
       ...(atts.length && {
         attachments: atts.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType }))
       })
@@ -1049,6 +1079,7 @@ exports.onRegistrationCompleted = functions.firestore
           emailConfirmationSubject: fs.emailConfirmationSubject,
           emailConfirmationIntro: fs.emailConfirmationIntro,
           emailConfirmationNote: fs.emailConfirmationNote,
+          emailConfirmationBody: fs.emailConfirmationBody,
         };
 
         const instructor = typeof effectiveSession.instructor === "object"
@@ -1072,8 +1103,36 @@ exports.onRegistrationCompleted = functions.firestore
         const customSubject = effectiveSession.emailConfirmationSubject;
         const customIntro = effectiveSession.emailConfirmationIntro;
         const customNote = effectiveSession.emailConfirmationNote;
+        // Full-body override: replaces the assembled email entirely.
+        // Supports {{name}} {{title}} {{date}} {{zoom}} placeholders.
+        const customBody = effectiveSession.emailConfirmationBody;
 
         const subject = customSubject || `Confirmed: Your seat is reserved for ${sessionTitle}! 🚀`;
+
+        if (customBody) {
+          const body = applyTemplate(customBody, {
+            name: studentName || "there",
+            title: sessionTitle,
+            date: formattedDate,
+            zoom: zoomLink,
+          });
+          await sendEmailHelper({
+            email: studentEmail,
+            name: studentName,
+            subject,
+            body,
+            resendApiKey: process.env.RESEND_API_KEY,
+            smtpEmail: process.env.SMTP_EMAIL,
+            smtpPass: process.env.SMTP_PASSWORD,
+            from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+            attachments: icsAttachment(buildMasterclassICS(effectiveSession, sessionTitle, sessionId)),
+          });
+          await change.after.ref.update({
+            detailsEmailSent: true,
+            detailsEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return null;
+        }
 
         let body = `Hi ${studentName || "there"},\n\n` +
           (customIntro
@@ -1804,7 +1863,33 @@ exports.processEmailBatch = functions
     let sent = 0, errors = 0, skipped = 0;
     const failures = []; // { email, name, error } for the admin task viewer
 
+    // Ad-hoc (no-regId) sends carry each recipient's index in the job's
+    // recipient list (r.idx). Delivered indices are recorded on the job doc
+    // (deliveredIdx) as we go, so a Cloud Tasks retry of a partially-completed
+    // batch — and the admin Retry button — only sends to who's still missing.
+    const jobRef = jobId ? db.collection("emailJobs").doc(jobId) : null;
+    const hasIdx = recipients.some((r) => r && r.idx != null);
+    let deliveredSet = new Set();
+    if (jobRef && hasIdx) {
+      const js = await jobRef.get();
+      deliveredSet = new Set((js.exists && js.data().deliveredIdx) || []);
+    }
+    let pendingIdx = [];
+    // Flush every 10 sends: keeps job-doc writes ~0.1/s per worker (contention-
+    // safe at 3 concurrent) while capping the re-send window on a mid-batch
+    // crash to at most 10 recipients.
+    const flushDelivered = async () => {
+      if (!jobRef || pendingIdx.length === 0) return;
+      const idxs = pendingIdx; pendingIdx = [];
+      await jobRef.set({
+        deliveredIdx: admin.firestore.FieldValue.arrayUnion(...idxs),
+        sent: admin.firestore.FieldValue.increment(idxs.length),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    };
+
     for (const r of recipients) {
+      if (r.idx != null && deliveredSet.has(r.idx)) continue; // delivered on a previous attempt — already counted
       try {
         // Registration-backed sends (zoom links, reminders, cancellations) read
         // the reg doc for retry-safe dedupe and to flag it sent. Ad-hoc list
@@ -1835,14 +1920,17 @@ exports.processEmailBatch = functions
           }
           await regRef.update(update);
         }
-        sent++;
+        if (r.idx != null) pendingIdx.push(r.idx); // counted via flushDelivered
+        else sent++;
       } catch (e) {
         const msg = String((e && e.message) || e || "Unknown error").slice(0, 300);
         console.error(`[BATCH ${jobId || "?"}] send failed for ${r.email}:`, e);
         failures.push({ email: r.email, name: r.name || "", error: msg });
         errors++;
       }
+      if (pendingIdx.length >= 10) await flushDelivered();
     }
+    await flushDelivered();
 
     if (jobId) {
       const update = {
@@ -1972,6 +2060,19 @@ exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB"
   if (!body.trim()) throw new functions.https.HttpsError("invalid-argument", "An email body is required.");
   if (rawRecipients.length === 0) throw new functions.https.HttpsError("invalid-argument", "No recipients were provided.");
 
+  // Optional calendar invite: { title, dateTime, duration, location }.
+  // Reuses the masterclass ICS builder (location rides in as the meeting link).
+  const event = (data && data.event) || null;
+  let ics = null;
+  if (event && event.title && event.dateTime) {
+    ics = buildMasterclassICS(
+      { dateTime: event.dateTime, duration: event.duration, zoomLink: String(event.location || "").trim() },
+      String(event.title).trim(),
+      "bulk"
+    );
+    if (!ics) throw new functions.https.HttpsError("invalid-argument", "The calendar event date/time could not be parsed.");
+  }
+
   // Validate each row (skip empty / malformed emails). No de-duplication: every
   // uploaded recipient is kept, matching exactly what the admin sees in the list
   // — two people can legitimately share one inbox, each with their own {{name}}.
@@ -2024,28 +2125,105 @@ exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB"
     total: recipients.length, sent: 0, errors: 0, skipped: 0,
     recipients: jobRecipientList(recipients),
     recipientsTruncated: recipients.length > EMAIL_JOB_RECIPIENT_CAP,
+    // Kept on the job so retryEmailJob can re-send to undelivered recipients.
+    bodyTpl: body,
+    ics: ics || null,
+    deliveredIdx: [],
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: (context.auth && context.auth.uid) || "emulator",
   });
 
   // Fan out into processEmailBatch tasks (no regId/flagField → direct send).
+  // Each recipient carries its index in the job's recipient list so delivery
+  // is tracked per person (deliveredIdx) and retries never double-send.
   const { getFunctions } = require("firebase-admin/functions");
   const queue = getFunctions().taskQueue("processEmailBatch");
+  const indexed = recipients.map((r, i) => ({ email: r.email, name: r.name, idx: i }));
   let batches = 0;
-  for (let i = 0; i < recipients.length; i += EMAIL_BATCH_SIZE) {
+  for (let i = 0; i < indexed.length; i += EMAIL_BATCH_SIZE) {
     await queue.enqueue({
       jobId: jobRef.id,
       subjectTpl: subject,
       bodyTpl: body,
       baseVars: {},
-      ics: null,
-      recipients: recipients.slice(i, i + EMAIL_BATCH_SIZE),
+      ics,
+      recipients: indexed.slice(i, i + EMAIL_BATCH_SIZE),
     });
     batches++;
   }
 
   console.log(`[BULK EMAIL] queued ${recipients.length} email(s) in ${batches} batch(es), job ${jobRef.id} (label: ${label})`);
   return { success: true, queued: recipients.length, batches, jobId: jobRef.id, total: recipients.length };
+});
+
+// ===============================================================
+// Retry a bulk email job: re-enqueue ONLY recipients not recorded in the
+// job's deliveredIdx. Admin-only. Error counters reset so the task viewer's
+// progress reflects the retry pass; sent/deliveredIdx keep accumulating.
+// ===============================================================
+exports.retryEmailJob = functions.runWith({ timeoutSeconds: 300, memory: "512MB" }).https.onCall(async (data, context) => {
+  const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isEmulator) {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    const role = callerDoc.exists ? callerDoc.data().role : "";
+    if (role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "Access denied. Only admins can retry email jobs.");
+    }
+  }
+
+  const jobId = ((data && data.jobId) || "").trim();
+  if (!jobId) throw new functions.https.HttpsError("invalid-argument", "A jobId is required.");
+  const jobRef = db.collection("emailJobs").doc(jobId);
+  const snap = await jobRef.get();
+  if (!snap.exists) throw new functions.https.HttpsError("not-found", "Email task not found.");
+  const job = snap.data();
+  if (job.type !== "bulk" || !job.bodyTpl) {
+    throw new functions.https.HttpsError("failed-precondition", "Only bulk email tasks sent after delivery tracking was added can be retried.");
+  }
+  const processed = (job.sent || 0) + (job.errors || 0) + (job.skipped || 0);
+  if ((job.total || 0) > 0 && processed < job.total) {
+    throw new functions.https.HttpsError("failed-precondition", "This task is still sending — wait for it to finish before retrying.");
+  }
+
+  // recipients is capped at EMAIL_JOB_RECIPIENT_CAP (5000); beyond that a job
+  // can't be retried per-recipient (recipientsTruncated flags this in the UI).
+  const recipients = Array.isArray(job.recipients) ? job.recipients : [];
+  const delivered = new Set(job.deliveredIdx || []);
+  const undelivered = recipients
+    .map((r, i) => ({ email: r.email, name: r.name || "", idx: i }))
+    .filter((r) => r.email && !delivered.has(r.idx));
+  if (undelivered.length === 0) {
+    return { success: true, retried: 0, batches: 0 };
+  }
+
+  // Fresh error slate for the retry pass.
+  await jobRef.set({
+    errors: 0, skipped: 0,
+    failures: admin.firestore.FieldValue.delete(),
+    retriedAt: admin.firestore.FieldValue.serverTimestamp(),
+    retryCount: admin.firestore.FieldValue.increment(1),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const { getFunctions } = require("firebase-admin/functions");
+  const queue = getFunctions().taskQueue("processEmailBatch");
+  let batches = 0;
+  for (let i = 0; i < undelivered.length; i += EMAIL_BATCH_SIZE) {
+    await queue.enqueue({
+      jobId,
+      subjectTpl: job.subject || "",
+      bodyTpl: job.bodyTpl,
+      baseVars: {},
+      ics: job.ics || null,
+      recipients: undelivered.slice(i, i + EMAIL_BATCH_SIZE),
+    });
+    batches++;
+  }
+  console.log(`[RETRY EMAIL] job ${jobId}: re-queued ${undelivered.length} undelivered recipient(s) in ${batches} batch(es)`);
+  return { success: true, retried: undelivered.length, batches };
 });
 
 // ===============================================================

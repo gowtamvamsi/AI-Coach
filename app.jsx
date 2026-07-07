@@ -158,6 +158,82 @@ function sortByCreatedAtDesc(list) {
 // HELPER COMPONENTS
 // ===============================================================
 
+// "Attach a calendar invite" fields shared by the two bulk-email composers
+// (spreadsheet upload + saved contacts). `event` is null when unchecked, else
+// { title, dateTime, duration, location } — sent as `event` to sendBulkEmail.
+function EventInviteFields({ event, setEvent, disabled }) {
+  return (
+    <div className="form-group">
+      <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--fg)", cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={!!event}
+          onChange={(e) => setEvent(e.target.checked ? { title: "", dateTime: "", duration: "60", location: "" } : null)}
+          disabled={disabled}
+        />
+        📅 Attach a calendar invite (.ics) with meeting details
+      </label>
+      {event && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+          <div>
+            <label className="form-label">Event title</label>
+            <input className="form-input" value={event.title} onChange={(e) => setEvent({ ...event, title: e.target.value })} placeholder="e.g. Claude Code Masterclass" disabled={disabled} />
+          </div>
+          <div>
+            <label className="form-label">Date & time</label>
+            <input className="form-input" type="datetime-local" value={event.dateTime} onChange={(e) => setEvent({ ...event, dateTime: e.target.value })} disabled={disabled} />
+          </div>
+          <div>
+            <label className="form-label">Duration (minutes)</label>
+            <input className="form-input" type="number" min="15" step="15" value={event.duration} onChange={(e) => setEvent({ ...event, duration: e.target.value })} disabled={disabled} />
+          </div>
+          <div>
+            <label className="form-label">Meeting link (optional)</label>
+            <input className="form-input" value={event.location} onChange={(e) => setEvent({ ...event, location: e.target.value })} placeholder="https://teams.microsoft.com/…" disabled={disabled} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bulk-email composer (subject + body + optional calendar invite + send).
+// Owns its field state locally so each keystroke re-renders only this small
+// form — NOT the ~5000-line DashboardView (which caused visible typing lag).
+// onSend receives { subject, body, event } and returns true to clear the form.
+function EmailComposer({ subjectPlaceholder, bodyPlaceholder, bodyRows, buttonLabel, sending, onSend }) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [event, setEvent] = useState(null);
+  const canSend = !sending && subject.trim() && body.trim();
+  const handleSend = async () => {
+    const ok = await onSend({ subject, body, event });
+    if (ok) { setSubject(""); setBody(""); setEvent(null); }
+  };
+  return (
+    <React.Fragment>
+      <div className="form-group">
+        <label className="form-label">Subject</label>
+        <input className="form-input" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={subjectPlaceholder} disabled={sending} />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Body (use {"{{name}}"} to personalize · **bold** and [links](https://…) supported)</label>
+        <textarea className="form-input" value={body} onChange={(e) => setBody(e.target.value)} rows={bodyRows} placeholder={bodyPlaceholder} disabled={sending} style={{ resize: "vertical", fontFamily: "inherit" }} />
+      </div>
+      <EventInviteFields event={event} setEvent={setEvent} disabled={sending} />
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={!canSend}
+        className="form-btn form-btn--accent"
+        style={{ width: "auto", margin: 0, padding: "14px 28px", background: sending ? "var(--bg-faint)" : "var(--c-pink)", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", gap: "8px" }}
+      >
+        {sending ? (<><span className="ai-status__spinner"></span> Queuing…</>) : buttonLabel}
+      </button>
+    </React.Fragment>
+  );
+}
+
 function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoProgress }) {
   const [activeTab, setActiveTab] = useState(0);
   const section = phase.sections[activeTab];
@@ -2322,8 +2398,8 @@ function DashboardView({ user, role, onLogout }) {
   const [bulkNote, setBulkNote] = useState("");          // feedback from the last upload
   const [bulkParsing, setBulkParsing] = useState(false);
   const [bulkParseError, setBulkParseError] = useState("");
-  const [bulkSubject, setBulkSubject] = useState("");
-  const [bulkBody, setBulkBody] = useState("");
+  // Subject/body/event fields live inside <EmailComposer> (local state) so
+  // typing doesn't re-render this whole component — only send status is here.
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkError, setBulkError] = useState("");
   const [bulkSuccess, setBulkSuccess] = useState("");
@@ -2331,8 +2407,7 @@ function DashboardView({ user, role, onLogout }) {
   // ── Saved marketing contacts (persisted from spreadsheet sends; reusable) ──
   const [savedContacts, setSavedContacts] = useState([]);   // [{ id(email), name, email, phone, source, lastEmailedAt, emailCount }]
   const [savedSearch, setSavedSearch] = useState("");
-  const [savedSubject, setSavedSubject] = useState("");
-  const [savedBody, setSavedBody] = useState("");
+  // Saved-contacts composer fields also live in <EmailComposer> local state.
   const [savedSending, setSavedSending] = useState(false);
   const [savedError, setSavedError] = useState("");
   const [savedSuccess, setSavedSuccess] = useState("");
@@ -2500,51 +2575,71 @@ function DashboardView({ user, role, onLogout }) {
   };
 
   // Re-email the entire saved audience — reuses the same fan-out + persistence.
-  const handleEmailSavedContacts = async () => {
+  // Receives the composer's fields; returns true so the composer clears itself.
+  const handleEmailSavedContacts = async ({ subject, body, event }) => {
     setSavedError(''); setSavedSuccess('');
-    if (savedContacts.length === 0) { setSavedError('No saved contacts yet — send a spreadsheet campaign first.'); return; }
-    if (!savedSubject.trim()) { setSavedError('Add an email subject.'); return; }
-    if (!savedBody.trim()) { setSavedError('Add an email body.'); return; }
-    if (!functions) { setSavedError('Firebase Functions is not initialized on this platform.'); return; }
+    if (savedContacts.length === 0) { setSavedError('No saved contacts yet — send a spreadsheet campaign first.'); return false; }
+    if (event && (!event.title.trim() || !event.dateTime)) { setSavedError('The calendar invite needs an event title and a date & time (or untick it).'); return false; }
+    if (!functions) { setSavedError('Firebase Functions is not initialized on this platform.'); return false; }
     setSavedSending(true);
     try {
       const call = functions.httpsCallable('sendBulkEmail');
       const res = await call({
-        subject: savedSubject,
-        body: savedBody,
+        subject,
+        body,
         label: 'Saved contacts',
         recipients: savedContacts.map((c) => ({ name: c.name, email: c.email, phone: c.phone })),
+        // datetime-local is in the admin's local timezone; send as absolute UTC.
+        ...(event && {
+          event: {
+            title: event.title.trim(),
+            dateTime: new Date(event.dateTime).toISOString(),
+            duration: Number(event.duration) || 60,
+            location: event.location.trim(),
+          },
+        }),
       });
       const result = res.data || {};
       if (result.success) {
         setSavedSuccess(`Queued ${result.queued} email${result.queued === 1 ? '' : 's'} to saved contacts. Track delivery in the Email Tasks section (job ${result.jobId}).`);
-        setSavedSubject(''); setSavedBody('');
-      } else { throw new Error('The server did not confirm the send.'); }
+        return true;
+      }
+      throw new Error('The server did not confirm the send.');
     } catch (err) {
       console.error('Saved-contacts email failed:', err);
       setSavedError(err.message || 'Failed to queue the email.');
+      return false;
     } finally { setSavedSending(false); }
   };
 
   // Hand the parsed list to the sendBulkEmail Cloud Function, which validates,
   // dedupes, writes an emailJobs progress doc, and fans the send out into
   // batched workers. Progress shows live in the Email Tasks section below.
-  const handleSendBulkEmail = async () => {
+  // Receives the composer's fields; returns true so the composer clears itself.
+  const handleSendBulkEmail = async ({ subject, body, event }) => {
     setBulkError("");
     setBulkSuccess("");
-    if (bulkRows.length === 0) { setBulkError("Upload a spreadsheet with recipients first."); return; }
-    if (!bulkSubject.trim()) { setBulkError("Add an email subject."); return; }
-    if (!bulkBody.trim()) { setBulkError("Add an email body."); return; }
-    if (!functions) { setBulkError("Firebase Functions is not initialized on this platform."); return; }
+    if (bulkRows.length === 0) { setBulkError("Upload a spreadsheet with recipients first."); return false; }
+    if (event && (!event.title.trim() || !event.dateTime)) { setBulkError("The calendar invite needs an event title and a date & time (or untick it)."); return false; }
+    if (!functions) { setBulkError("Firebase Functions is not initialized on this platform."); return false; }
 
     setBulkSending(true);
     try {
       const call = functions.httpsCallable("sendBulkEmail");
       const res = await call({
-        subject: bulkSubject,
-        body: bulkBody,
+        subject,
+        body,
         label: bulkFiles.map((f) => f.name).join(", ") || "Spreadsheet upload",
         recipients: bulkRows.map((r) => ({ name: r.name, email: r.email, phone: r.phone })),
+        // datetime-local is in the admin's local timezone; send as absolute UTC.
+        ...(event && {
+          event: {
+            title: event.title.trim(),
+            dateTime: new Date(event.dateTime).toISOString(),
+            duration: Number(event.duration) || 60,
+            location: event.location.trim(),
+          },
+        }),
       });
       const result = res.data || {};
       if (result.success) {
@@ -2552,18 +2647,81 @@ function DashboardView({ user, role, onLogout }) {
         setBulkRows([]);
         setBulkFiles([]);
         setBulkNote("");
-        setBulkSubject("");
-        setBulkBody("");
-      } else {
-        throw new Error("The server did not confirm the send.");
+        return true;
       }
+      throw new Error("The server did not confirm the send.");
     } catch (err) {
       console.error("Bulk email send failed:", err);
       setBulkError(err.message || "Failed to queue the bulk email.");
+      return false;
     } finally {
       setBulkSending(false);
     }
   };
+
+  // These preview tables render up to 1,000 rows — memo them so unrelated
+  // dashboard state changes (live snapshots, tab switches) don't re-diff them.
+  const bulkPreviewTable = React.useMemo(() => (
+    <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+      <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ textAlign: "left" }}>
+              <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Name</th>
+              <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Email</th>
+              <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bulkRows.slice(0, 1000).map((r, i) => (
+              <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
+                <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{r.name || "—"}</td>
+                <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.email}</td>
+                <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.phone || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {bulkRows.length > 1000 && (
+        <div style={{ padding: "8px 14px", fontSize: "12px", color: "var(--fg-faint)", borderTop: "1px solid var(--line)", background: "var(--bg-elev)" }}>
+          Showing the first 1,000 — all {bulkRows.length.toLocaleString()} recipients will be emailed.
+        </div>
+      )}
+    </div>
+  ), [bulkRows]);
+
+  const savedContactsTable = React.useMemo(() => (
+    <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+      <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ textAlign: "left" }}>
+              {["Name", "Email", "Phone", "Source", ""].map((h, i) => (
+                <th key={i} style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {savedContacts
+              .filter((c) => { const q = savedSearch.trim().toLowerCase(); if (!q) return true; return (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q); })
+              .slice(0, 1000)
+              .map((c) => (
+                <tr key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
+                  <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{c.name || "—"}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.email}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.phone || "—"}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--fg-faint)", fontSize: "12px" }}>{c.source || "—"}</td>
+                  <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                    <button type="button" onClick={() => handleRemoveSavedContact(c.id)} title="Remove contact" style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", fontSize: "14px" }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ), [savedContacts, savedSearch]);
 
   const handleLaunchBroadcast = async () => {
     const emails = Array.from(new Set(
@@ -4630,54 +4788,16 @@ ${mcRawSyllabus}`;
                 <b style={{ color: "var(--c-emerald)" }}>{bulkRows.length}</b> valid recipient{bulkRows.length === 1 ? "" : "s"} ready{bulkFiles.length > 1 ? ` across ${bulkFiles.length} files` : ""}
               </div>
 
-              <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
-                <div style={{ maxHeight: "320px", overflowY: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                    <thead>
-                      <tr style={{ textAlign: "left" }}>
-                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Name</th>
-                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Email</th>
-                        <th style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>Phone</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkRows.slice(0, 1000).map((r, i) => (
-                        <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
-                          <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{r.name || "—"}</td>
-                          <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.email}</td>
-                          <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{r.phone || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {bulkRows.length > 1000 && (
-                  <div style={{ padding: "8px 14px", fontSize: "12px", color: "var(--fg-faint)", borderTop: "1px solid var(--line)", background: "var(--bg-elev)" }}>
-                    Showing the first 1,000 — all {bulkRows.length.toLocaleString()} recipients will be emailed.
-                  </div>
-                )}
-              </div>
+              {bulkPreviewTable}
 
-              <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input className="form-input" value={bulkSubject} onChange={(e) => setBulkSubject(e.target.value)} placeholder="e.g. A new AI Engineering cohort is opening 🚀" disabled={bulkSending} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Body (plain text · use {"{{name}}"} to personalize)</label>
-                <textarea className="form-input" value={bulkBody} onChange={(e) => setBulkBody(e.target.value)} rows={8} placeholder={"Hi {{name}},\n\nWe just opened enrollment for…"} disabled={bulkSending} style={{ resize: "vertical", fontFamily: "inherit" }} />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSendBulkEmail}
-                disabled={bulkSending || !bulkSubject.trim() || !bulkBody.trim()}
-                className="form-btn form-btn--accent"
-                style={{ width: "auto", margin: 0, padding: "14px 28px", background: bulkSending ? "var(--bg-faint)" : "var(--c-pink)", cursor: (bulkSending || !bulkSubject.trim() || !bulkBody.trim()) ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}
-              >
-                {bulkSending
-                  ? (<><span className="ai-status__spinner"></span> Queuing…</>)
-                  : (<>✉ Send to {bulkRows.length} recipient{bulkRows.length === 1 ? "" : "s"}</>)}
-              </button>
+              <EmailComposer
+                subjectPlaceholder="e.g. A new AI Engineering cohort is opening 🚀"
+                bodyPlaceholder={"Hi {{name}},\n\nWe just opened enrollment for…"}
+                bodyRows={8}
+                buttonLabel={`✉ Send to ${bulkRows.length} recipient${bulkRows.length === 1 ? "" : "s"}`}
+                sending={bulkSending}
+                onSend={handleSendBulkEmail}
+              />
             </div>
           )}
 
@@ -4705,53 +4825,16 @@ ${mcRawSyllabus}`;
                 <input className="form-input" style={{ maxWidth: "240px", padding: "8px 12px" }} placeholder="Search name / email…" value={savedSearch} onChange={(e) => setSavedSearch(e.target.value)} />
               </div>
 
-              <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
-                <div style={{ maxHeight: "320px", overflowY: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                    <thead>
-                      <tr style={{ textAlign: "left" }}>
-                        {["Name", "Email", "Phone", "Source", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {savedContacts
-                        .filter((c) => { const q = savedSearch.trim().toLowerCase(); if (!q) return true; return (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q); })
-                        .slice(0, 1000)
-                        .map((c) => (
-                          <tr key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
-                            <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{c.name || "—"}</td>
-                            <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.email}</td>
-                            <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.phone || "—"}</td>
-                            <td style={{ padding: "10px 14px", color: "var(--fg-faint)", fontSize: "12px" }}>{c.source || "—"}</td>
-                            <td style={{ padding: "10px 14px", textAlign: "right" }}>
-                              <button type="button" onClick={() => handleRemoveSavedContact(c.id)} title="Remove contact" style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", fontSize: "14px" }}>✕</button>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {savedContactsTable}
 
-              <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input className="form-input" value={savedSubject} onChange={(e) => setSavedSubject(e.target.value)} placeholder="Re-engage your saved audience…" disabled={savedSending} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Body (plain text · use {"{{name}}"} to personalize)</label>
-                <textarea className="form-input" value={savedBody} onChange={(e) => setSavedBody(e.target.value)} rows={7} placeholder={"Hi {{name}},\n\nWe just opened a new cohort…"} disabled={savedSending} style={{ resize: "vertical", fontFamily: "inherit" }} />
-              </div>
-              <button
-                type="button"
-                onClick={handleEmailSavedContacts}
-                disabled={savedSending || !savedSubject.trim() || !savedBody.trim()}
-                className="form-btn form-btn--accent"
-                style={{ width: "auto", margin: 0, padding: "14px 28px", background: savedSending ? "var(--bg-faint)" : "var(--c-pink)", cursor: (savedSending || !savedSubject.trim() || !savedBody.trim()) ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}
-              >
-                {savedSending ? (<><span className="ai-status__spinner"></span> Queuing…</>) : (<>✉ Email all {savedContacts.length} saved contact{savedContacts.length === 1 ? "" : "s"}</>)}
-              </button>
+              <EmailComposer
+                subjectPlaceholder="Re-engage your saved audience…"
+                bodyPlaceholder={"Hi {{name}},\n\nWe just opened a new cohort…"}
+                bodyRows={7}
+                buttonLabel={`✉ Email all ${savedContacts.length} saved contact${savedContacts.length === 1 ? "" : "s"}`}
+                sending={savedSending}
+                onSend={handleEmailSavedContacts}
+              />
 
               {savedError && (<p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-rust)" }}>⚠ {savedError}</p>)}
               {savedSuccess && (<p style={{ marginTop: "14px", fontSize: "13px", color: "var(--c-emerald)", lineHeight: 1.5 }}>✓ {savedSuccess}</p>)}
@@ -5148,6 +5231,9 @@ function AdminEmailTasks() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryMsg, setRetryMsg] = useState('');
+  const [showUndeliveredOnly, setShowUndeliveredOnly] = useState(false);
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
@@ -5188,9 +5274,28 @@ function AdminEmailTasks() {
     const processed = processedOf(selected);
     const pct = total ? Math.min(100, Math.round((processed / total) * 100)) : 0;
     const recipients = Array.isArray(selected.recipients) ? selected.recipients : [];
+    // Jobs sent after per-recipient delivery tracking was added carry
+    // deliveredIdx (indices into recipients). Older jobs show no statuses.
+    const tracked = Array.isArray(selected.deliveredIdx);
+    const deliveredSet = new Set(tracked ? selected.deliveredIdx : []);
+    const undeliveredCount = tracked ? recipients.reduce((n, _, i) => n + (deliveredSet.has(i) ? 0 : 1), 0) : 0;
+    const canRetry = tracked && selected.type === 'bulk' && selected.bodyTpl && status === 'done' && undeliveredCount > 0;
+    const handleRetry = async () => {
+      if (!functions) { setRetryMsg('⚠ Firebase Functions is not initialized on this platform.'); return; }
+      setRetrying(true); setRetryMsg('');
+      try {
+        const res = await functions.httpsCallable('retryEmailJob')({ jobId: selected.id });
+        const d = res.data || {};
+        setRetryMsg(d.retried > 0
+          ? `✓ Retrying ${d.retried} undelivered recipient${d.retried === 1 ? '' : 's'} — progress updates live below.`
+          : '✓ Everyone already received this email — nothing to retry.');
+      } catch (err) {
+        setRetryMsg('⚠ ' + (err.message || 'Retry failed.'));
+      } finally { setRetrying(false); }
+    };
     return (
       <section className="email-tasks">
-        <button type="button" className="email-tasks__back" onClick={() => setSelectedId(null)}>← All tasks</button>
+        <button type="button" className="email-tasks__back" onClick={() => { setSelectedId(null); setRetryMsg(''); setShowUndeliveredOnly(false); }}>← All tasks</button>
         <div className="email-tasks__detail-head">
           <span className={`email-tasks__badge email-tasks__badge--${status}`}>{statusLabel[status]}</span>
           <h2 className="email-tasks__title">{(selected.label || selected.type || 'Email')} — {selected.title || selected.sessionId || 'Masterclass'}</h2>
@@ -5215,6 +5320,25 @@ function AdminEmailTasks() {
           </div>
         )}
 
+        {tracked && (
+          <div className="email-tasks__counts" style={{ marginTop: '12px', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+            <span>📬 <strong>{deliveredSet.size}</strong> delivered</span>
+            <span className={undeliveredCount > 0 ? 'is-err' : ''}>{undeliveredCount} not delivered</span>
+            {canRetry && (
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={retrying}
+                className="form-btn form-btn--accent"
+                style={{ width: 'auto', margin: 0, padding: '8px 18px', fontSize: '13px', background: retrying ? 'var(--bg-faint)' : 'var(--c-pink)', cursor: retrying ? 'not-allowed' : 'pointer' }}
+              >
+                {retrying ? 'Queuing retry…' : `↻ Retry ${undeliveredCount} undelivered`}
+              </button>
+            )}
+          </div>
+        )}
+        {retryMsg && <p style={{ marginTop: '8px', fontSize: '13px', lineHeight: 1.5, color: retryMsg.startsWith('⚠') ? 'var(--c-rust)' : 'var(--c-emerald)' }}>{retryMsg}</p>}
+
         {Array.isArray(selected.failures) && selected.failures.length > 0 && (
           <div className="email-tasks__failures">
             <div className="email-tasks__recips-head email-tasks__recips-head--err">
@@ -5235,19 +5359,34 @@ function AdminEmailTasks() {
         )}
 
         <div className="email-tasks__recips">
-          <div className="email-tasks__recips-head">
-            Recipients {selected.recipientsTruncated ? `(first ${recipients.length} of ${total})` : `(${recipients.length})`}
+          <div className="email-tasks__recips-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>Recipients {selected.recipientsTruncated ? `(first ${recipients.length} of ${total})` : `(${recipients.length})`}</span>
+            {tracked && recipients.length > 0 && (
+              <label style={{ fontWeight: 400, fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <input type="checkbox" checked={showUndeliveredOnly} onChange={(e) => setShowUndeliveredOnly(e.target.checked)} />
+                undelivered only
+              </label>
+            )}
           </div>
           {recipients.length === 0 ? (
             <p className="email-tasks__empty">No recipient list stored for this task.</p>
           ) : (
             <ul className="email-tasks__recip-list">
-              {recipients.map((r, i) => (
-                <li key={i}>
-                  <span className="email-tasks__recip-name">{r.name || '—'}</span>
-                  <span className="email-tasks__recip-email">{r.email}</span>
-                </li>
-              ))}
+              {recipients.map((r, i) => {
+                const delivered = deliveredSet.has(i);
+                if (tracked && showUndeliveredOnly && delivered) return null;
+                return (
+                  <li key={i}>
+                    <span className="email-tasks__recip-name">{r.name || '—'}</span>
+                    <span className="email-tasks__recip-email">{r.email}</span>
+                    {tracked && (
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', whiteSpace: 'nowrap', color: delivered ? 'var(--c-emerald)' : 'var(--c-rust)' }}>
+                        {delivered ? '✓ delivered' : '✗ not delivered'}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
