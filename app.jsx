@@ -5012,15 +5012,13 @@ ${mcRawSyllabus}`;
 
 
 // ===============================================================
-// ADMIN — Courses tab. Static preview of the paid course's public
-// page: intro hero, overview copy, collapsible curriculum (from
-// window.COURSE_CURRICULUM / window.COURSE_INFO in data.js), and
-// the instructor bio card also used on the roadmap page.
+// ADMIN — Courses tab. Public-style sales page for the paid course
+// (kept admin-gated until launch; layout follows the approved "Atlas
+// Landing Wireframe" 1a): hero + price card, stats, learning
+// experience, projects, pathways, phase-grouped curriculum, tools,
+// instructor, career support, pricing card, FAQ. All content comes
+// from the window.COURSE_* globals in data.js.
 // ===============================================================
-// Cosmetic-only duration text — the curriculum data has no real lesson
-// lengths, so this just cycles a small set of plausible values by index.
-const COURSES_DURATION_CYCLE = ['12 mins', '18 mins', '24 mins', '9 mins', '15 mins'];
-
 function CoursesCurriculumSubmodule({ sm, modNum, startIndex }) {
   const [open, setOpen] = useState(false);
   return (
@@ -5042,7 +5040,6 @@ function CoursesCurriculumSubmodule({ sm, modNum, startIndex }) {
               <span className="courses-lesson__play" aria-hidden="true" />
               <span className="courses-lesson__num">{modNum}.{startIndex + i + 1}</span>
               <span className="courses-lesson__title">{l}</span>
-              <span className="courses-lesson__duration">{COURSES_DURATION_CYCLE[(startIndex + i) % COURSES_DURATION_CYCLE.length]}</span>
             </li>
           ))}
         </ul>
@@ -5066,9 +5063,8 @@ function CoursesCurriculumModule({ mod }) {
           <div className="courses-module__num">Module {mod.n}</div>
           <div className="courses-module__title">{mod.title}</div>
           <div className="courses-module__meta">
-            <span className="courses-module__meta-item">{mod.submodules.length} chapters</span>
+            <span className="courses-module__meta-item">{mod.submodules.length} chapter{mod.submodules.length === 1 ? '' : 's'}</span>
             <span className="courses-module__meta-item">Project-first lessons</span>
-            <span className="courses-module__meta-item">0% complete</span>
           </div>
         </div>
         <span className="courses-module__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
@@ -5076,6 +5072,14 @@ function CoursesCurriculumModule({ mod }) {
       {open && (
         <div className="courses-module__body">
           {mod.tagline && <p className="courses-module__tagline">{mod.tagline}</p>}
+          {Array.isArray(mod.tools) && mod.tools.length > 0 && (
+            <div className="courses-module__tools">
+              {mod.tools.map((t) => <span key={t} className="v2-curriculum-chip">{t}</span>)}
+            </div>
+          )}
+          {mod.project && (
+            <p className="courses-module__project"><b>Project:</b> {mod.project}</p>
+          )}
           {mod.submodules.map((sm) => {
             const startIndex = lessonCounter;
             lessonCounter += sm.lessons.length;
@@ -5087,41 +5091,133 @@ function CoursesCurriculumModule({ mod }) {
   );
 }
 
+// One phase group inside the curriculum — colored tag, module range,
+// blurb, then the module accordions belonging to that phase.
+function CoursesPhaseGroup({ phase, index, modules }) {
+  const mods = modules.filter((m) => phase.modules.includes(m.n));
+  const range = phase.modules.length > 1
+    ? `Modules ${phase.modules[0]}–${phase.modules[phase.modules.length - 1]}`
+    : `Module ${phase.modules[0]}`;
+  return (
+    <div className="courses-phase">
+      <div className="courses-phase__head">
+        <span className="courses-phase__tag" data-color={phase.color}>Phase {index + 1} · {phase.title}</span>
+        <span className="courses-phase__range">{range}</span>
+      </div>
+      <p className="courses-phase__blurb">{phase.blurb}</p>
+      <div className="courses-curriculum__list">
+        {mods.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
+      </div>
+    </div>
+  );
+}
+
+function CoursesFAQ() {
+  const faqs = window.COURSE_FAQ || [];
+  const [open, setOpen] = useState(0);
+  if (!faqs.length) return null;
+  return (
+    <section className="v2-faq courses-faq">
+      <V2SectionHeader eyebrow="Questions" plain="Frequently asked" em="questions." />
+      <div className="v2-faq-list">
+        {faqs.map((f, i) => {
+          const isOpen = open === i;
+          return (
+            <div key={i} className={`v2-faq-card ${isOpen ? 'is-open' : ''}`}>
+              <button
+                type="button"
+                className="v2-faq-q"
+                onClick={() => setOpen(isOpen ? -1 : i)}
+                aria-expanded={isOpen}
+              >
+                <span className="v2-faq-q-text">{f.q}</span>
+                <span className="v2-faq-chevron" aria-hidden="true">{isOpen ? '−' : '+'}</span>
+              </button>
+              <div className="v2-faq-a" hidden={!isOpen}>
+                <p>{f.a}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function CoursesTabView() {
   const info = window.COURSE_INFO || {};
   const modules = window.COURSE_CURRICULUM || [];
+  const phases = window.COURSE_PHASES || [];
+  const projects = window.COURSE_PROJECTS || [];
+  const tools = window.COURSE_TOOLS || [];
+  const priceFmt = (n) => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN') : n);
+  const scrollToId = (id) => (e) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const experienceCards = [
+    ['🧭', 'Build Atlas step by step', 'Every module upgrades one real AI assistant — from 40 lines to production.'],
+    ['⚙️', 'Production-grade agent systems', 'RAG, MCP, memory, LangGraph, multi-agent orchestration, deployment, and monitoring.'],
+    ['💻', 'Code-first lessons', 'Build before theory. Understand by shipping.'],
+    ['📝', 'Assignments after every module', 'Practice each concept immediately, while it is fresh.'],
+    ['🚀', 'Capstone portfolio projects', 'Graduate with deployable projects you can show recruiters.'],
+    ['🎯', 'Career support', 'Mock interviews, resume review, 1-on-1 sessions, and doubts cleared in 24 hours.'],
+  ];
+
+  const pathCards = [
+    ['Beginner to AI Agents', 'Start with NLP intuition, LLMs, and prompt engineering.', 'Modules 00–03'],
+    ['Agentic AI Engineer', 'Go deep on RAG, tools, memory, MCP, and LangGraph.', 'Modules 04–08'],
+    ['Production AI Developer', 'Deployment, monitoring, evaluation, and guardrails.', 'Modules 09–13'],
+    ['Portfolio Builder', 'Capstones and interview-ready deployed projects.', 'Module 14'],
+  ];
+
+  const careerCards = [
+    ['🎤', 'Mock interviews'],
+    ['📄', 'Resume review'],
+    ['🤝', '1-on-1 sessions'],
+    ['💬', 'Community access'],
+  ];
 
   return (
     <div className="courses-page">
-      {/* SECTION 1 — Course intro (full-bleed, same as the homepage hero) */}
+      {/* HERO — pitch left, price card right (wireframe 1a) */}
       <header className="coaching-home__hero v2-hero hero--split">
         <div className="v2-hero-grid">
           <div className="v2-hero-left">
+            <span className="courses-hero-badge">{info.badge}</span>
             <h1 className="v2-hero-title">
-              <span className="v2-hero-title-line">{info.title}</span>
+              <span className="v2-hero-title-line">{info.headline}</span>
             </h1>
-            <p className="v2-hero-sub">{info.intro}</p>
-            <p className="v2-hero-sub">
-              Course Instructor: <em>{V2_BRAND.name}</em>
-            </p>
-            <div className="v2-hero-actions">
-              <span className="v2-mc-price">
-                <s className="v2-mc-price-was">₹35,000</s>
-                <span className="v2-mc-price-free">₹29,999</span>
-              </span>
+            <p className="v2-hero-sub">{info.subheadline}</p>
+            <div className="courses-hero-chips">
+              {(info.proofChips || []).map((c) => <span key={c} className="v2-curriculum-chip">{c}</span>)}
             </div>
             <div className="v2-hero-actions">
-              <button type="button" className="v2-hero-cta" disabled>
-                <span className="v2-hero-cta-text">Enroll now</span>
-              </button>
+              <a href="#courses-curriculum" className="v2-hero-cta" onClick={scrollToId('courses-curriculum')}>
+                <span className="v2-hero-cta-text">Explore Curriculum</span>
+              </a>
+              <a
+                href={V2_BRAND.roadmapVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="v2-hero-cta v2-hero-cta--ghost"
+              >
+                <span className="v2-hero-cta-text">▶ Watch Course Preview</span>
+              </a>
             </div>
           </div>
           <div className="v2-hero-right">
-            <V2ClickToPlayVideo
-              videoId={V2_BRAND.roadmapVideoId}
-              title={`${info.title} — ${V2_BRAND.name}`}
-              caption="Watch on YouTube"
-            />
+            <aside className="courses-price-card">
+              <span className="courses-price-card__tag">Price</span>
+              <div className="courses-price-card__price">{priceFmt(info.price)}</div>
+              <div className="courses-price-card__was">Usually {priceFmt(info.priceWas)}</div>
+              <p className="courses-price-card__note">{info.priceNote}</p>
+              <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta courses-price-card__cta">
+                <span className="v2-hero-cta-text">Enroll Now</span>
+              </a>
+            </aside>
           </div>
         </div>
 
@@ -5132,10 +5228,6 @@ function CoursesTabView() {
             <div className="hero__stat-label">Modules</div>
           </div>
           <div>
-            <div className="hero__stat-num">{info.submoduleCount}</div>
-            <div className="hero__stat-label">Sub-modules</div>
-          </div>
-          <div>
             <div className="hero__stat-num">{info.lessonCount}</div>
             <div className="hero__stat-label">Lessons</div>
           </div>
@@ -5143,34 +5235,28 @@ function CoursesTabView() {
             <div className="hero__stat-num">4</div>
             <div className="hero__stat-label">Capstones</div>
           </div>
+          <div>
+            <div className="hero__stat-num">24h</div>
+            <div className="hero__stat-label">Doubt support</div>
+          </div>
+          <div>
+            <div className="hero__stat-num">1:1</div>
+            <div className="hero__stat-label">Guidance</div>
+          </div>
         </div>
 
       </header>
 
       <div className="courses-page-body">
-        {/* SECTION 2 — What's included */}
+        {/* Learning experience */}
         <section className="courses-offers">
           <V2SectionHeader
-            eyebrow="What's Included"
+            eyebrow="Learning Experience"
             plain="Everything you need"
-            em="to get hired."
+            em="to go from learner to builder."
           />
           <div className="courses-offers__grid">
-            <div className="courses-offer courses-offer--feature">
-              <span className="courses-offer__icon" aria-hidden="true">🧠</span>
-              <div className="courses-offer__text">
-                <h3 className="courses-offer__title">Production Agentic AI Course</h3>
-                <p className="courses-offer__body">15 modules, 73 sub-modules, 144 lessons — build Atlas from a 40-line agent into a deployed, monitored, production-grade agentic system.</p>
-              </div>
-            </div>
-            {[
-              ['🎤', 'Mock Interviews', 'Practice real agent-engineer interview rounds with structured feedback.'],
-              ['🤝', '1-on-1 Sessions', 'Personal guidance whenever you are stuck or planning your next step.'],
-              ['📝', 'Assignments', 'Hands-on work after every module so the concepts actually stick.'],
-              ['🚀', 'Capstone Projects', 'Build, deploy, and monitor portfolio-ready agentic products end-to-end.'],
-              ['📄', 'Resume Review', 'Get your resume sharpened for AI engineering roles.'],
-              ['⏱️', 'Doubts Cleared in 24 Hours', 'Ask anytime — every question answered within a day.'],
-            ].map(([icon, title, body]) => (
+            {experienceCards.map(([icon, title, body]) => (
               <div key={title} className="courses-offer">
                 <span className="courses-offer__icon" aria-hidden="true">{icon}</span>
                 <div className="courses-offer__text">
@@ -5182,26 +5268,61 @@ function CoursesTabView() {
           </div>
         </section>
 
-        {/* SECTION 3 — Course Overview */}
-        <section className="courses-overview">
+        {/* Projects you will build */}
+        <section className="courses-projects">
           <V2SectionHeader
-            eyebrow="Course Overview"
-            plain="Build first."
-            em="Understand deeply."
+            eyebrow="Build-First"
+            plain="Projects"
+            em="you will build."
           />
-          <div className="courses-overview__prose">
-            {(info.overview || []).map((p, i) => (
-              <p key={i} className={`courses-overview__para${i === 0 ? ' courses-overview__para--lead' : ''}`}>{p}</p>
+          <div className="courses-projects__grid">
+            {projects.map((p, i) => (
+              <div key={p.title} className="courses-project">
+                <div className="courses-project__visual" aria-hidden="true">
+                  <div className="courses-project__visual-dots"><span /><span /><span /></div>
+                  <div className="courses-project__visual-lines"><i /><i /><i /></div>
+                </div>
+                <div className="courses-project__num">{String(i + 1).padStart(2, '0')}</div>
+                <h3 className="courses-project__title">{p.title}</h3>
+                <p className="courses-project__desc">{p.desc}</p>
+                <div className="courses-project__skills">
+                  {(p.skills || []).map((s) => <span key={s} className="v2-curriculum-chip">{s}</span>)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="courses-cta-band">
+            <a href="#courses-curriculum" className="v2-hero-cta v2-hero-cta--ghost" onClick={scrollToId('courses-curriculum')}>
+              <span className="v2-hero-cta-text">See the full curriculum →</span>
+            </a>
+          </div>
+        </section>
+
+        {/* Pathways */}
+        <section className="courses-paths">
+          <V2SectionHeader
+            eyebrow="Pathways"
+            plain="Choose your path"
+            em="inside the course."
+          />
+          <div className="courses-paths__grid">
+            {pathCards.map(([title, body, range]) => (
+              <div key={title} className="courses-path">
+                <h3 className="courses-path__title">{title}</h3>
+                <p className="courses-path__body">{body}</p>
+                <div className="courses-path__range">{range}</div>
+                <a href="#courses-curriculum" className="courses-path__link" onClick={scrollToId('courses-curriculum')}>View modules →</a>
+              </div>
             ))}
           </div>
         </section>
 
-        {/* SECTION 4 — Curriculum */}
-        <section className="courses-curriculum">
+        {/* Curriculum grouped by phase */}
+        <section className="courses-curriculum" id="courses-curriculum">
           <V2SectionHeader
-            eyebrow="Course Curriculum"
-            plain="From your first agent"
-            em="to production-grade."
+            eyebrow="Roadmap"
+            plain="Full curriculum,"
+            em="grouped by phase."
           />
           <div className="courses-curriculum-shell">
             <div className="courses-curriculum__stats" aria-label="Curriculum summary">
@@ -5209,14 +5330,90 @@ function CoursesTabView() {
               <span className="v2-curriculum-chip">{info.submoduleCount} sub-modules</span>
               <span className="v2-curriculum-chip v2-curriculum-chip--accent">{info.lessonCount} lessons</span>
             </div>
-            <div className="courses-curriculum__list">
-              {modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
-            </div>
+            {phases.length
+              ? phases.map((phase, i) => <CoursesPhaseGroup key={phase.title} phase={phase} index={i} modules={modules} />)
+              : <div className="courses-curriculum__list">{modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}</div>}
+          </div>
+          <div className="courses-cta-band">
+            <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta">
+              <span className="v2-hero-cta-text">Enroll in the Program</span>
+            </a>
           </div>
         </section>
 
-        {/* SECTION 5 — Instructor */}
+        {/* Tools you will use */}
+        <section className="courses-tools">
+          <V2SectionHeader
+            eyebrow="Practical Stack"
+            plain="Tools"
+            em="you will use."
+          />
+          <div className="courses-tools__chips">
+            {tools.map((t) => <span key={t} className="v2-curriculum-chip">{t}</span>)}
+          </div>
+        </section>
+
+        {/* Instructor */}
         <InstructorBio />
+
+        {/* Career support */}
+        <section className="courses-career">
+          <V2SectionHeader
+            eyebrow="Outcomes"
+            plain="Career support"
+            em="built in."
+          />
+          <div className="courses-career__grid">
+            {careerCards.map(([icon, title]) => (
+              <div key={title} className="courses-offer courses-offer--center">
+                <span className="courses-offer__icon" aria-hidden="true">{icon}</span>
+                <div className="courses-offer__text">
+                  <h3 className="courses-offer__title">{title}</h3>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section className="courses-pricing" id="courses-pricing">
+          <V2SectionHeader
+            eyebrow="Pricing"
+            plain="One program,"
+            em="everything included."
+          />
+          <div className="courses-pricing-card">
+            <h3 className="courses-pricing-card__name">{info.title}</h3>
+            <div className="courses-pricing-card__price">
+              {priceFmt(info.price)} <s className="courses-pricing-card__was">{priceFmt(info.priceWas)}</s>
+            </div>
+            <ul className="courses-pricing-card__includes">
+              {(info.pricingIncludes || []).map((x) => <li key={x}>{x}</li>)}
+            </ul>
+            <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta courses-pricing-card__cta">
+              <span className="v2-hero-cta-text">Enroll Now</span>
+            </a>
+            <a
+              href={V2_BRAND.whatsappCommunity}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="v2-hero-cta v2-hero-cta--ghost courses-pricing-card__cta"
+            >
+              <span className="v2-hero-cta-text">💬 Talk to us on WhatsApp</span>
+            </a>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <CoursesFAQ />
+      </div>
+
+      {/* Sticky enroll bar — mobile only (CSS-gated) */}
+      <div className="courses-sticky-cta">
+        <span className="courses-sticky-cta__price">{priceFmt(info.price)} <s>{priceFmt(info.priceWas)}</s></span>
+        <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta">
+          <span className="v2-hero-cta-text">Enroll Now</span>
+        </a>
       </div>
     </div>
   );

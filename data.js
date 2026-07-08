@@ -300,6 +300,8 @@ window.COURSE_CURRICULUM = [
     n: "00",
     title: "Build a Full Working Agent",
     tagline: "Ship a working agent on day one — before the fundamentals grind.",
+    project: "Atlas v0 — a working agent in 40 lines, no frameworks",
+    tools: ["Python", "LLM APIs"],
     submodules: [
       { n: "0.1", title: "What You'll Build: Meet Atlas, the Course's Running Agent", lessons: ["Meet Atlas: The AI Assistant You'll Build, Deploy & Monitor"] },
       { n: "0.2", title: "Build Your First Working Agent in 40 Lines (No Frameworks)", lessons: ["Build a Working AI Agent in 40 Lines (No Frameworks, No Magic)"] }
@@ -309,6 +311,8 @@ window.COURSE_CURRICULUM = [
     n: "01",
     title: "NLP Basics, Intuition-First",
     tagline: "Understand what text becomes before an LLM ever sees it.",
+    project: "Semantic search over your own notes",
+    tools: ["Tokens", "Embeddings", "Vector similarity", "Transformers"],
     submodules: [
       { n: "1.1", title: "How Machines Learned to Understand Language (Deep Learning, No Math)", lessons: ["Deep Learning Explained Without a Single Equation"] },
       { n: "1.2", title: "Tokens: How AI Actually Reads Text", lessons: ["Tokens: Why AI Doesn't See Words the Way You Do"] },
@@ -324,6 +328,8 @@ window.COURSE_CURRICULUM = [
     n: "02",
     title: "LLMs: Internals, Parameters, Benchmarking & Cost",
     tagline: "Pick and control the right model for a job — and predict its cost.",
+    project: "A provider-agnostic LLM client (cloud + local via Ollama)",
+    tools: ["OpenAI SDK", "LangChain", "Ollama"],
     submodules: [
       { n: "2.1", title: "What an LLM Is: Training, Next-Token Prediction, Context & Limits", lessons: ["What Is an LLM, Really? A Short History & How They're Trained", "Next-Token Prediction, Explained From Scratch", "How to Communicate With LLMs Using an API Key", "What Is a Context Window? Why a Model Can Only “See” So Much at Once", "The Brain in a Windowless Room: Cutoffs, Hallucination & What LLMs Can't Know"] },
       { n: "2.2", title: "Controlling Model Output: Decoding Dials & Reasoning vs Base Models", lessons: ["Temperature, Top-p, Max Tokens, Stop Sequences & Frequency/Presence Penalties: The Dials That Change Everything", "Reasoning vs Base Models: When “Thinking” Models Actually Win"] },
@@ -337,6 +343,8 @@ window.COURSE_CURRICULUM = [
     n: "03",
     title: "Prompt Engineering",
     tagline: "Reliably get the behavior you want — the skill every agent call depends on.",
+    project: "A prompt toolkit you'll reuse in every agent call",
+    tools: ["Chain-of-Thought", "Structured output", "Pydantic"],
     submodules: [
       { n: "3.1", title: "Core Prompting Techniques: From Prompt Anatomy to Meta-Prompting", lessons: ["Anatomy of a Prompt: Instruction, Context, Input & Format", "Interview-Style Prompting: Drawing the Best Answer Out of a Model", "Chain-of-Thought: Making a Model Show Its Work", "Structured Output: Forcing Clean JSON With Pydantic Schemas", "Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)", "A Look Ahead: Context & Loop Engineering (Coming Later in the Course)"] }
     ]
@@ -345,6 +353,8 @@ window.COURSE_CURRICULUM = [
     n: "04",
     title: "Foundations of Agentic Systems",
     tagline: "Understand the agent loop deeply — because you built it by hand.",
+    project: "Atlas gets a ReAct brain, live tools, and self-correction",
+    tools: ["ReAct", "Tool calling", "Plan-and-Solve"],
     submodules: [
       { n: "4.1", title: "What Is an Agent? Autonomy Levels, the Agent Loop & ReAct", lessons: ["From Rule-Based to Fully Autonomous: The 5 Levels of Agent Autonomy", "LLMs vs Agents vs Workflows: The Difference Nobody Explains Clearly", "The Agent Loop: Reason → Act → Observe → Repeat (ReAct)", "Build It: Give Atlas a ReAct Brain"] },
       { n: "4.2", title: "Giving an Agent Tools: Function Calling & Tool Use", lessons: ["Give Your LLM Hands: Tool Calling From Scratch (Include more examples)", "Build It: Atlas Gets Its First Tools (Live Search + Calculator)", "More Examples of Tool Use"] },
@@ -358,6 +368,8 @@ window.COURSE_CURRICULUM = [
     n: "05",
     title: "RAG — Retrieval-Augmented Generation",
     tagline: "Answer from your own documents — grounded and cited, not from memory.",
+    project: "Document intelligence for Atlas — grounded, cited answers",
+    tools: ["Vector DBs", "Chunking", "Reranking", "Graph RAG"],
     submodules: [
       { n: "5.1", title: "Naive RAG", lessons: ["RAG Architecture: The Anatomy of a Pipeline", "Chunking Strategies", "Vector Databases", "Retrieval"] },
       { n: "5.2", title: "Advanced RAG", lessons: ["Advanced RAG Architecture", "Search Algorithms: HNSW & IVF", "Retrieval Reranking", "LLM as a Judge", "HyDE: Hypothetical Document Embeddings", "FLARE: Forward-Looking Active Retrieval"] },
@@ -371,6 +383,8 @@ window.COURSE_CURRICULUM = [
     n: "06",
     title: "MCP — Model Context Protocol",
     tagline: "Connect your agent to anything through one universal standard.",
+    project: "An MCP server from scratch + a Gmail & Calendar MCP for Atlas",
+    tools: ["MCP", "Gmail API", "Calendar API"],
     submodules: [
       { n: "6.1", title: "What Exactly Is an MCP — and Why We Need Them", lessons: ["The M×N Problem: Why MCP Exists", "Tools vs MCP vs Prompts: What Goes Where", "Host, Client & Server: The MCP Architecture"] },
       { n: "6.2", title: "Build Your Own MCP Server From Scratch", lessons: ["Build It: An MCP Server From Scratch (Host, Client & Server)"] },
@@ -384,6 +398,8 @@ window.COURSE_CURRICULUM = [
     n: "07",
     title: "Memory & Optimization",
     tagline: "Remember across sessions without blowing the context window.",
+    project: "Atlas remembers your preferences across sessions — on a token budget",
+    tools: ["Vector memory", "Context engineering", "Token budgeting"],
     submodules: [
       { n: "7.1", title: "Short-Term Memory & the Context Window", lessons: ["The Context Window: Why Your Agent Forgets Mid-Conversation", "Build It: Conversation Memory for Atlas"] },
       { n: "7.2", title: "Long-Term Memory (Vector DBs, Profiling)", lessons: ["Long-Term Memory: How Production Agents Remember You", "Build It: Atlas Remembers Your Preferences Across Sessions"] },
@@ -396,6 +412,8 @@ window.COURSE_CURRICULUM = [
     n: "08",
     title: "State Machines & DAGs (LangGraph)",
     tagline: "Control an agent's flow deterministically — and pause for a human.",
+    project: "Atlas re-architected on LangGraph with approval checkpoints",
+    tools: ["LangGraph", "State machines", "Human-in-the-loop"],
     submodules: [
       { n: "8.1", title: "From Loops to State: Why Agents Need a Single Source of Truth", lessons: ["Why Loops Aren't Enough: State as the Single Source of Truth — and the Drawbacks of Context & Loop Engineering"] },
       { n: "8.2", title: "Modeling Agents as Graphs: Nodes, Edges & State in LangGraph", lessons: ["Agents as Graphs: The Mental Model Behind LangGraph", "Build It: Re-Architect Atlas on LangGraph"] },
@@ -407,6 +425,8 @@ window.COURSE_CURRICULUM = [
     n: "09",
     title: "Evaluation",
     tagline: "Prove your agent works and catch regressions before users do.",
+    project: "A regression suite that blocks bad Atlas changes",
+    tools: ["LLM-as-Judge", "Eval datasets", "Trajectory benchmarks"],
     submodules: [
       { n: "9.1", title: "Why Agents Are Hard to Evaluate", lessons: ["Non-Deterministic Nightmares: Why You Can't Unit-Test an Agent"] },
       { n: "9.2", title: "Success-Rate Evaluation: Scoring Non-Deterministic Agents", lessons: ["Success Rate: Scoring an Agent That Answers Differently Every Time", "Build It: A Success-Rate Eval Harness for Atlas"] },
@@ -418,6 +438,8 @@ window.COURSE_CURRICULUM = [
     n: "10",
     title: "Multi-Agent Orchestration",
     tagline: "Make specialized agents collaborate without burning $400 in a loop.",
+    project: "Atlas becomes a researcher + writer + critic team",
+    tools: ["LangGraph", "OpenAI Agents SDK", "CrewAI"],
     submodules: [
       { n: "10.1", title: "Specialized Agents: When a Team Beats One Generalist", lessons: ["One Genius vs a Team: When Multiple Agents Beat One"] },
       { n: "10.2", title: "Orchestration Patterns: Hierarchical vs Peer-to-Peer Teams", lessons: ["Hierarchical vs Peer-to-Peer: How Agent Teams Are Organized", "Build It: Turn Atlas Into a Researcher + Writer + Critic Team"] },
@@ -429,6 +451,8 @@ window.COURSE_CURRICULUM = [
     n: "11",
     title: "Security & Guardrails",
     tagline: "Survive malicious users and handle sensitive data safely.",
+    project: "Atlas locked down — guardrails, least privilege, PII redaction",
+    tools: ["Guardrails", "Prompt-injection defense", "Sandboxing"],
     submodules: [
       { n: "11.1", title: "Input & Output Guardrails: The First Line of Defense", lessons: ["Input & Output Guardrails: The First Line of Defense", "Build It: Input & Output Guardrails for Atlas"] },
       { n: "11.2", title: "Tool Guardrails: Constraining What an Agent Can Do", lessons: ["Tool Guardrails: Constraining What an Agent Is Allowed to Do", "Build It: Guardrails Around Atlas's Tools"] },
@@ -442,6 +466,8 @@ window.COURSE_CURRICULUM = [
     n: "12",
     title: "Deployment (incl. FastAPI)",
     tagline: "Real users can use your agent over the internet.",
+    project: "Atlas live on the internet with a chat UI",
+    tools: ["FastAPI", "Docker", "Async", "CI/CD"],
     submodules: [
       { n: "12.1", title: "Serving an Agent as an API With FastAPI", lessons: ["From Notebook to API: Serving an Agent With FastAPI", "Build It: Wrap Atlas in a FastAPI Service"] },
       { n: "12.2", title: "Containerizing Your Agent With Docker", lessons: ["Docker for AI Apps: “It Works on My Machine” Is Not a Deploy", "Build It: Dockerize Atlas"] },
@@ -454,6 +480,8 @@ window.COURSE_CURRICULUM = [
     n: "13",
     title: "Monitoring & Operations",
     tagline: "See what your live agent is doing, what it costs, and how to improve it.",
+    project: "A cost & quality dashboard for live Atlas",
+    tools: ["Langfuse", "LangSmith", "Tracing"],
     submodules: [
       { n: "13.1", title: "Tracing Every Step of a Live Agent", lessons: ["You Can't Fix What You Can't See: Tracing Every Agent Step", "Build It: Full-Trace Logging for Live Atlas"] },
       { n: "13.2", title: "Observability Tooling: Langfuse & LangSmith", lessons: ["Observability for Agents: Traces, Dashboards & Alerts", "Langfuse vs LangSmith: Choosing Your Observability Stack", "Build It: Instrument Atlas With Langfuse & LangSmith"] },
@@ -465,6 +493,8 @@ window.COURSE_CURRICULUM = [
     n: "14",
     title: "Capstone Projects & Portfolio",
     tagline: "Ship and monitor your OWN agentic product — portfolio-ready.",
+    project: "Your own agentic product — built, deployed, monitored",
+    tools: ["Full production stack", "Portfolio", "Interview prep"],
     submodules: [
       { n: "14.1", title: "Choosing & Scoping Your Capstone", lessons: ["How to Scope an Agentic Project That Actually Ships"] },
       { n: "14.2", title: "Capstone A — Customer-Support Agent", lessons: ["Build, Deploy & Monitor a Support Agent End-to-End"] },
@@ -478,14 +508,64 @@ window.COURSE_CURRICULUM = [
 
 window.COURSE_INFO = {
   title: "Generative & Agentic AI Engineering",
-  intro: "is a hands-on course that takes learners from building their first 40-line AI agent to deploying, monitoring, and optimizing a production-grade agentic system. Through the course, learners build Atlas, a running AI assistant project, while learning LLM fundamentals, prompt engineering, tool use, MCP, RAG, memory, LangGraph, multi-agent orchestration, evaluation, guardrails, deployment, monitoring, and capstone projects. The curriculum includes 15 modules, 73 sub-modules, and 144 lessons, designed to help learners understand the theory and immediately apply it through real-world builds",
   moduleCount: 15,
   submoduleCount: 73,
   lessonCount: 144,
-  overview: [
-    "Generative & Agentic AI Engineering is a hands-on, build-first program designed to take you from AI curiosity to engineering production-ready intelligent systems.",
-    "Instead of only learning concepts, you will build Atlas—your own evolving AI assistant—from a simple 40-line agent into a deployed, monitored, secure, and scalable agentic product. Along the way, you will learn how modern LLMs work, how to make them reason and use tools, connect them to real-world services through MCP, retrieve trusted information with RAG, remember users across sessions, collaborate through multi-agent systems, and operate reliably in production.",
-    "The course is structured for learners who want practical clarity, not framework magic. You will first build core systems from scratch to understand what happens under the hood, then level up using industry-relevant tools such as LangChain, LangGraph, FastAPI, Docker, Langfuse, LangSmith, and cloud deployment workflows.",
-    "By the end, you will have the skills and portfolio needed to design, build, evaluate, secure, deploy, and improve real AI agents—whether for customer support, coding assistance, research, finance, or voice-based applications. With 15 modules, 73 sub-modules, and 144 lessons, this course gives you a complete path from your first agent to a production-grade Agentic AI Engineer."
+  badge: "Build-First Agentic AI Program",
+  headline: "Become a Production-Ready Agentic AI Engineer",
+  subheadline: "Build Atlas — a real AI assistant — from a 40-line agent to a deployed, monitored, multi-agent system.",
+  proofChips: ["15 modules", "144 lessons", "4 capstones", "Mock interviews", "1-on-1 guidance", "Doubts cleared in 24h"],
+  price: 29999,
+  priceWas: 35000,
+  priceNote: "Includes live support, assignments, capstones, resume review, and interview prep.",
+  enrollUrl: "https://balajichippadacourse.edmingle.com/course/GenerativeAgenticAIEngineering-111299",
+  pricingIncludes: [
+    "Full course access — 15 modules, 144 lessons",
+    "Assignments after every module",
+    "4 capstone projects, deployed and monitored",
+    "Mock interviews with structured feedback",
+    "Resume review for AI engineering roles",
+    "1-on-1 guidance sessions",
+    "Doubts cleared within 24 hours",
+    "Private community access"
   ]
 };
+
+// Curriculum phases for the Courses tab — module `n` values grouped into a
+// guided roadmap. Colors come from the PHASE_COLORS palette (styles.css vars).
+window.COURSE_PHASES = [
+  { title: "Foundations", blurb: "Ship an agent on day one, then build the intuition — NLP, LLMs, and prompting.", modules: ["00", "01", "02", "03"], color: "teal-deep" },
+  { title: "Agentic Systems", blurb: "The agent loop, tools, RAG, MCP, memory, and LangGraph — the core of the craft.", modules: ["04", "05", "06", "07", "08"], color: "purple" },
+  { title: "Production Engineering", blurb: "Evaluation, multi-agent teams, security, deployment, and monitoring — real users, real traffic.", modules: ["09", "10", "11", "12", "13"], color: "rust" },
+  { title: "Capstone & Portfolio", blurb: "Ship your own agentic product end-to-end and get interview-ready.", modules: ["14"], color: "emerald" }
+];
+
+// "Projects you will build" cards for the Courses tab.
+window.COURSE_PROJECTS = [
+  { title: "40-Line AI Agent", module: "00", desc: "A working agent with no frameworks and no magic — so you understand every line.", skills: ["Agent loop", "LLM APIs"] },
+  { title: "Tool-Using Assistant", module: "04", desc: "Atlas gets a ReAct brain, live search, real APIs, and a self-correction loop.", skills: ["ReAct", "Tool calling"] },
+  { title: "RAG Knowledge Agent", module: "05", desc: "Grounded, cited answers from your own documents — naive to agentic RAG.", skills: ["Vector DBs", "Reranking"] },
+  { title: "Memory-Enabled Assistant", module: "07", desc: "Atlas remembers you across sessions without blowing the context window.", skills: ["Long-term memory", "Context engineering"] },
+  { title: "LangGraph Workflow Agent", module: "08", desc: "Deterministic routing and human approval gates before risky actions.", skills: ["LangGraph", "Human-in-the-loop"] },
+  { title: "Multi-Agent Research System", module: "10", desc: "A researcher + writer + critic team that collaborates without runaway cost.", skills: ["Orchestration", "A2A communication"] },
+  { title: "Secure Production Agent", module: "11", desc: "Guardrails, prompt-injection defense, least privilege, and PII redaction.", skills: ["Guardrails", "Red-teaming"] },
+  { title: "Deployed Capstone Product", module: "14", desc: "Your own agentic product — support, coding, finance, or voice — live and monitored.", skills: ["FastAPI + Docker", "Observability"] }
+];
+
+// "Tools you will use" chips for the Courses tab.
+window.COURSE_TOOLS = [
+  "Python", "OpenAI & Claude APIs", "LangChain", "LangGraph", "MCP", "RAG",
+  "Vector databases", "Pydantic", "FastAPI", "Docker", "CI/CD", "Ollama",
+  "CrewAI", "OpenAI Agents SDK", "Langfuse", "LangSmith", "Guardrails", "Cloud deployment"
+];
+
+// Courses tab FAQ. Refund / certificate / EMI entries intentionally absent
+// until those policies are confirmed — add them here when they are.
+window.COURSE_FAQ = [
+  { q: "Is this course beginner-friendly?", a: "Yes — if you can write basic Python and use a terminal, you're ready. Module 0 has you shipping a working agent on day one, and Module 1 builds the NLP/LLM intuition from scratch, without heavy math." },
+  { q: "Do I need prior AI/ML experience?", a: "No. The course starts with intuition-first foundations — tokens, embeddings, transformers — explained without equations, then moves to hands-on agent engineering." },
+  { q: "Will I build real projects?", a: "The whole course is one continuous build. You evolve Atlas, a real AI assistant, through every module, and finish with capstone products — customer support, coding, finance, or voice agents — deployed and monitored." },
+  { q: "What if I get stuck?", a: "Every doubt is answered within 24 hours, and you get 1-on-1 sessions whenever you need personal guidance or a plan for your next step." },
+  { q: "Will this help me get a job?", a: "That's the goal of the final phase: portfolio-ready deployed projects, resume review, and mock interviews that simulate real agent-engineer rounds." },
+  { q: "Is this theory or hands-on?", a: "Build-first, always. You build each system from scratch to understand it, then level up to the industry tools — LangChain, LangGraph, FastAPI, Docker, Langfuse, LangSmith." }
+];
