@@ -58,10 +58,11 @@ test('prerender — cache-bust versions are present on bundles', () => {
   }
 });
 
-test('app bundle — courses tab includes polished offer and curriculum shell', () => {
+test('app bundle — courses tab includes landing sections (v3 design)', () => {
   const js = read('app.build.js');
-  assert.match(js, /courses-offers/, 'courses page has offer grid');
-  assert.match(js, /courses-curriculum-shell/, 'courses page has curriculum shell');
+  assert.match(js, /cv3-enquiry-card/, 'courses page has enquiry form card');
+  assert.match(js, /cv3-curriculum-detail/, 'courses page has master-detail curriculum');
+  assert.match(js, /cv3-pricing-card/, 'courses page has pricing card');
 });
 
 test('app bundle — my account tab includes polished dashboard shell', () => {

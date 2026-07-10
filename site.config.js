@@ -35,7 +35,7 @@ window.SITE_CONFIG = {
     youtubeChannel: 'https://www.youtube.com/@balajichippada',
     roadmapVideoId: 'Mf_J_PVGTdA', // homepage hero embed
     roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
-    whatsappCommunity: 'https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP',
+    whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     instagram: 'https://www.instagram.com/balajichippada',
     github: 'https://github.com/ch-balaji',

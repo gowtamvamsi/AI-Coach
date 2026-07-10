@@ -722,7 +722,7 @@ exports.onLeadCreated = functions.firestore
       `https://balajichippada.com/\n\n` +
       `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
       `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
-      `https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP\n\n` +
+      `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
       `Let's build some amazing agentic systems together!\n\n` +
       `Best,\n` +
       `Balaji Chippada\n` +
@@ -1255,7 +1255,7 @@ exports.onUserSignupWelcome = functions.firestore
         `• Reserve your seat for the next live masterclass — the first one is free:\n` +
         `  https://balajichippada.com/\n\n` +
         `Have a question or just want to say hi? Reply directly to this email, or join our WhatsApp community:\n` +
-        `https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP\n\n` +
+        `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
         `Let's build some amazing agentic systems together!\n\n` +
         `Best,\n` +
         `Balaji Chippada\n` +
@@ -1689,11 +1689,20 @@ async function processMasterclassComms() {
 }
 
 // Runs daily at 09:00 IST.
+// Kill switch: create config/masterclassReminders with { disabled: true } in
+// Firestore to pause the automatic reminders (no redeploy needed); delete the
+// doc or set disabled: false to resume. The manual sendMasterclassComms
+// callable below ignores the switch, so an admin can still send on demand.
 exports.sendMasterclassCommsScheduled = functions.runWith({ timeoutSeconds: 540, memory: "512MB" }).pubsub
   .schedule("0 9 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async () => {
     try {
+      const ks = await db.collection("config").doc("masterclassReminders").get();
+      if (ks.exists && ks.data().disabled) {
+        console.log("[MC COMMS] Skipped — disabled via config/masterclassReminders kill switch.");
+        return null;
+      }
       await processMasterclassComms();
     } catch (err) {
       console.error("[MC COMMS] Scheduled run failed:", err);

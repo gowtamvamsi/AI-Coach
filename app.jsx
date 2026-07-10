@@ -2940,7 +2940,7 @@ function DashboardView({ user, role, onLogout }) {
               `https://balajichippada.com/\n\n` +
               `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
               `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
-              `https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP\n\n` +
+              `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
               `Let's build some amazing agentic systems together!\n\n` +
               `Best,\n` +
               `Balaji Chippada\n` +
@@ -3844,7 +3844,7 @@ ${mcRawSyllabus}`;
           <p className="hero__sub" style={{ marginTop: "8px" }}>Manage scheduled masterclasses, edit metadata, and monitor registrations.</p>
         </div>
         <div className="dashboard__userinfo">
-          <span>{user.email}</span>
+          <span>{(user && user.email) || '—'}</span>
           <span className="dashboard__role-badge">{role}</span>
           <button className="dashboard__logout-btn" onClick={onLogout}>Sign Out</button>
         </div>
@@ -4844,6 +4844,9 @@ ${mcRawSyllabus}`;
       </div>
       )}
 
+      {/* ── Course Enquiries Panel (Full Width) — admin only ── */}
+      {isAdmin && <AdminEnquiriesPanel />}
+
       {/* 5. Marketing Email Broadcast Modal — admin only */}
       {isAdmin && showBroadcastModal && (
         <div className="modal-overlay" style={{ zIndex: 300 }}>
@@ -5012,130 +5015,193 @@ ${mcRawSyllabus}`;
 
 
 // ===============================================================
-// ADMIN — Courses tab. Public-style sales page for the paid course
-// (kept admin-gated until launch; layout follows the approved "Atlas
-// Landing Wireframe" 1a): hero + price card, stats, learning
-// experience, projects, pathways, phase-grouped curriculum, tools,
-// instructor, career support, pricing card, FAQ. All content comes
-// from the window.COURSE_* globals in data.js.
+// ADMIN — Courses tab. Landing-page redesign ("Balaji Chippada —
+// Course" design bundle; kept admin-gated until launch): hero with
+// enquiry form, trust bar, flagship course card, highlights grid,
+// master–detail curriculum, dark projects band, instructor,
+// testimonials (hidden until real quotes exist in data.js), pricing
+// card, FAQ, newsletter. Content comes from the window.COURSE_*
+// globals in data.js; the enquiry form and newsletter both write to
+// the open `leads` collection (rules require email + source only).
 // ===============================================================
-function CoursesCurriculumSubmodule({ sm, modNum, startIndex }) {
-  const [open, setOpen] = useState(false);
+function CoursesSectionHead({ eyebrow, title, sub }) {
   return (
-    <div className="courses-submodule">
-      <button
-        type="button"
-        className="courses-submodule__head"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span className="courses-submodule__icon" aria-hidden="true" />
-        <span className="courses-submodule__title">{sm.title}</span>
-        <span className="courses-submodule__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
-      </button>
-      {open && (
-        <ul className="courses-submodule__lessons">
-          {sm.lessons.map((l, i) => (
-            <li key={i} className="courses-lesson">
-              <span className="courses-lesson__play" aria-hidden="true" />
-              <span className="courses-lesson__num">{modNum}.{startIndex + i + 1}</span>
-              <span className="courses-lesson__title">{l}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="cv3-section-head">
+      <div className="cv3-eyebrow">{eyebrow}</div>
+      <h2 className="cv3-h2">{title}</h2>
+      {sub && <p className="cv3-section-sub">{sub}</p>}
     </div>
   );
 }
 
-function CoursesCurriculumModule({ mod }) {
-  const [open, setOpen] = useState(false);
-  let lessonCounter = 0;
+function CoursesEnquiryCard() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    const err = V2_VALIDATE.nameError(name) || V2_VALIDATE.emailError(email) || V2_VALIDATE.phoneError(phone, false);
+    if (err) { setError(err); return; }
+    setLoading(true); setError('');
+    try {
+      const db = window.firebase.firestore();
+      await db.collection('leads').add({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        occupation: role,
+        message: message.trim(),
+        source: 'course_enquiry',
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setSent(true);
+    } catch (e) {
+      console.error('[COURSE ENQUIRY] persistence failed', e);
+      setError('Something went wrong — please try again or reach us on WhatsApp.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="courses-module">
-      <button
-        type="button"
-        className="courses-module__head"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <div className="courses-module__headtext">
-          <div className="courses-module__num">Module {mod.n}</div>
-          <div className="courses-module__title">{mod.title}</div>
-          <div className="courses-module__meta">
-            <span className="courses-module__meta-item">{mod.submodules.length} chapter{mod.submodules.length === 1 ? '' : 's'}</span>
-            <span className="courses-module__meta-item">Project-first lessons</span>
+    <div className="cv3-hero-right">
+      <div className="cv3-enquiry-card">
+        <h3 className="cv3-enquiry-title">Enquire About This Course</h3>
+        {sent ? (
+          <p className="cv3-enquiry-success">✓ Thanks — we got your message and will get back to you within 24 hours.</p>
+        ) : (
+          <div className="cv3-enquiry-fields">
+            <label className="cv3-field">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
+              <input type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label className="cv3-field">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+              <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            <label className="cv3-field">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" /></svg>
+              <input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </label>
+            <label className="cv3-field cv3-field--select">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M9 3h6" /></svg>
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="">I am a…</option>
+                <option>Working professional</option>
+                <option>Student</option>
+                <option>Homemaker</option>
+                <option>Founder / entrepreneur</option>
+                <option>Other</option>
+              </select>
+              <svg className="cv3-field-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </label>
+            <label className="cv3-field cv3-field--textarea">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-4 3v-3H4z" /></svg>
+              <textarea placeholder="Your Message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+            </label>
+            <button type="button" className="cv3-enquiry-send" onClick={submit} disabled={loading}>
+              {loading ? 'SENDING…' : 'SEND MESSAGE'}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
+            </button>
+            {error && <p className="cv3-enquiry-error">{error}</p>}
+            <div className="cv3-enquiry-note">Your information is secure with us</div>
+          </div>
+        )}
+      </div>
+      <a href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer" className="cv3-whatsapp-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.004c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.94 1.35-.5.05-1.13.24-3.66-.77-3.08-1.24-5.06-4.4-5.22-4.6-.15-.2-1.25-1.66-1.25-3.17s.79-2.25 1.07-2.56c.28-.3.61-.38.82-.38.2 0 .41 0 .59.01.19.01.44-.07.69.53.24.6.83 2.06.9 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.28.1 1.76.83 2.06.98.3.15.5.22.57.35.07.13.07.73-.17 1.4z" /></svg>
+        Talk to us on WhatsApp
+      </a>
+    </div>
+  );
+}
+
+function CoursesCurriculumV3() {
+  const modules = window.COURSE_CURRICULUM || [];
+  const [sel, setSel] = useState(0);
+  const m = modules[sel] || { submodules: [] };
+  return (
+    <section className="cv3-section" id="cv3-curriculum">
+      <CoursesSectionHead
+        eyebrow="Full curriculum"
+        title="Course Curriculum"
+        sub={`${modules.length} modules, each paired with a shippable build. Click a module to see what's inside.`}
+      />
+      <div className="cv3-curriculum">
+        <div className="cv3-curriculum-list">
+          {modules.map((mod, i) => (
+            <button key={mod.n} type="button" className={`cv3-mod ${i === sel ? 'is-active' : ''}`} onClick={() => setSel(i)}>
+              <span className="cv3-mod-num">{mod.n}</span>
+              <span className="cv3-mod-title">{mod.title}</span>
+            </button>
+          ))}
+        </div>
+        <div className="cv3-curriculum-detail">
+          <div className="cv3-eyebrow">Module {m.n}</div>
+          <div className="cv3-detail-rule" />
+          <h3 className="cv3-detail-title">{m.title}</h3>
+          {m.tagline && <p className="cv3-detail-summary">{m.tagline}</p>}
+          {m.project && <p className="cv3-detail-project"><b>You build:</b> {m.project}</p>}
+          <div className="cv3-detail-lessons">
+            {(m.submodules || []).map((sm, i) => (
+              <div key={sm.n} className="cv3-lesson">
+                <span className="cv3-lesson-num">{i + 1}</span>
+                <span className="cv3-lesson-text">{sm.title}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <span className="courses-module__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
-      </button>
-      {open && (
-        <div className="courses-module__body">
-          {mod.tagline && <p className="courses-module__tagline">{mod.tagline}</p>}
-          {Array.isArray(mod.tools) && mod.tools.length > 0 && (
-            <div className="courses-module__tools">
-              {mod.tools.map((t) => <span key={t} className="v2-curriculum-chip">{t}</span>)}
-            </div>
-          )}
-          {mod.project && (
-            <p className="courses-module__project"><b>Project:</b> {mod.project}</p>
-          )}
-          {mod.submodules.map((sm) => {
-            const startIndex = lessonCounter;
-            lessonCounter += sm.lessons.length;
-            return <CoursesCurriculumSubmodule key={sm.n} sm={sm} modNum={mod.n} startIndex={startIndex} />;
-          })}
-        </div>
-      )}
-    </div>
+      </div>
+    </section>
   );
 }
 
-// One phase group inside the curriculum — colored tag, module range,
-// blurb, then the module accordions belonging to that phase.
-function CoursesPhaseGroup({ phase, index, modules }) {
-  const mods = modules.filter((m) => phase.modules.includes(m.n));
-  const range = phase.modules.length > 1
-    ? `Modules ${phase.modules[0]}–${phase.modules[phase.modules.length - 1]}`
-    : `Module ${phase.modules[0]}`;
+function CoursesTestimonials() {
+  const items = window.COURSE_TESTIMONIALS || [];
+  if (!items.length) return null;
   return (
-    <div className="courses-phase">
-      <div className="courses-phase__head">
-        <span className="courses-phase__tag" data-color={phase.color}>Phase {index + 1} · {phase.title}</span>
-        <span className="courses-phase__range">{range}</span>
+    <section className="cv3-section">
+      <CoursesSectionHead eyebrow="Testimonials" title="Engineers who stopped guessing" />
+      <div className="cv3-testimonials">
+        {items.map((t, i) => (
+          <div key={i} className="cv3-quote-card">
+            <p className="cv3-quote">&ldquo;{t.quote}&rdquo;</p>
+            <div className="cv3-quote-who">
+              <span className="cv3-quote-avatar">{(t.name || '?').charAt(0)}</span>
+              <div>
+                <div className="cv3-quote-name">{t.name}</div>
+                <div className="cv3-quote-role">{t.role}</div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-      <p className="courses-phase__blurb">{phase.blurb}</p>
-      <div className="courses-curriculum__list">
-        {mods.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}
-      </div>
-    </div>
+    </section>
   );
 }
 
 function CoursesFAQ() {
   const faqs = window.COURSE_FAQ || [];
-  const [open, setOpen] = useState(0);
+  const [open, setOpen] = useState(-1);
   if (!faqs.length) return null;
   return (
-    <section className="v2-faq courses-faq">
-      <V2SectionHeader eyebrow="Questions" plain="Frequently asked" em="questions." />
-      <div className="v2-faq-list">
+    <section className="cv3-section cv3-section--narrow" id="cv3-faq">
+      <CoursesSectionHead eyebrow="FAQ" title="Questions, answered" />
+      <div className="cv3-faq-list">
         {faqs.map((f, i) => {
           const isOpen = open === i;
           return (
-            <div key={i} className={`v2-faq-card ${isOpen ? 'is-open' : ''}`}>
-              <button
-                type="button"
-                className="v2-faq-q"
-                onClick={() => setOpen(isOpen ? -1 : i)}
-                aria-expanded={isOpen}
-              >
-                <span className="v2-faq-q-text">{f.q}</span>
-                <span className="v2-faq-chevron" aria-hidden="true">{isOpen ? '−' : '+'}</span>
+            <div key={i} className={`cv3-faq-item ${isOpen ? 'is-open' : ''}`}>
+              <button type="button" className="cv3-faq-q" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? -1 : i)}>
+                <span className="cv3-faq-q-text">{f.q}</span>
+                <span className="cv3-faq-plus" aria-hidden="true">+</span>
               </button>
-              <div className="v2-faq-a" hidden={!isOpen}>
-                <p>{f.a}</p>
-              </div>
+              <div className="cv3-faq-a"><p>{f.a}</p></div>
             </div>
           );
         })}
@@ -5144,12 +5210,46 @@ function CoursesFAQ() {
   );
 }
 
+function CoursesNewsletter() {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async () => {
+    const err = V2_VALIDATE.emailError(email);
+    if (err) { setError(err); return; }
+    setLoading(true); setError('');
+    try {
+      await saveLead({ name: '', email, source: 'course_newsletter' });
+      setSent(true);
+    } catch (e) {
+      setError('Could not subscribe — please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <section className="cv3-section cv3-newsletter" id="cv3-newsletter">
+      <div className="cv3-newsletter-card">
+        <h2 className="cv3-newsletter-title">Not ready yet? Get the free playbook.</h2>
+        <p className="cv3-newsletter-sub">Join the list for production-AI notes, new lessons, and early-bird offers. No spam.</p>
+        {sent ? (
+          <p className="cv3-newsletter-success">✓ Subscribed — see you in your inbox.</p>
+        ) : (
+          <div className="cv3-newsletter-row">
+            <input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button type="button" onClick={submit} disabled={loading}>{loading ? 'Subscribing…' : 'Subscribe'}</button>
+          </div>
+        )}
+        {error && <p className="cv3-enquiry-error">{error}</p>}
+      </div>
+    </section>
+  );
+}
+
 function CoursesTabView() {
   const info = window.COURSE_INFO || {};
-  const modules = window.COURSE_CURRICULUM || [];
-  const phases = window.COURSE_PHASES || [];
   const projects = window.COURSE_PROJECTS || [];
-  const tools = window.COURSE_TOOLS || [];
   const priceFmt = (n) => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN') : n);
   const scrollToId = (id) => (e) => {
     e.preventDefault();
@@ -5157,263 +5257,248 @@ function CoursesTabView() {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const experienceCards = [
-    ['🧭', 'Build Atlas step by step', 'Every module upgrades one real AI assistant — from 40 lines to production.'],
-    ['⚙️', 'Production-grade agent systems', 'RAG, MCP, memory, LangGraph, multi-agent orchestration, deployment, and monitoring.'],
-    ['💻', 'Code-first lessons', 'Build before theory. Understand by shipping.'],
-    ['📝', 'Assignments after every module', 'Practice each concept immediately, while it is fresh.'],
-    ['🚀', 'Capstone portfolio projects', 'Graduate with deployable projects you can show recruiters.'],
-    ['🎯', 'Career support', 'Mock interviews, resume review, 1-on-1 sessions, and doubts cleared in 24 hours.'],
-  ];
-
-  const pathCards = [
-    ['Beginner to AI Agents', 'Start with NLP intuition, LLMs, and prompt engineering.', 'Modules 00–03'],
-    ['Agentic AI Engineer', 'Go deep on RAG, tools, memory, MCP, and LangGraph.', 'Modules 04–08'],
-    ['Production AI Developer', 'Deployment, monitoring, evaluation, and guardrails.', 'Modules 09–13'],
-    ['Portfolio Builder', 'Capstones and interview-ready deployed projects.', 'Module 14'],
-  ];
-
-  const careerCards = [
-    ['🎤', 'Mock interviews'],
-    ['📄', 'Resume review'],
-    ['🤝', '1-on-1 sessions'],
-    ['💬', 'Community access'],
+  const highlights = [
+    ['Full lecture videos', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="2" y="5" width="15" height="14" rx="2" /><path d="m17 9 5-3v12l-5-3" /></svg>],
+    ['Handwritten notes', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>],
+    ['Code & projects', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>],
+    ['Assignments', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><path d="m9 14 2 2 4-4" /></svg>],
+    ['Certificate', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5" /></svg>],
+    ['Lifetime access', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8c-2.5 0-4 2-4 4s1.5 4 4 4c3 0 5-8 10-8 2.5 0 4 2 4 4s-1.5 4-4 4c-5 0-7-8-10-8z" /></svg>],
+    ['Resume prep assistance', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M8 13h8M8 17h5" /></svg>],
+    ['Mock interviews', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>],
   ];
 
   return (
-    <div className="courses-page">
-      {/* HERO — pitch left, price card right (wireframe 1a) */}
-      <header className="coaching-home__hero v2-hero hero--split">
-        <div className="v2-hero-grid">
-          <div className="v2-hero-left">
-            <span className="courses-hero-badge">{info.badge}</span>
-            <h1 className="v2-hero-title">
-              <span className="v2-hero-title-line">{info.headline}</span>
-            </h1>
-            <p className="v2-hero-sub">{info.subheadline}</p>
-            <div className="courses-hero-chips">
-              {(info.proofChips || []).map((c) => <span key={c} className="v2-curriculum-chip">{c}</span>)}
-            </div>
-            <div className="v2-hero-actions">
-              <a href="#courses-curriculum" className="v2-hero-cta" onClick={scrollToId('courses-curriculum')}>
-                <span className="v2-hero-cta-text">Explore Curriculum</span>
-              </a>
-              <a
-                href={V2_BRAND.roadmapVideoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="v2-hero-cta v2-hero-cta--ghost"
-              >
-                <span className="v2-hero-cta-text">▶ Watch Course Preview</span>
-              </a>
-            </div>
+    <div className="cv3">
+      {/* HERO — pitch left, enquiry form right */}
+      <header className="cv3-hero">
+        <div className="cv3-hero-left">
+          <h1 className="cv3-hero-title">Build production-grade <em>Agentic AI</em> that ships.</h1>
+          <p className="cv3-hero-sub">Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring.</p>
+          <div className="cv3-hero-ctas">
+            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
+            <a href="#cv3-curriculum" className="cv3-btn cv3-btn--ghost" onClick={scrollToId('cv3-curriculum')}>View curriculum →</a>
           </div>
-          <div className="v2-hero-right">
-            <aside className="courses-price-card">
-              <span className="courses-price-card__tag">Price</span>
-              <div className="courses-price-card__price">{priceFmt(info.price)}</div>
-              <div className="courses-price-card__was">Usually {priceFmt(info.priceWas)}</div>
-              <p className="courses-price-card__note">{info.priceNote}</p>
-              <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta courses-price-card__cta">
-                <span className="v2-hero-cta-text">Enroll Now</span>
-              </a>
-            </aside>
+          <div className="cv3-hero-stats">
+            <div><div className="cv3-stat-num">{V2_SOCIAL.youtubeSubs}</div><div className="cv3-stat-label">YouTube learners</div></div>
+            <div><div className="cv3-stat-num">9 yrs</div><div className="cv3-stat-label">Production experience</div></div>
+            <div><div className="cv3-stat-num">100%</div><div className="cv3-stat-label">Hands-on projects</div></div>
           </div>
         </div>
-
-        {/* Anchor stat row — mirrors the home/roadmap hero rhythm */}
-        <div className="hero__stats v2-hero-stats">
-          <div>
-            <div className="hero__stat-num">{info.moduleCount}</div>
-            <div className="hero__stat-label">Modules</div>
-          </div>
-          <div>
-            <div className="hero__stat-num">{info.lessonCount}</div>
-            <div className="hero__stat-label">Lessons</div>
-          </div>
-          <div>
-            <div className="hero__stat-num">4</div>
-            <div className="hero__stat-label">Capstones</div>
-          </div>
-          <div>
-            <div className="hero__stat-num">24h</div>
-            <div className="hero__stat-label">Doubt support</div>
-          </div>
-          <div>
-            <div className="hero__stat-num">1:1</div>
-            <div className="hero__stat-label">Guidance</div>
-          </div>
-        </div>
-
+        <CoursesEnquiryCard />
       </header>
 
-      <div className="courses-page-body">
-        {/* Learning experience */}
-        <section className="courses-offers">
-          <V2SectionHeader
-            eyebrow="Learning Experience"
-            plain="Everything you need"
-            em="to go from learner to builder."
-          />
-          <div className="courses-offers__grid">
-            {experienceCards.map(([icon, title, body]) => (
-              <div key={title} className="courses-offer">
-                <span className="courses-offer__icon" aria-hidden="true">{icon}</span>
-                <div className="courses-offer__text">
-                  <h3 className="courses-offer__title">{title}</h3>
-                  <p className="courses-offer__body">{body}</p>
-                </div>
-              </div>
-            ))}
+      {/* TRUST BAR */}
+      <section className="cv3-trust">
+        <div className="cv3-trust-inner">
+          <span className="cv3-trust-label">Built from experience at</span>
+          <div className="cv3-trust-logos">
+            <span>Amazon</span>
+            <span>Warner Bros. Discovery</span>
+            <span>T-Mobile</span>
+            <span>Infosys</span>
+            <span>Swisscom</span>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Projects you will build */}
-        <section className="courses-projects">
-          <V2SectionHeader
-            eyebrow="Build-First"
-            plain="Projects"
-            em="you will build."
-          />
-          <div className="courses-projects__grid">
-            {projects.map((p, i) => (
-              <div key={p.title} className="courses-project">
-                <div className="courses-project__visual" aria-hidden="true">
-                  <div className="courses-project__visual-dots"><span /><span /><span /></div>
-                  <div className="courses-project__visual-lines"><i /><i /><i /></div>
+      {/* FLAGSHIP COURSE CARD */}
+      <section className="cv3-section" id="cv3-course">
+        <CoursesSectionHead eyebrow="The course" title="One deep, opinionated program on shipping agents" />
+        <div className="cv3-flagship">
+          <div className="cv3-flagship-main">
+            <div className="cv3-flagship-badge">FLAGSHIP</div>
+            <h3 className="cv3-flagship-title">{info.flagshipName}</h3>
+            <p className="cv3-flagship-desc">A production-first engineering course. Design agent architectures, wire up tools and memory, orchestrate multiple agents, and stand up evals, guardrails, and monitoring you can trust in front of real users.</p>
+            <div className="cv3-flagship-facts">
+              {(info.facts || []).map((f) => (
+                <div key={f.k} className="cv3-fact">
+                  <span className="cv3-fact-dot" aria-hidden="true" />
+                  <div><div className="cv3-fact-k">{f.k}</div><div className="cv3-fact-v">{f.v}</div></div>
                 </div>
-                <div className="courses-project__num">{String(i + 1).padStart(2, '0')}</div>
-                <h3 className="courses-project__title">{p.title}</h3>
-                <p className="courses-project__desc">{p.desc}</p>
-                <div className="courses-project__skills">
-                  {(p.skills || []).map((s) => <span key={s} className="v2-curriculum-chip">{s}</span>)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="courses-cta-band">
-            <a href="#courses-curriculum" className="v2-hero-cta v2-hero-cta--ghost" onClick={scrollToId('courses-curriculum')}>
-              <span className="v2-hero-cta-text">See the full curriculum →</span>
-            </a>
-          </div>
-        </section>
-
-        {/* Pathways */}
-        <section className="courses-paths">
-          <V2SectionHeader
-            eyebrow="Pathways"
-            plain="Choose your path"
-            em="inside the course."
-          />
-          <div className="courses-paths__grid">
-            {pathCards.map(([title, body, range]) => (
-              <div key={title} className="courses-path">
-                <h3 className="courses-path__title">{title}</h3>
-                <p className="courses-path__body">{body}</p>
-                <div className="courses-path__range">{range}</div>
-                <a href="#courses-curriculum" className="courses-path__link" onClick={scrollToId('courses-curriculum')}>View modules →</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Curriculum grouped by phase */}
-        <section className="courses-curriculum" id="courses-curriculum">
-          <V2SectionHeader
-            eyebrow="Roadmap"
-            plain="Full curriculum,"
-            em="grouped by phase."
-          />
-          <div className="courses-curriculum-shell">
-            <div className="courses-curriculum__stats" aria-label="Curriculum summary">
-              <span className="v2-curriculum-chip">{info.moduleCount} modules</span>
-              <span className="v2-curriculum-chip">{info.submoduleCount} sub-modules</span>
-              <span className="v2-curriculum-chip v2-curriculum-chip--accent">{info.lessonCount} lessons</span>
+              ))}
             </div>
-            {phases.length
-              ? phases.map((phase, i) => <CoursesPhaseGroup key={phase.title} phase={phase} index={i} modules={modules} />)
-              : <div className="courses-curriculum__list">{modules.map((mod) => <CoursesCurriculumModule key={mod.n} mod={mod} />)}</div>}
           </div>
-          <div className="courses-cta-band">
-            <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta">
-              <span className="v2-hero-cta-text">Enroll in the Program</span>
-            </a>
+          <div className="cv3-flagship-side">
+            <div>
+              <div className="cv3-price-label">One-time payment</div>
+              <div className="cv3-price">{priceFmt(info.price)}</div>
+              <div className="cv3-price-note">Inclusive of GST · No subscription</div>
+            </div>
+            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
+            <div className="cv3-flagship-includes">
+              {(info.includes || []).map((inc) => (
+                <div key={inc} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{inc}</div>
+              ))}
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Tools you will use */}
-        <section className="courses-tools">
-          <V2SectionHeader
-            eyebrow="Practical Stack"
-            plain="Tools"
-            em="you will use."
-          />
-          <div className="courses-tools__chips">
-            {tools.map((t) => <span key={t} className="v2-curriculum-chip">{t}</span>)}
+      {/* HIGHLIGHTS */}
+      <section className="cv3-section" id="cv3-highlights">
+        <CoursesSectionHead eyebrow="What's included" title="Course highlights" />
+        <div className="cv3-highlights">
+          {highlights.map(([label, icon]) => (
+            <div key={label} className="cv3-highlight">
+              <span className="cv3-highlight-icon">{icon}</span>
+              <div className="cv3-highlight-label">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CURRICULUM — master/detail */}
+      <CoursesCurriculumV3 />
+
+      {/* PROJECTS — dark band */}
+      <section className="cv3-projects" id="cv3-projects">
+        <div className="cv3-projects-inner">
+          <div className="cv3-section-head">
+            <div className="cv3-eyebrow cv3-eyebrow--on-dark">Hands-on</div>
+            <h2 className="cv3-h2 cv3-h2--on-dark">Projects <em>you will build.</em></h2>
+            <p className="cv3-section-sub cv3-section-sub--on-dark">Every module ends with something running. You leave with a portfolio of production-grade agents.</p>
           </div>
-        </section>
-
-        {/* Instructor */}
-        <InstructorBio />
-
-        {/* Career support */}
-        <section className="courses-career">
-          <V2SectionHeader
-            eyebrow="Outcomes"
-            plain="Career support"
-            em="built in."
-          />
-          <div className="courses-career__grid">
-            {careerCards.map(([icon, title]) => (
-              <div key={title} className="courses-offer courses-offer--center">
-                <span className="courses-offer__icon" aria-hidden="true">{icon}</span>
-                <div className="courses-offer__text">
-                  <h3 className="courses-offer__title">{title}</h3>
+          <div className="cv3-projects-grid">
+            {projects.map((p) => (
+              <div key={p.num} className="cv3-project">
+                <div className="cv3-project-visual" aria-hidden="true">
+                  <div className="cv3-project-dots"><span /><span /><span /></div>
+                  <div className="cv3-project-lines"><i /><i /><i /></div>
+                </div>
+                <div className="cv3-project-num">{p.num}</div>
+                <div className="cv3-project-title">{p.title}</div>
+                <div className="cv3-project-desc">{p.desc}</div>
+                <div className="cv3-project-tags">
+                  {(p.tags || []).map((tag) => <span key={tag} className="cv3-project-tag">{tag}</span>)}
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Pricing */}
-        <section className="courses-pricing" id="courses-pricing">
-          <V2SectionHeader
-            eyebrow="Pricing"
-            plain="One program,"
-            em="everything included."
-          />
-          <div className="courses-pricing-card">
-            <h3 className="courses-pricing-card__name">{info.title}</h3>
-            <div className="courses-pricing-card__price">
-              {priceFmt(info.price)} <s className="courses-pricing-card__was">{priceFmt(info.priceWas)}</s>
-            </div>
-            <ul className="courses-pricing-card__includes">
-              {(info.pricingIncludes || []).map((x) => <li key={x}>{x}</li>)}
-            </ul>
-            <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta courses-pricing-card__cta">
-              <span className="v2-hero-cta-text">Enroll Now</span>
-            </a>
-            <a
-              href={V2_BRAND.whatsappCommunity}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="v2-hero-cta v2-hero-cta--ghost courses-pricing-card__cta"
-            >
-              <span className="v2-hero-cta-text">💬 Talk to us on WhatsApp</span>
-            </a>
+      {/* INSTRUCTOR */}
+      <section className="cv3-instructor" id="cv3-instructor">
+        <div className="cv3-instructor-inner">
+          <div className="cv3-instructor-photo">
+            <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
           </div>
-        </section>
+          <div>
+            <div className="cv3-eyebrow">Your instructor</div>
+            <h2 className="cv3-h2">Balaji Chippada</h2>
+            <p className="cv3-instructor-para">Nine years building and shipping production software — currently at <b>Swisscom</b>, with prior work at <b>Amazon</b>, <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>. NIT Calicut graduate.</p>
+            <p className="cv3-instructor-para">I teach {V2_SOCIAL.youtubeSubs} engineers on YouTube how the theory actually holds up under real load. This course is the distilled, no-fluff version of that.</p>
+            <div className="cv3-instructor-stats">
+              <div className="cv3-instructor-stat"><div className="cv3-stat-num">{V2_SOCIAL.youtubeSubs}</div><div className="cv3-stat-label">Subscribers</div></div>
+              <div className="cv3-instructor-stat"><div className="cv3-stat-num">5</div><div className="cv3-stat-label">Global companies</div></div>
+              <div className="cv3-instructor-stat"><div className="cv3-stat-num">NIT</div><div className="cv3-stat-label">Calicut alumnus</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        {/* FAQ */}
-        <CoursesFAQ />
-      </div>
+      {/* TESTIMONIALS — hidden until real quotes exist in data.js */}
+      <CoursesTestimonials />
 
-      {/* Sticky enroll bar — mobile only (CSS-gated) */}
-      <div className="courses-sticky-cta">
-        <span className="courses-sticky-cta__price">{priceFmt(info.price)} <s>{priceFmt(info.priceWas)}</s></span>
-        <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="v2-hero-cta">
-          <span className="v2-hero-cta-text">Enroll Now</span>
-        </a>
+      {/* PRICING */}
+      <section className="cv3-section" id="cv3-pricing">
+        <CoursesSectionHead eyebrow="Pricing" title="One price. Everything included." />
+        <div className="cv3-pricing-card">
+          <span className="cv3-pricing-pill">Full lifetime access</span>
+          <div className="cv3-pricing-name">{info.flagshipName}</div>
+          <div className="cv3-pricing-price">{priceFmt(info.price)}</div>
+          <div className="cv3-price-note">One-time payment · Inclusive of GST · No subscription</div>
+          <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="cv3-btn cv3-btn--accent cv3-pricing-cta">Enroll now</a>
+          <div className="cv3-pricing-features">
+            {(info.pricingIncludes || []).map((feat) => (
+              <div key={feat} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{feat}</div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <CoursesFAQ />
+
+      {/* NEWSLETTER */}
+      <CoursesNewsletter />
+    </div>
+  );
+}
+
+// ===============================================================
+// ADMIN — Course enquiries panel. Live list of `leads` docs with
+// source == 'course_enquiry' (written by the Courses tab enquiry
+// form), message text shown in full. Owns its own state — don't
+// fold this into DashboardView (see CLAUDE.md re-render warning).
+// ===============================================================
+function AdminEnquiriesPanel() {
+  const [enquiries, setEnquiries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('leads')
+      .where('source', '==', 'course_enquiry')
+      .onSnapshot(
+        (snap) => {
+          setEnquiries(sortByCreatedAtDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+          setLoading(false);
+        },
+        (err) => {
+          console.error('[ENQUIRIES] snapshot failed:', err);
+          setError('Could not load enquiries.');
+          setLoading(false);
+        }
+      );
+    return () => unsub();
+  }, []);
+
+  const fmtDate = (ts) => {
+    const d = ts && typeof ts.toDate === 'function' ? ts.toDate() : null;
+    return d ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+  };
+
+  return (
+    <div className="dashboard__panel" style={{ marginTop: '28px' }}>
+      <h2 className="dashboard__panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+        📨 Course Enquiries
+        <span style={{ fontSize: '13px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono', fontWeight: 400 }}>
+          {loading ? '…' : `${enquiries.length} total`}
+        </span>
+      </h2>
+      <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)', maxWidth: '100%' }}>
+        Messages from the &ldquo;Enquire About This Course&rdquo; form on the Courses page. Live — new enquiries appear as they arrive.
+      </p>
+      {error && <p style={{ fontSize: '14px', color: 'var(--c-rust)', marginTop: '16px' }}>⚠ {error}</p>}
+      {!loading && !error && enquiries.length === 0 && (
+        <p style={{ fontSize: '14px', color: 'var(--fg-faint)', marginTop: '16px' }}>No enquiries yet.</p>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '18px' }}>
+        {enquiries.map((q) => (
+          <div key={q.id} style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: '12px', padding: '18px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600 }}>
+                {q.name || '(no name)'}
+                {q.occupation && (
+                  <span className="dashboard__role-badge" style={{ marginLeft: '10px', fontSize: '11px' }}>{q.occupation}</span>
+                )}
+              </div>
+              <span style={{ fontSize: '12px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono' }}>{fmtDate(q.createdAt)}</span>
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--fg-dim)', marginTop: '4px', fontFamily: 'JetBrains Mono' }}>
+              <a href={`mailto:${q.email}`} style={{ color: 'inherit' }}>{q.email}</a>
+              {q.phone ? ` · ${q.phone}` : ''}
+            </div>
+            {q.message ? (
+              <p style={{ margin: '12px 0 0', fontSize: '14px', lineHeight: 1.6, color: 'var(--fg)', whiteSpace: 'pre-wrap' }}>{q.message}</p>
+            ) : (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--fg-faint)', fontStyle: 'italic' }}>No message left.</p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -5811,25 +5896,30 @@ function App() {
   const [selectedTier, setSelectedTier] = useState(null);
   const [legalPage, setLegalPage] = useState(null);
 
-  // Track which masterclasses this visitor has already reserved, so we stop
+  // Track which masterclass OCCURRENCES this visitor has reserved, so we stop
   // prompting them (sticky bar, banner, CTAs) and show a "registered" state.
-  const [reservedMcIds, setReservedMcIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('reserved_mc_ids') || '[]'); }
+  // Stored as occurrence keys (mcOccKeys) — title+date, not title alone — so a
+  // recurring series doesn't mark a future date "reserved" for someone who only
+  // booked a past one. localStorage gives instant paint; Firestore (below) is
+  // the authority and merges in on load.
+  const [reservedOccs, setReservedOccs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('reserved_mc_occ') || '[]'); }
     catch (e) { return []; }
   });
-  const markReserved = React.useCallback((mcId) => {
-    if (!mcId) return;
-    setReservedMcIds((prev) => {
-      if (prev.includes(mcId)) return prev;
-      const next = [...prev, mcId];
-      try { localStorage.setItem('reserved_mc_ids', JSON.stringify(next)); } catch (e) {}
+  const markReserved = React.useCallback((session) => {
+    if (!session) return;
+    const keys = mcOccKeys(session.title, mcDateMs(session.dateTime), session.id);
+    if (!keys.length) return;
+    setReservedOccs((prev) => {
+      const set = new Set(prev);
+      let changed = false;
+      keys.forEach((k) => { if (!set.has(k)) { set.add(k); changed = true; } });
+      if (!changed) return prev;
+      const next = Array.from(set);
+      try { localStorage.setItem('reserved_mc_occ', JSON.stringify(next)); } catch (e) {}
       return next;
     });
   }, []);
-  // Titles of classes the signed-in user has actually booked (from Firestore).
-  // Lets us recognise a reservation even when the featured masterclass is a
-  // duplicate doc with a different id but the same class.
-  const [reservedMcTitles, setReservedMcTitles] = useState([]);
   
   // Checkout mock sandbox screen state
   const [mockCheckoutData, setMockCheckoutData] = useState(null);
@@ -6174,28 +6264,30 @@ function App() {
   // hero even though My Account listed the session. Source + cancel filter
   // mirror V2StudentDashboard's bookings loader.
   useEffect(() => {
-    if (!db || !user) { setReservedMcTitles([]); return; }
+    // Signed out: drop Firestore-derived reservations, keep this device's own
+    // localStorage cache (its own bookings) so we don't leak another user's state.
+    if (!db || !user) {
+      try { setReservedOccs(JSON.parse(localStorage.getItem('reserved_mc_occ') || '[]')); }
+      catch (e) { setReservedOccs([]); }
+      return;
+    }
     const unsub = db.collection('users').doc(user.uid).collection('bookings')
       .onSnapshot((snap) => {
-        const ids = [];
-        const titles = [];
+        const keys = [];
         snap.forEach((doc) => {
           const b = doc.data() || {};
           if (b.status === 'cancelled' || b.deleted === true) return;
-          if (b.masterclassId) ids.push(b.masterclassId);
-          if (b.sessionId) ids.push(b.sessionId);
-          const t = (b.masterclassTitle || b.sessionTitle || '').trim().toLowerCase();
-          if (t) titles.push(t);
+          const title = b.masterclassTitle || b.sessionTitle || '';
+          const dateMs = mcDateMs(b.sessionDate || b.sessionDateTime);
+          const id = b.masterclassId || b.sessionId || '';
+          mcOccKeys(title, dateMs, id).forEach((k) => keys.push(k));
         });
-        setReservedMcTitles(titles);
-        if (ids.length) {
-          setReservedMcIds((prev) => {
-            const set = new Set(prev);
-            let changed = false;
-            ids.forEach((id) => { if (!set.has(id)) { set.add(id); changed = true; } });
-            return changed ? Array.from(set) : prev;
-          });
-        }
+        setReservedOccs((prev) => {
+          const set = new Set(prev);
+          let changed = false;
+          keys.forEach((k) => { if (!set.has(k)) { set.add(k); changed = true; } });
+          return changed ? Array.from(set) : prev;
+        });
       }, (err) => {
         // Clients can't read the staff-only registrations collection, so the
         // bookings subcollection above is the source of truth; ignore denials.
@@ -6644,9 +6736,8 @@ function App() {
       setActiveMainTab('home');
       // Reserved-seat state is a per-visitor cache; clear it on sign-out so a
       // signed-out visitor no longer sees "Seat booked ✓" / upcoming-session UI.
-      setReservedMcIds([]);
-      setReservedMcTitles([]);
-      try { localStorage.removeItem('reserved_mc_ids'); } catch (e) {}
+      setReservedOccs([]);
+      try { localStorage.removeItem('reserved_mc_occ'); } catch (e) {}
     }
   };
 
@@ -6663,7 +6754,7 @@ function App() {
     });
     setMockCheckoutData(null);
     setBookingStep('success');
-    if (session && session.id) markReserved(session.id);
+    if (session && session.id) markReserved(session);
     if (user && !user.isAnonymous && db && session) {
       try {
         // Use the class id as the booking doc id so re-booking the same class
@@ -7045,12 +7136,14 @@ function App() {
   // popup, curriculum, booking, sticky bar, closing CTA) sees the SAME object.
   // mergeMcWithConfig makes site.config.js win for content; Firestore only
   // contributes runtime state (seatsBooked, zoomLink, etc).
-  // A class is "reserved" if its id is cached/derived OR the signed-in user has
-  // a booking with the same title (covers duplicate docs for the same class).
-  const isMcReserved = (mc) => !!(mc && (
-    reservedMcIds.includes(mc.id) ||
-    (mc.title && reservedMcTitles.includes(mc.title.trim().toLowerCase()))
-  ));
+  // A class is "reserved" if any of its occurrence keys (title+date, or exact id)
+  // matches one the visitor has booked. Occurrence-scoped so a recurring series
+  // doesn't show "registered" for a future date the visitor never booked.
+  const isMcReserved = (mc) => {
+    if (!mc) return false;
+    const keys = mcOccKeys(mc.title, mcDateMs(mc.dateTime), mc.id);
+    return keys.some((k) => reservedOccs.includes(k));
+  };
   const nextMasterclass = mergeMcWithConfig(getNextUpcomingMasterclass(masterclasses, sessions), masterclasses, sessions);
   const nextMcReserved = isMcReserved(nextMasterclass);
   // IDs of masterclasses/sessions an admin has deleted — used to hide them from

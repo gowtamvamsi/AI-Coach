@@ -508,64 +508,60 @@ window.COURSE_CURRICULUM = [
 
 window.COURSE_INFO = {
   title: "Generative & Agentic AI Engineering",
+  flagshipName: "Agentic AI at Production Level",
   moduleCount: 15,
   submoduleCount: 73,
   lessonCount: 144,
-  badge: "Build-First Agentic AI Program",
-  headline: "Become a Production-Ready Agentic AI Engineer",
-  subheadline: "Build Atlas — a real AI assistant — from a 40-line agent to a deployed, monitored, multi-agent system.",
-  proofChips: ["15 modules", "144 lessons", "4 capstones", "Mock interviews", "1-on-1 guidance", "Doubts cleared in 24h"],
   price: 29999,
-  priceWas: 35000,
-  priceNote: "Includes live support, assignments, capstones, resume review, and interview prep.",
   enrollUrl: "https://balajichippadacourse.edmingle.com/course/GenerativeAgenticAIEngineering-111299",
+  // Flagship-card fact grid (label/value pairs)
+  facts: [
+    { k: "Format", v: "Self-paced" },
+    { k: "Access", v: "Lifetime + all updates" },
+    { k: "Level", v: "Starter → advanced" },
+    { k: "Prereqs", v: "Start from scratch — no experience needed" },
+    { k: "Projects", v: "Hands-on production builds" },
+    { k: "Certificate", v: "Verified on completion" }
+  ],
+  // Short includes list on the flagship card's price panel
+  includes: [
+    "All module recordings, forever",
+    "Private community & code reviews",
+    "Production-ready starter templates",
+    "Lifetime access to all updates"
+  ],
+  // Pricing-card feature list
   pricingIncludes: [
-    "Full course access — 15 modules, 144 lessons",
-    "Assignments after every module",
-    "4 capstone projects, deployed and monitored",
-    "Mock interviews with structured feedback",
-    "Resume review for AI engineering roles",
-    "1-on-1 guidance sessions",
-    "Doubts cleared within 24 hours",
-    "Private community access"
+    "All 15 modules, fully self-paced",
+    "Production-ready starter templates & code",
+    "Private community & code reviews",
+    "Verified certificate on completion",
+    "Mock interviews & resume prep assistance",
+    "Lifetime access to all future updates"
   ]
 };
 
-// Curriculum phases for the Courses tab — module `n` values grouped into a
-// guided roadmap. Colors come from the PHASE_COLORS palette (styles.css vars).
-window.COURSE_PHASES = [
-  { title: "Foundations", blurb: "Ship an agent on day one, then build the intuition — NLP, LLMs, and prompting.", modules: ["00", "01", "02", "03"], color: "teal-deep" },
-  { title: "Agentic Systems", blurb: "The agent loop, tools, RAG, MCP, memory, and LangGraph — the core of the craft.", modules: ["04", "05", "06", "07", "08"], color: "purple" },
-  { title: "Production Engineering", blurb: "Evaluation, multi-agent teams, security, deployment, and monitoring — real users, real traffic.", modules: ["09", "10", "11", "12", "13"], color: "rust" },
-  { title: "Capstone & Portfolio", blurb: "Ship your own agentic product end-to-end and get interview-ready.", modules: ["14"], color: "emerald" }
-];
-
 // "Projects you will build" cards for the Courses tab.
 window.COURSE_PROJECTS = [
-  { title: "40-Line AI Agent", module: "00", desc: "A working agent with no frameworks and no magic — so you understand every line.", skills: ["Agent loop", "LLM APIs"] },
-  { title: "Tool-Using Assistant", module: "04", desc: "Atlas gets a ReAct brain, live search, real APIs, and a self-correction loop.", skills: ["ReAct", "Tool calling"] },
-  { title: "RAG Knowledge Agent", module: "05", desc: "Grounded, cited answers from your own documents — naive to agentic RAG.", skills: ["Vector DBs", "Reranking"] },
-  { title: "Memory-Enabled Assistant", module: "07", desc: "Atlas remembers you across sessions without blowing the context window.", skills: ["Long-term memory", "Context engineering"] },
-  { title: "LangGraph Workflow Agent", module: "08", desc: "Deterministic routing and human approval gates before risky actions.", skills: ["LangGraph", "Human-in-the-loop"] },
-  { title: "Multi-Agent Research System", module: "10", desc: "A researcher + writer + critic team that collaborates without runaway cost.", skills: ["Orchestration", "A2A communication"] },
-  { title: "Secure Production Agent", module: "11", desc: "Guardrails, prompt-injection defense, least privilege, and PII redaction.", skills: ["Guardrails", "Red-teaming"] },
-  { title: "Deployed Capstone Product", module: "14", desc: "Your own agentic product — support, coding, finance, or voice — live and monitored.", skills: ["FastAPI + Docker", "Observability"] }
+  { num: "01", title: "Agent From Scratch", desc: "A working agent in ~40 lines — no frameworks, no magic. You understand every line of the loop.", tags: ["Agent loop", "LLM APIs"] },
+  { num: "02", title: "Tool-Using Assistant", desc: "A ReAct-style agent with live search, real API calls, and a self-correction loop.", tags: ["ReAct", "Tool calling"] },
+  { num: "03", title: "RAG Knowledge Agent", desc: "Grounded, cited answers over your own documents — from naive RAG to agentic retrieval.", tags: ["Vector DBs", "Reranking"] },
+  { num: "04", title: "Memory-Enabled Assistant", desc: "An agent that remembers users across sessions without blowing the context window.", tags: ["Long-term memory", "Context engineering"] },
+  { num: "05", title: "Multi-Agent Research System", desc: "A researcher + writer + critic team that collaborates without runaway cost.", tags: ["Orchestration", "A2A communication"] },
+  { num: "06", title: "Deployed Capstone Product", desc: "Your own agentic product — support, coding, or finance — shipped live and monitored.", tags: ["FastAPI + Docker", "Observability"] }
 ];
 
-// "Tools you will use" chips for the Courses tab.
-window.COURSE_TOOLS = [
-  "Python", "OpenAI & Claude APIs", "LangChain", "LangGraph", "MCP", "RAG",
-  "Vector databases", "Pydantic", "FastAPI", "Docker", "CI/CD", "Ollama",
-  "CrewAI", "OpenAI Agents SDK", "Langfuse", "LangSmith", "Guardrails", "Cloud deployment"
-];
-
-// Courses tab FAQ. Refund / certificate / EMI entries intentionally absent
-// until those policies are confirmed — add them here when they are.
+// Courses tab FAQ.
 window.COURSE_FAQ = [
-  { q: "Is this course beginner-friendly?", a: "Yes — if you can write basic Python and use a terminal, you're ready. Module 0 has you shipping a working agent on day one, and Module 1 builds the NLP/LLM intuition from scratch, without heavy math." },
-  { q: "Do I need prior AI/ML experience?", a: "No. The course starts with intuition-first foundations — tokens, embeddings, transformers — explained without equations, then moves to hands-on agent engineering." },
-  { q: "Will I build real projects?", a: "The whole course is one continuous build. You evolve Atlas, a real AI assistant, through every module, and finish with capstone products — customer support, coding, finance, or voice agents — deployed and monitored." },
-  { q: "What if I get stuck?", a: "Every doubt is answered within 24 hours, and you get 1-on-1 sessions whenever you need personal guidance or a plan for your next step." },
-  { q: "Will this help me get a job?", a: "That's the goal of the final phase: portfolio-ready deployed projects, resume review, and mock interviews that simulate real agent-engineer rounds." },
-  { q: "Is this theory or hands-on?", a: "Build-first, always. You build each system from scratch to understand it, then level up to the industry tools — LangChain, LangGraph, FastAPI, Docker, Langfuse, LangSmith." }
+  { q: "Do I need prior AI/ML experience?", a: "No. You can start from scratch — we build the AI intuition from first principles and take you all the way to advanced production topics." },
+  { q: "Is the course self-paced?", a: "Yes. Every lesson is pre-recorded and yours for life. Move as fast or as slow as you like, on your own schedule." },
+  { q: "How long do I have access?", a: "Lifetime. You keep access to all recordings, materials, and future updates — with a single one-time payment." },
+  { q: "Is this just LangChain tutorials?", a: "No. We stay framework-aware but focus on the durable engineering — architecture, evals, guardrails, and ops — that outlasts any single library." },
+  { q: "Will this help me get a job?", a: "The capstone is designed to be an interview-ready portfolio piece, backed by mock interviews and resume prep assistance." },
+  { q: "What if I get stuck?", a: "Every doubt is answered within 24 hours, and you get the private community plus code reviews whenever you need a second pair of eyes." }
 ];
+
+// Real student testimonials for the Courses tab. Leave empty until real
+// quotes (with permission) exist — the section hides itself when empty.
+// Shape: { quote, name, role }
+window.COURSE_TESTIMONIALS = [];

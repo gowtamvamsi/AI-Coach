@@ -124,3 +124,34 @@ test('data — site.config masterclass has a parseable date + non-negative price
   assert.ok(!Number.isNaN(new Date(mc.dateTime).getTime()), 'dateTime is parseable');
   assert.ok(typeof mc.price === 'number' && mc.price >= 0, 'price is a non-negative number');
 });
+
+// ── Reservation occurrence keys: a recurring series must be scoped by DATE, not
+//    title alone, or a past booking marks a future date as "reserved". ─────────
+test('mcOccKeys — same title + different date is NOT the same occurrence', () => {
+  const title = 'Mastering Claude Code: Building Agentic Systems';
+  const past = g.mcOccKeys(title, g.mcDateMs('2026-05-11T19:00:00+05:30'), 'mc-may');
+  const next = g.mcOccKeys(title, g.mcDateMs('2026-07-11T19:00:00+05:30'), 'mc-jul');
+  // Regression guard for the "seat booked" false-positive: no key overlaps.
+  assert.equal(next.some((k) => past.includes(k)), false);
+});
+
+test('mcOccKeys — same title + same day matches even across duplicate doc ids', () => {
+  const title = 'Mastering Claude Code: Building Agentic Systems';
+  const booked = g.mcOccKeys(title, g.mcDateMs('2026-07-11T19:00:00+05:30'), 'doc-A');
+  const featured = g.mcOccKeys(' mastering claude code: building agentic systems ',
+    g.mcDateMs('2026-07-11T19:00:00+05:30'), 'doc-B'); // different id, same event
+  assert.equal(featured.some((k) => booked.includes(k)), true);
+});
+
+test('mcOccKeys — dateless booking still matches its exact doc id', () => {
+  const booked = g.mcOccKeys('Some Class', g.mcDateMs(null), 'doc-X');
+  const featured = g.mcOccKeys('Some Class', g.mcDateMs('2026-07-11T19:00:00+05:30'), 'doc-X');
+  assert.equal(featured.some((k) => booked.includes(k)), true);
+});
+
+test('mcDateMs — accepts ISO string, Firestore Timestamp, and rejects junk', () => {
+  assert.equal(typeof g.mcDateMs('2026-07-11T19:00:00+05:30'), 'number');
+  assert.equal(g.mcDateMs({ seconds: 1783950000 }), 1783950000 * 1000);
+  assert.equal(g.mcDateMs(null), null);
+  assert.equal(g.mcDateMs('not-a-date'), null);
+});

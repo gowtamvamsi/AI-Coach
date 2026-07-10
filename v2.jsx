@@ -545,7 +545,7 @@ const V2_BRAND = Object.assign({
   youtubeChannel: 'https://www.youtube.com/@balajichippada',
   roadmapVideoId: 'Mf_J_PVGTdA',
   roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
-  whatsappCommunity: 'https://chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP',
+  whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
   linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
   instagram: 'https://www.instagram.com/balajichippada',
   github: 'https://github.com/ch-balaji',
@@ -692,6 +692,31 @@ function getNextUpcomingMasterclass(masterclasses, sessions) {
 
   // 3. Fallback to null (no upcoming session found)
   return null;
+}
+
+// Coerce a date (Firestore Timestamp | ISO string | Date | epoch ms) to epoch ms.
+function mcDateMs(val) {
+  if (!val) return null;
+  if (typeof val.toDate === 'function') return val.toDate().getTime();
+  if (val.seconds) return val.seconds * 1000;
+  const t = new Date(val).getTime();
+  return isNaN(t) ? null : t;
+}
+
+// A masterclass reservation is scoped to a specific dated OCCURRENCE, not just a
+// title. This is a recurring series with a stable title, so matching by title
+// alone marked every future occurrence "reserved" for anyone who booked a PAST
+// one. Key set = "title|utc-day" (matches duplicate docs of the same event) plus
+// an "id:<id>" fallback (matches the exact doc when a date is missing). Two keys
+// are "the same occurrence" iff their sets intersect. UTC-day keeps the key
+// stable across viewer timezones since the input is an absolute instant.
+function mcOccKeys(title, dateMs, id) {
+  const keys = [];
+  const t = (title || '').trim().toLowerCase();
+  const ms = (typeof dateMs === 'number' && !isNaN(dateMs)) ? dateMs : null;
+  if (t && ms != null) keys.push(t + '|' + Math.floor(ms / 86400000));
+  if (id) keys.push('id:' + id);
+  return keys;
 }
 
 // Times render in the VIEWER's local timezone (no forced timeZone). The stored
