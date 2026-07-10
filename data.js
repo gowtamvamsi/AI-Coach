@@ -530,10 +530,10 @@ window.COURSE_INFO = {
   ],
   // Short includes list on the flagship card's price panel
   includes: [
-    "All module recordings, forever",
-    "Private community & code reviews",
-    "Production-ready starter templates",
-    "Lifetime access to all updates"
+    "Biweekly live sessions on the latest topics",
+    "Session recordings available for 2 years",
+    "Private WhatsApp community",
+    "Production-ready starter templates & code reviews"
   ],
   // Pricing-card feature list
   pricingIncludes: [
@@ -570,3 +570,22 @@ window.COURSE_FAQ = [
 // quotes (with permission) exist — the section hides itself when empty.
 // Shape: { quote, name, role }
 window.COURSE_TESTIMONIALS = [];
+
+// Hero + instructor copy for the Courses tab. Social links themselves live in
+// V2_BRAND (v2.jsx); this only carries the marketing copy/stats.
+window.COURSE_INSTRUCTOR = {
+  // Hero checklist chips.
+  heroChips: [
+    "Build RAG and tool-using agents",
+    "Learn evaluation and observability",
+    "Deploy real-world production workflows",
+  ],
+  // Instructor section.
+  roleLine: "9+ years in AI/ML · Production agentic AI · 26K+ on YouTube",
+  quote: "I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.",
+  stats: [
+    { num: "26K+", label: "Subscribers" },
+    { num: "5,000+", label: "Mentored" },
+    { num: "170K+", label: "Roadmap views" },
+  ],
+};

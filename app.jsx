@@ -5125,6 +5125,13 @@ function CoursesCurriculumV3() {
   const modules = window.COURSE_CURRICULUM || [];
   const [sel, setSel] = useState(0);
   const m = modules[sel] || { submodules: [] };
+  const goToBuy = () => {
+    const el = document.getElementById('cv3-pricing');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const lockIcon = (
+    <svg className="cv3-lesson-lock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+  );
   return (
     <section className="cv3-section" id="cv3-curriculum">
       <CoursesSectionHead
@@ -5149,10 +5156,11 @@ function CoursesCurriculumV3() {
           {m.project && <p className="cv3-detail-project"><b>You build:</b> {m.project}</p>}
           <div className="cv3-detail-lessons">
             {(m.submodules || []).map((sm, i) => (
-              <div key={sm.n} className="cv3-lesson">
+              <button key={sm.n} type="button" className="cv3-lesson" onClick={goToBuy} title="Unlock this content — enroll to access">
                 <span className="cv3-lesson-num">{i + 1}</span>
                 <span className="cv3-lesson-text">{sm.title}</span>
-              </div>
+                {lockIcon}
+              </button>
             ))}
           </div>
         </div>
@@ -5247,9 +5255,10 @@ function CoursesNewsletter() {
   );
 }
 
-function CoursesTabView() {
+function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
+  const instr = window.COURSE_INSTRUCTOR || {};
   const priceFmt = (n) => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN') : n);
   const scrollToId = (id) => (e) => {
     e.preventDefault();
@@ -5258,32 +5267,60 @@ function CoursesTabView() {
   };
 
   const highlights = [
-    ['Full lecture videos', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="2" y="5" width="15" height="14" rx="2" /><path d="m17 9 5-3v12l-5-3" /></svg>],
-    ['Handwritten notes', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>],
-    ['Code & projects', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>],
-    ['Assignments', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><path d="m9 14 2 2 4-4" /></svg>],
-    ['Certificate', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5" /></svg>],
-    ['Lifetime access', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8c-2.5 0-4 2-4 4s1.5 4 4 4c3 0 5-8 10-8 2.5 0 4 2 4 4s-1.5 4-4 4c-5 0-7-8-10-8z" /></svg>],
-    ['Resume prep assistance', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M8 13h8M8 17h5" /></svg>],
-    ['Mock interviews', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>],
+    ['Full course access', 'Lifetime access to all modules and updates.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0z" /><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0z" /></svg>],
+    ['Live & office hours', 'Regular live sessions to clear doubts.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>],
+    ['Code & projects', 'Hands-on projects with production-ready code.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>],
+    ['Assignments', 'Practical assignments to reinforce learning.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><path d="m9 14 2 2 4-4" /></svg>],
+    ['Certificate', 'Shareable certificate upon course completion.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5" /></svg>],
+    ['Lifetime access', 'Learn at your own pace, forever.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8c-2.5 0-4 2-4 4s1.5 4 4 4c3 0 5-8 10-8 2.5 0 4 2 4 4s-1.5 4-4 4c-5 0-7-8-10-8z" /></svg>],
+    ['Community & network', 'Connect with learners and AI builders.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>],
+    ['More & freebies', 'Templates, cheat sheets and exclusive resources.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13M20 12v9H4v-9" /><path d="M12 8C12 5 10 3 8 3a2.5 2.5 0 0 0 0 5zM12 8c0-3 2-5 4-5a2.5 2.5 0 0 1 0 5z" /></svg>],
+  ];
+
+  const heroStats = [
+    [V2_SOCIAL.youtubeSubs, 'YouTube learners', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>],
+    ['9 yrs', 'Production experience', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>],
+    ['100%', 'Hands-on projects', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m12 2 2.9 6.3 6.9.9-5 4.8 1.3 6.9-6.1-3.4-6.1 3.4 1.3-6.9-5-4.8 6.9-.9z" /></svg>],
   ];
 
   return (
     <div className="cv3">
       {/* HERO — pitch left, enquiry form right */}
       <header className="cv3-hero">
+        <img className="cv3-hero-bg cv3-hero-bg--light" src="uploads/hero_Section_bacground.png" alt="" aria-hidden="true" loading="eager" decoding="async" />
+        <img className="cv3-hero-bg cv3-hero-bg--dark" src="uploads/hero_Section_bacground_dark_mode.png" alt="" aria-hidden="true" loading="eager" decoding="async" />
         <div className="cv3-hero-left">
-          <h1 className="cv3-hero-title">Build production-grade <em>Agentic AI</em> that ships.</h1>
-          <p className="cv3-hero-sub">Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring - built by alumni from IIT, IIM, NIT, DAU, Amazon, Warner Bros. Discovery, T-Mobile, Infosys, Swisscom, Applied AI Course.</p>
+          <h1 className="cv3-hero-title">Build production-grade<br /><em>Agentic AI</em> that ships.</h1>
+          <p className="cv3-hero-sub">
+            Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring. Built by alumni from{' '}
+            {['IIT', 'IIM', 'NIT', 'DAU', 'Amazon', 'Warner Bros. Discovery', 'T-Mobile', 'Infosys', 'Swisscom', 'Applied AI Course'].map((name, i, arr) => (
+              <React.Fragment key={name}>
+                <b className="cv3-hero-highlight">{name}</b>{i < arr.length - 1 ? ', ' : '.'}
+              </React.Fragment>
+            ))}
+          </p>
           <div className="cv3-hero-ctas">
             <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
             <a href="#cv3-curriculum" className="cv3-btn cv3-btn--ghost" onClick={scrollToId('cv3-curriculum')}>View curriculum →</a>
           </div>
           <div className="cv3-hero-stats">
-            <div><div className="cv3-stat-num">{V2_SOCIAL.youtubeSubs}</div><div className="cv3-stat-label">YouTube learners</div></div>
-            <div><div className="cv3-stat-num">9 yrs</div><div className="cv3-stat-label">Production experience</div></div>
-            <div><div className="cv3-stat-num">100%</div><div className="cv3-stat-label">Hands-on projects</div></div>
+            {heroStats.map(([num, label, icon]) => (
+              <div key={label} className="cv3-hero-stat">
+                <span className="cv3-hero-stat-icon" aria-hidden="true">{icon}</span>
+                <div><div className="cv3-stat-num">{num}</div><div className="cv3-stat-label">{label}</div></div>
+              </div>
+            ))}
           </div>
+          {(instr.heroChips || []).length > 0 && (
+            <div className="cv3-hero-chips">
+              {instr.heroChips.map((chip) => (
+                <span key={chip} className="cv3-hero-chip">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--cv3-accent)" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" stroke="#fff" strokeWidth="2" fill="none" /></svg>
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <CoursesEnquiryCard />
       </header>
@@ -5341,12 +5378,15 @@ function CoursesTabView() {
 
       {/* HIGHLIGHTS */}
       <section className="cv3-section" id="cv3-highlights">
-        <CoursesSectionHead eyebrow="What's included" title="Course highlights" />
+        <CoursesSectionHead eyebrow="What you'll get" title="Course highlights" sub="Everything you need to build, ship and scale production-grade AI agents" />
         <div className="cv3-highlights">
-          {highlights.map(([label, icon]) => (
+          {highlights.map(([label, desc, icon]) => (
             <div key={label} className="cv3-highlight">
               <span className="cv3-highlight-icon">{icon}</span>
-              <div className="cv3-highlight-label">{label}</div>
+              <div className="cv3-highlight-body">
+                <div className="cv3-highlight-label">{label}</div>
+                <div className="cv3-highlight-desc">{desc}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -5391,13 +5431,16 @@ function CoursesTabView() {
           <div>
             <div className="cv3-eyebrow">Your instructor</div>
             <h2 className="cv3-h2">Balaji Chippada</h2>
-            <p className="cv3-instructor-para">Nine years building and shipping production software — currently at <b>Swisscom</b>, with prior work at <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>. NIT Calicut graduate.</p>
-            <p className="cv3-instructor-para">I teach {V2_SOCIAL.youtubeSubs} engineers on YouTube how the theory actually holds up under real load. This course is the distilled, no-fluff version of that.</p>
+            {instr.roleLine && <div className="cv3-instructor-role">{instr.roleLine}</div>}
+            {instr.quote && <blockquote className="cv3-instructor-quote">{instr.quote}</blockquote>}
+            <p className="cv3-instructor-para">I build production-scale agentic applications and teach engineers what actually matters once systems leave the demo stage. My free <b>26-week roadmap</b> is fully open source, no paywall — the live masterclasses are where we build together on the hard phases: RAG, Claude Code, multi-agent orchestration, guardrails, and deployment.</p>
+            <p className="cv3-instructor-para">Over the last three years I've personally mentored <b>5,000+</b> students and working professionals — with production experience across <b>Swisscom</b>, <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>.</p>
             <div className="cv3-instructor-stats">
-              <div className="cv3-instructor-stat"><div className="cv3-stat-num">{V2_SOCIAL.youtubeSubs}</div><div className="cv3-stat-label">Subscribers</div></div>
-              <div className="cv3-instructor-stat"><div className="cv3-stat-num">5</div><div className="cv3-stat-label">Global companies</div></div>
-              <div className="cv3-instructor-stat"><div className="cv3-stat-num">NIT</div><div className="cv3-stat-label">Calicut alumnus</div></div>
+              {(instr.stats || []).map((s) => (
+                <div key={s.label} className="cv3-instructor-stat"><div className="cv3-stat-num">{s.num}</div><div className="cv3-stat-label">{s.label}</div></div>
+              ))}
             </div>
+            <div className="cv3-eyebrow cv3-instructor-connect-label">Connect with me</div>
             <InstructorSocialLinks />
           </div>
         </div>
@@ -5428,6 +5471,9 @@ function CoursesTabView() {
 
       {/* NEWSLETTER */}
       <CoursesNewsletter />
+
+      {/* SITE FOOTER — reuse the home page footer */}
+      <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
     </div>
   );
 }
@@ -7127,6 +7173,9 @@ function App() {
   // Helper check for staff role authorization
   const isUserStaff = userRole === 'admin' || userRole === 'teacher' || userRole === 'support';
 
+  const canSeeStaffTabs = isUserStaff;
+  const canSeeAdminTabs = userRole === 'admin';
+
   // Expose whether the signed-in user may add/edit per-video "Code" links inline
   // in the roadmap. Mirrors the videoCodeLinks Firestore rule (admins / bootstrap
   // emails). Set during render so the video players (v2.jsx) read it immediately.
@@ -7254,7 +7303,7 @@ function App() {
           My Account
         </button>
       )}
-      {isUserStaff && (
+      {canSeeStaffTabs && (
         <button
           role="tab"
           aria-selected={activeMainTab === 'dashboard'}
@@ -7264,7 +7313,7 @@ function App() {
           Dashboard
         </button>
       )}
-      {userRole === 'admin' && (
+      {canSeeAdminTabs && (
         <button
           role="tab"
           aria-selected={activeMainTab === 'emailtasks'}
@@ -7274,7 +7323,7 @@ function App() {
           Email Tasks
         </button>
       )}
-      {userRole === 'admin' && (
+      {canSeeAdminTabs && (
         <button
           role="tab"
           aria-selected={activeMainTab === 'courses'}
@@ -7756,7 +7805,7 @@ function App() {
         />
       )}
 
-      {activeMainTab === 'dashboard' && isUserStaff && (
+      {activeMainTab === 'dashboard' && canSeeStaffTabs && (
         <DashboardView
           user={user}
           role={userRole}
@@ -7764,14 +7813,14 @@ function App() {
         />
       )}
 
-      {activeMainTab === 'emailtasks' && userRole === 'admin' && (
+      {activeMainTab === 'emailtasks' && canSeeAdminTabs && (
         <div className="email-tasks-page">
           <AdminEmailTasks />
         </div>
       )}
 
-      {activeMainTab === 'courses' && userRole === 'admin' && (
-        <CoursesTabView />
+      {activeMainTab === 'courses' && canSeeAdminTabs && (
+        <CoursesTabView setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
       )}
 
 
