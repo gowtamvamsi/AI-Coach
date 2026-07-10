@@ -5274,7 +5274,7 @@ function CoursesTabView() {
       <header className="cv3-hero">
         <div className="cv3-hero-left">
           <h1 className="cv3-hero-title">Build production-grade <em>Agentic AI</em> that ships.</h1>
-          <p className="cv3-hero-sub">Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring.</p>
+          <p className="cv3-hero-sub">Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring - built by alumni from IIT, IIM, NIT, DAU, Amazon, Warner Bros. Discovery, T-Mobile, Infosys, Swisscom, Applied AI Course.</p>
           <div className="cv3-hero-ctas">
             <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
             <a href="#cv3-curriculum" className="cv3-btn cv3-btn--ghost" onClick={scrollToId('cv3-curriculum')}>View curriculum →</a>
@@ -5293,11 +5293,15 @@ function CoursesTabView() {
         <div className="cv3-trust-inner">
           <span className="cv3-trust-label">Built from experience at</span>
           <div className="cv3-trust-logos">
-            <span>Amazon</span>
-            <span>Warner Bros. Discovery</span>
-            <span>T-Mobile</span>
-            <span>Infosys</span>
-            <span>Swisscom</span>
+            <img className="cv3-logo-crest" src="/logos/iitg.svg" alt="IIT Guwahati" />
+            <img className="cv3-logo-crest" src="/logos/iima.svg" alt="IIM Ahmedabad" />
+            <img className="cv3-logo-crest" src="/logos/nitc.svg" alt="NIT Calicut" />
+            <img src="/logos/amazon.svg" alt="Amazon" />
+            <img src="/logos/wbd.svg" alt="Warner Bros. Discovery" />
+            <img src="/logos/tmobile.svg" alt="T-Mobile" />
+            <img src="/logos/infosys.svg" alt="Infosys" />
+            <img src="/logos/swisscom.svg" alt="Swisscom" />
+            <img src="/logos/appliedai.png" alt="Applied AI Course" />
           </div>
         </div>
       </section>
@@ -5387,13 +5391,14 @@ function CoursesTabView() {
           <div>
             <div className="cv3-eyebrow">Your instructor</div>
             <h2 className="cv3-h2">Balaji Chippada</h2>
-            <p className="cv3-instructor-para">Nine years building and shipping production software — currently at <b>Swisscom</b>, with prior work at <b>Amazon</b>, <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>. NIT Calicut graduate.</p>
+            <p className="cv3-instructor-para">Nine years building and shipping production software — currently at <b>Swisscom</b>, with prior work at <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>. NIT Calicut graduate.</p>
             <p className="cv3-instructor-para">I teach {V2_SOCIAL.youtubeSubs} engineers on YouTube how the theory actually holds up under real load. This course is the distilled, no-fluff version of that.</p>
             <div className="cv3-instructor-stats">
               <div className="cv3-instructor-stat"><div className="cv3-stat-num">{V2_SOCIAL.youtubeSubs}</div><div className="cv3-stat-label">Subscribers</div></div>
               <div className="cv3-instructor-stat"><div className="cv3-stat-num">5</div><div className="cv3-stat-label">Global companies</div></div>
               <div className="cv3-instructor-stat"><div className="cv3-stat-num">NIT</div><div className="cv3-stat-label">Calicut alumnus</div></div>
             </div>
+            <InstructorSocialLinks />
           </div>
         </div>
       </section>

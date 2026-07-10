@@ -8791,17 +8791,17 @@ body.nav-menu-open .v2-mobile-sticky {
   border: 1px solid var(--cv3-line);
   border-radius: 22px;
   background: var(--cv3-paper);
-  padding: 34px;
+  padding: 26px;
   box-shadow: 0 24px 60px -34px rgba(26, 24, 20, 0.4);
 }
 .cv3-enquiry-title {
   font-family: var(--cv3-serif);
-  font-size: 27px;
+  font-size: 23px;
   font-weight: 400;
   letter-spacing: -0.01em;
-  margin: 0 0 22px;
+  margin: 0 0 16px;
 }
-.cv3-enquiry-fields { display: flex; flex-direction: column; gap: 12px; }
+.cv3-enquiry-fields { display: flex; flex-direction: column; gap: 10px; }
 .cv3-field {
   position: relative;
   display: flex;
@@ -8824,7 +8824,7 @@ body.nav-menu-open .v2-mobile-sticky {
   border: none;
   outline: none;
   background: transparent;
-  padding: 14px 0;
+  padding: 11px 0;
   font-size: 15px;
   font-family: inherit;
   color: var(--cv3-ink);
@@ -8840,7 +8840,7 @@ body.nav-menu-open .v2-mobile-sticky {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 15px;
+  padding: 13px;
   border-radius: 12px;
   border: none;
   background: var(--cv3-ink);
@@ -8864,7 +8864,7 @@ body.nav-menu-open .v2-mobile-sticky {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 15px;
+  padding: 13px;
   border-radius: 14px;
   border: 1px solid var(--cv3-line);
   background: var(--cv3-paper);
@@ -8884,7 +8884,7 @@ body.nav-menu-open .v2-mobile-sticky {
   padding: 28px 40px;
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 32px;
   flex-wrap: wrap;
 }
 .cv3-trust-label {
@@ -8896,13 +8896,28 @@ body.nav-menu-open .v2-mobile-sticky {
 }
 .cv3-trust-logos {
   display: flex;
-  gap: 40px;
+  gap: 24px;
   flex-wrap: wrap;
   align-items: center;
   font-family: var(--cv3-serif);
   font-size: 20px;
   color: var(--cv3-ink2);
 }
+.cv3-trust-logos img {
+  height: 26px;
+  width: auto;
+}
+/* Round institute crests need more height than wordmarks to stay legible */
+.cv3-trust-logos img.cv3-logo-crest { height: 36px; }
+/* Dark wordmarks (Amazon, Infosys, Swisscom) are unreadable on the dark theme —
+   sit each colored logo on a soft paper chip there. */
+[data-theme="dark"] .cv3-trust-logos img {
+  height: 44px;
+  padding: 9px 14px;
+  background: #f4f1ec;
+  border-radius: 10px;
+}
+[data-theme="dark"] .cv3-trust-logos img.cv3-logo-crest { height: 50px; padding: 7px; }
 
 /* Flagship course card */
 .cv3-flagship {
@@ -9106,6 +9121,7 @@ body.nav-menu-open .v2-mobile-sticky {
 .cv3-instructor-para b { color: var(--cv3-ink); font-weight: 600; }
 .cv3-instructor-stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
 .cv3-instructor-stat { padding: 16px 22px; border-radius: 14px; background: var(--cv3-paper); border: 1px solid var(--cv3-line); }
+.cv3-instructor-inner .instructor__socials { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--cv3-line); }
 
 /* Testimonials (masonry columns) */
 .cv3-testimonials { columns: 3; column-gap: 20px; }
@@ -9269,6 +9285,8 @@ body.nav-menu-open .v2-mobile-sticky {
   .cv3-newsletter-card { padding: 44px 24px; }
   .cv3-trust-inner { gap: 16px; padding: 22px 24px; }
   .cv3-trust-logos { gap: 20px; font-size: 17px; }
+  .cv3-trust-logos img { height: 20px; }
+  [data-theme="dark"] .cv3-trust-logos img { height: 36px; padding: 8px 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cv3-btn, .cv3-highlight, .cv3-project, .cv3-mod, .cv3-whatsapp-btn, .cv3-faq-plus, .cv3-faq-a {

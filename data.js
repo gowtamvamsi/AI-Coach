@@ -346,7 +346,12 @@ window.COURSE_CURRICULUM = [
     project: "A prompt toolkit you'll reuse in every agent call",
     tools: ["Chain-of-Thought", "Structured output", "Pydantic"],
     submodules: [
-      { n: "3.1", title: "Core Prompting Techniques: From Prompt Anatomy to Meta-Prompting", lessons: ["Anatomy of a Prompt: Instruction, Context, Input & Format", "Interview-Style Prompting: Drawing the Best Answer Out of a Model", "Chain-of-Thought: Making a Model Show Its Work", "Structured Output: Forcing Clean JSON With Pydantic Schemas", "Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)", "A Look Ahead: Context & Loop Engineering (Coming Later in the Course)"] }
+      { n: "3.1", title: "Anatomy of a Prompt: Instruction, Context, Input & Format", lessons: ["Anatomy of a Prompt: Instruction, Context, Input & Format"] },
+      { n: "3.2", title: "Interview-Style Prompting: Drawing the Best Answer Out of a Model", lessons: ["Interview-Style Prompting: Drawing the Best Answer Out of a Model"] },
+      { n: "3.3", title: "Chain-of-Thought: Making a Model Show Its Work", lessons: ["Chain-of-Thought: Making a Model Show Its Work"] },
+      { n: "3.4", title: "Structured Output: Forcing Clean JSON With Pydantic Schemas", lessons: ["Structured Output: Forcing Clean JSON With Pydantic Schemas"] },
+      { n: "3.5", title: "Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)", lessons: ["Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)"] },
+      { n: "3.6", title: "A Look Ahead: Context & Loop Engineering (Coming Later in the Course)", lessons: ["A Look Ahead: Context & Loop Engineering (Coming Later in the Course)"] }
     ]
   },
   {
