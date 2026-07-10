@@ -1024,10 +1024,19 @@ exports.processDripCampaign = functions.https.onCall(async (data, context) => {
   }
 });
 
+// Kill switch: create config/dripCampaign with { disabled: true } in Firestore
+// to pause the automatic drip emails (no redeploy needed); delete the doc or
+// set disabled: false to resume. The manual processDripCampaign callable above
+// ignores the switch, so an admin can still trigger a run on demand.
 exports.processDripCampaignScheduled = functions.pubsub
   .schedule("every 24 hours")
   .onRun(async (context) => {
     try {
+      const ks = await db.collection("config").doc("dripCampaign").get();
+      if (ks.exists && ks.data().disabled) {
+        console.log("[DRIP] Skipped — disabled via config/dripCampaign kill switch.");
+        return null;
+      }
       await processDrips();
       return null;
     } catch (err) {
