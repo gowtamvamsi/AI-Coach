@@ -737,37 +737,10 @@ function RoadmapView({
         </div>
       </section>
 
-      {/* INSTRUCTOR */}
-      <section className="instructor reveal" data-screen-label="03 Instructor">
-        <div className="instructor__card">
-          <div className="instructor__photo">
-            <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
-          </div>
-          <div className="instructor__body">
-            <div className="instructor__label">Your Instructor</div>
-            <h3 className="instructor__name">{V2_BRAND.name}</h3>
-            <div className="instructor__role">8 years in AI/ML · Production agentic AI · {V2_SOCIAL.youtubeSubs} YouTube</div>
-            <p className="instructor__quote">&ldquo;If I had to start all over again in 2026, this is exactly how I would begin.&rdquo;</p>
-            <p className="instructor__bio">
-              I build <span>production-scale agentic applications</span> and teach what matters when systems
-              leave the demo stage. This roadmap is the free, open-source curriculum from my
-              <span> {V2_SOCIAL.roadmapViews}-view</span> YouTube walkthrough — no paywall, no course funnel at the end.
-            </p>
-            <div className="instructor__chips">
-              <span className="instructor__chip">{V2_SOCIAL.roadmapViews} roadmap views</span>
-              <span className="instructor__chip">LangGraph</span>
-              <span className="instructor__chip">ReAct · MCP</span>
-              <span className="instructor__chip">Production RAG</span>
-              <span className="instructor__chip">Multi-Agent</span>
-              <span className="instructor__chip">LLMOps</span>
-            </div>
-          </div>
-          <div className="instructor__cta">
-            <div className="instructor__connect-label">Connect with me</div>
-            <InstructorSocialLinks />
-          </div>
-        </div>
-      </section>
+      {/* INSTRUCTOR — shared Courses-tab (cv3) section */}
+      <div className="cv3 cv3-embed" data-screen-label="03 Instructor">
+        <CoursesInstructorSection />
+      </div>
 
       {/* PHASES */}
       <section className="phases">
@@ -1349,108 +1322,42 @@ function InstructorSocialLinks() {
   );
 }
 
-function InstructorBio() {
-  const containerRef = useRef(null);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
-
-  useEffect(() => {
-    setIsMobileViewport(window.innerWidth <= 768);
-    const handleResize = () => setIsMobileViewport(window.innerWidth <= 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  let scrollYProgress;
-  try {
-    const scrollObj = useScroll ? useScroll({
-      target: containerRef,
-      offset: ["start end", "end start"]
-    }) : null;
-    scrollYProgress = scrollObj ? scrollObj.scrollYProgress : null;
-  } catch (e) {
-    console.warn("Framer Motion useScroll element target not available", e);
-  }
-
-  const dummyValue = useMotionValue ? useMotionValue(0.5) : null;
-  const activeProgress = scrollYProgress || dummyValue;
-
-  const scaleMin = isMobileViewport ? 0.98 : 0.93;
-  const scaleMax = isMobileViewport ? 1.02 : 1.06;
-
-  // Symmetrical grow and shrink card effect:
-  // Starts at scale 0.93 when entering from bottom, peaks at scale 1.06 in viewport center, shrinks back to 0.93 as it exits top.
-  const cardScale = useTransform ? useTransform(activeProgress, [0, 0.5, 1], [scaleMin, scaleMax, scaleMin]) : 1;
-  const cardOpacity = useTransform ? useTransform(activeProgress, [0, 0.15, 0.85, 1], [0.65, 1, 1, 0.65]) : 1;
-
+// Shared "Your instructor" section — the Courses-tab (cv3) design, reused on
+// the Home and Full Roadmap pages. Reads window.COURSE_INSTRUCTOR (data.js).
+// Standalone usages wrap it in `.cv3 cv3-embed` for the cv3 tokens + full-bleed.
+function CoursesInstructorSection() {
+  const instr = window.COURSE_INSTRUCTOR || {};
   return (
-    <section ref={containerRef} id="instructor" style={{ margin: isMobileViewport ? '40px 0' : '120px 0', padding: '0', overflow: 'visible' }}>
-      <RevealOnScroll>
-        {motion ? (
-          <motion.div 
-            className="instructor__card"
-            style={{ 
-              scale: cardScale, 
-              opacity: cardOpacity,
-              transformOrigin: 'center center'
-            }}
-          >
-            <div className="instructor__photo">
-              {/* Instructor card intentionally keeps the original portrait photo;
-                  the new square headshot is used everywhere else. */}
-              <img src="uploads/balaji-chippada-portrait.webp" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
-            </div>
-            <div className="instructor__body">
-              <div className="instructor__label">Your Instructor</div>
-              <h3 className="instructor__name">{V2_INSTRUCTOR.name}</h3>
-              <div className="instructor__role">{V2_INSTRUCTOR.title}</div>
-              {V2_INSTRUCTOR.quote && (
-                <p className="instructor__quote">&ldquo;{V2_INSTRUCTOR.quote}&rdquo;</p>
-              )}
-              <p className="instructor__bio">{V2_INSTRUCTOR.bio}</p>
-              {Array.isArray(V2_INSTRUCTOR.chips) && V2_INSTRUCTOR.chips.length > 0 && (
-                <div className="instructor__chips">
-                  {V2_INSTRUCTOR.chips.map((chip, i) => (
-                    <span key={i} className="instructor__chip">{chip}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="instructor__cta">
-              <div className="instructor__connect-label">Connect with me</div>
-              <InstructorSocialLinks />
-            </div>
-          </motion.div>
-        ) : (
-          <div className="instructor__card">
-            <div className="instructor__photo">
-              {/* Instructor card intentionally keeps the original portrait photo;
-                  the new square headshot is used everywhere else. */}
-              <img src="uploads/balaji-chippada-portrait.webp" alt={V2_INSTRUCTOR.name} loading="lazy" decoding="async" />
-            </div>
-            <div className="instructor__body">
-              <div className="instructor__label">Your Instructor</div>
-              <h3 className="instructor__name">{V2_INSTRUCTOR.name}</h3>
-              <div className="instructor__role">{V2_INSTRUCTOR.title}</div>
-              {V2_INSTRUCTOR.quote && (
-                <p className="instructor__quote">&ldquo;{V2_INSTRUCTOR.quote}&rdquo;</p>
-              )}
-              <p className="instructor__bio">{V2_INSTRUCTOR.bio}</p>
-              {Array.isArray(V2_INSTRUCTOR.chips) && V2_INSTRUCTOR.chips.length > 0 && (
-                <div className="instructor__chips">
-                  {V2_INSTRUCTOR.chips.map((chip, i) => (
-                    <span key={i} className="instructor__chip">{chip}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="instructor__cta">
-              <div className="instructor__connect-label">Connect with me</div>
-              <InstructorSocialLinks />
-            </div>
+    <section className="cv3-instructor" id="cv3-instructor">
+      <div className="cv3-instructor-inner">
+        <div className="cv3-instructor-photo">
+          <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
+        </div>
+        <div>
+          <div className="cv3-eyebrow">Your instructor</div>
+          <h2 className="cv3-h2">Balaji Chippada</h2>
+          {instr.roleLine && <div className="cv3-instructor-role">{instr.roleLine}</div>}
+          {instr.quote && <blockquote className="cv3-instructor-quote">{instr.quote}</blockquote>}
+          <p className="cv3-instructor-para">I build production-scale agentic applications and teach engineers what actually matters once systems leave the demo stage. My free <b>26-week roadmap</b> is fully open source, no paywall — the live masterclasses are where we build together on the hard phases: RAG, Claude Code, multi-agent orchestration, guardrails, and deployment.</p>
+          <p className="cv3-instructor-para">Over the last three years I've personally mentored <b>5,000+</b> students and working professionals — with production experience across <b>Swisscom</b>, <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>.</p>
+          <div className="cv3-instructor-stats">
+            {(instr.stats || []).map((s) => (
+              <div key={s.label} className="cv3-instructor-stat"><div className="cv3-stat-num">{s.num}</div><div className="cv3-stat-label">{s.label}</div></div>
+            ))}
           </div>
-        )}
-      </RevealOnScroll>
+          <div className="cv3-eyebrow cv3-instructor-connect-label">Connect with me</div>
+          <InstructorSocialLinks />
+        </div>
+      </div>
     </section>
+  );
+}
+
+function InstructorBio() {
+  return (
+    <div id="instructor" className="cv3 cv3-embed">
+      <CoursesInstructorSection />
+    </div>
   );
 }
 
@@ -3857,9 +3764,18 @@ ${mcRawSyllabus}`;
         </div>
       )}
 
+      <nav className="dashboard__nav" aria-label="Dashboard sections">
+        {isAdmin && <a href="#dash-videos">Roadmap Videos</a>}
+        {isAdmin && <a href="#dash-code-links">Code Links</a>}
+        <a href="#dash-classes">Masterclasses</a>
+        <a href="#mc-schedule-form">{isAdmin ? 'Schedule' : 'Overview'}</a>
+        {isAdmin && <a href="#dash-marketing">Marketing</a>}
+        {isAdmin && <a href="#dash-enquiries">Enquiries</a>}
+      </nav>
+
 {/* ── Roadmap Video Linker (Admin) ── */}
       {isAdmin && (
-        <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+        <div id="dash-videos" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
           <h2 className="dashboard__panel-title">Roadmap Videos</h2>
           <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)' }}>
             Link YouTube videos to phases and modules. Changes appear on the Full Roadmap tab immediately.
@@ -3955,7 +3871,7 @@ ${mcRawSyllabus}`;
       
 {/* ── Per-video "Link to code" manager (Admins only) ── */}
       {isAdmin && (
-        <div className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+        <div id="dash-code-links" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
           <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
           <p style={{ fontSize: '13px', color: 'var(--fg-dim)', margin: '0 0 16px' }}>
             Add a “Link to code” button to any individual video by its URL — including each video inside a playlist. Paste the single video’s YouTube link (not the playlist link).
@@ -3996,7 +3912,7 @@ ${mcRawSyllabus}`;
 
       {/* ── Sessions Management Section (Admins only) ── */}
       {isAdmin && (
-        <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
+        <div id="dash-classes" className="dashboard__panel" style={{ marginBottom: "28px" }}>
           <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({combinedClasses.length})</h2>
           {(() => {
             if (combinedClasses.length === 0) {
@@ -4459,7 +4375,7 @@ ${mcRawSyllabus}`;
 
       {/* ── Marketing & Audience Management Panel (Full Width) — admin only ── */}
       {isAdmin && (
-      <div className="dashboard__panel" style={{ marginTop: "28px" }}>
+      <div id="dash-marketing" className="dashboard__panel" style={{ marginTop: "28px" }}>
         <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           📈 Marketing & Audience Management
         </h2>
@@ -4863,7 +4779,7 @@ ${mcRawSyllabus}`;
                 </p>
                 {broadcastCampaignId && (
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.04)",
+                    background: "var(--bg-subtle)",
                     border: "1px solid var(--line-strong)",
                     borderRadius: "8px",
                     padding: "16px",
@@ -5125,10 +5041,6 @@ function CoursesCurriculumV3() {
   const modules = window.COURSE_CURRICULUM || [];
   const [sel, setSel] = useState(0);
   const m = modules[sel] || { submodules: [] };
-  const goToBuy = () => {
-    const el = document.getElementById('cv3-pricing');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
   const lockIcon = (
     <svg className="cv3-lesson-lock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
   );
@@ -5156,11 +5068,11 @@ function CoursesCurriculumV3() {
           {m.project && <p className="cv3-detail-project"><b>You build:</b> {m.project}</p>}
           <div className="cv3-detail-lessons">
             {(m.submodules || []).map((sm, i) => (
-              <button key={sm.n} type="button" className="cv3-lesson" onClick={goToBuy} title="Unlock this content — enroll to access">
+              <div key={sm.n} className="cv3-lesson">
                 <span className="cv3-lesson-num">{i + 1}</span>
                 <span className="cv3-lesson-text">{sm.title}</span>
                 {lockIcon}
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -5218,43 +5130,6 @@ function CoursesFAQ() {
   );
 }
 
-function CoursesNewsletter() {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-  const submit = async () => {
-    const err = V2_VALIDATE.emailError(email);
-    if (err) { setError(err); return; }
-    setLoading(true); setError('');
-    try {
-      await saveLead({ name: '', email, source: 'course_newsletter' });
-      setSent(true);
-    } catch (e) {
-      setError('Could not subscribe — please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  return (
-    <section className="cv3-section cv3-newsletter" id="cv3-newsletter">
-      <div className="cv3-newsletter-card">
-        <h2 className="cv3-newsletter-title">Not ready yet? Get the free playbook.</h2>
-        <p className="cv3-newsletter-sub">Join the list for production-AI notes, new lessons, and early-bird offers. No spam.</p>
-        {sent ? (
-          <p className="cv3-newsletter-success">✓ Subscribed — see you in your inbox.</p>
-        ) : (
-          <div className="cv3-newsletter-row">
-            <input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button type="button" onClick={submit} disabled={loading}>{loading ? 'Subscribing…' : 'Subscribe'}</button>
-          </div>
-        )}
-        {error && <p className="cv3-enquiry-error">{error}</p>}
-      </div>
-    </section>
-  );
-}
-
 function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
@@ -5292,7 +5167,10 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
         <div className="cv3-hero-left">
           <h1 className="cv3-hero-title">Build production-grade<br /><em>Agentic AI</em> that ships.</h1>
           <p className="cv3-hero-sub">
-            Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring. Built by alumni from{' '}
+            Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring.
+          </p>
+          <p className="cv3-hero-sub cv3-hero-sub--alumni">
+            Built by alumni from{' '}
             {['IIT', 'IIM', 'NIT', 'DAU', 'Amazon', 'Warner Bros. Discovery', 'T-Mobile', 'Infosys', 'Swisscom', 'Applied AI Course'].map((name, i, arr) => (
               <React.Fragment key={name}>
                 <b className="cv3-hero-highlight">{name}</b>{i < arr.length - 1 ? ', ' : '.'}
@@ -5422,29 +5300,8 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
         </div>
       </section>
 
-      {/* INSTRUCTOR */}
-      <section className="cv3-instructor" id="cv3-instructor">
-        <div className="cv3-instructor-inner">
-          <div className="cv3-instructor-photo">
-            <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
-          </div>
-          <div>
-            <div className="cv3-eyebrow">Your instructor</div>
-            <h2 className="cv3-h2">Balaji Chippada</h2>
-            {instr.roleLine && <div className="cv3-instructor-role">{instr.roleLine}</div>}
-            {instr.quote && <blockquote className="cv3-instructor-quote">{instr.quote}</blockquote>}
-            <p className="cv3-instructor-para">I build production-scale agentic applications and teach engineers what actually matters once systems leave the demo stage. My free <b>26-week roadmap</b> is fully open source, no paywall — the live masterclasses are where we build together on the hard phases: RAG, Claude Code, multi-agent orchestration, guardrails, and deployment.</p>
-            <p className="cv3-instructor-para">Over the last three years I've personally mentored <b>5,000+</b> students and working professionals — with production experience across <b>Swisscom</b>, <b>Warner Bros. Discovery</b>, <b>T-Mobile</b>, and <b>Infosys</b>.</p>
-            <div className="cv3-instructor-stats">
-              {(instr.stats || []).map((s) => (
-                <div key={s.label} className="cv3-instructor-stat"><div className="cv3-stat-num">{s.num}</div><div className="cv3-stat-label">{s.label}</div></div>
-              ))}
-            </div>
-            <div className="cv3-eyebrow cv3-instructor-connect-label">Connect with me</div>
-            <InstructorSocialLinks />
-          </div>
-        </div>
-      </section>
+      {/* INSTRUCTOR — shared section (also used on Home + Full Roadmap) */}
+      <CoursesInstructorSection />
 
       {/* TESTIMONIALS — hidden until real quotes exist in data.js */}
       <CoursesTestimonials />
@@ -5469,11 +5326,6 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
       {/* FAQ */}
       <CoursesFAQ />
 
-      {/* NEWSLETTER */}
-      <CoursesNewsletter />
-
-      {/* SITE FOOTER — reuse the home page footer */}
-      <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
     </div>
   );
 }
@@ -5513,7 +5365,7 @@ function AdminEnquiriesPanel() {
   };
 
   return (
-    <div className="dashboard__panel" style={{ marginTop: '28px' }}>
+    <div id="dash-enquiries" className="dashboard__panel" style={{ marginTop: '28px' }}>
       <h2 className="dashboard__panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
         📨 Course Enquiries
         <span style={{ fontSize: '13px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono', fontWeight: 400 }}>
@@ -7765,9 +7617,6 @@ function App() {
           {/* ── Closing CTA Section ── */}
           <V2ClosingCTA nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
 
-          {/* ── Footer Section ── */}
-          <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
-
         </main>
       )}
 
@@ -7822,6 +7671,9 @@ function App() {
       {activeMainTab === 'courses' && canSeeAdminTabs && (
         <CoursesTabView setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
       )}
+
+      {/* ── Site footer — shown on every tab ── */}
+      <SiteFooter setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
 
 
       {/* ===============================================================

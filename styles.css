@@ -140,8 +140,9 @@ body {
 
 /* ============ NAV ============ */
 .nav {
-  position: fixed; top: 14px; left: 16px; right: 16px;
-  max-width: 1240px;
+  /* Full-width bar, edge to edge (was a centered floating pill). */
+  position: fixed; top: 0; left: 0; right: 0;
+  max-width: none;
   margin: 0 auto;
   padding: 8px 10px 8px 24px;
   /* 3-column grid keeps the centre tab group truly centred regardless of how
@@ -151,7 +152,7 @@ body {
   align-items: center;
   gap: 16px;
   z-index: 50;
-  border-radius: 999px;
+  border-radius: 0;
   /* Floating pill: warm cream surface with an orange glow rising from the
      bottom edge. Slightly translucent so the constant backdrop blur reads
      once content scrolls underneath. */
@@ -2604,7 +2605,7 @@ body {
 
 /* Public masterclass grid page */
 .coaching-home {
-  max-width: 1200px;
+  max-width: none; /* full-width tabs, edge to edge */
   margin: 0 auto 80px;
   padding: 0 4vw;
   /* No opacity fade-in here: it delayed the hero (the LCP element) from
@@ -3687,7 +3688,7 @@ body.modal-open {
 
 /* Staff Portal & Dashboard Container */
 .dashboard {
-  max-width: 1400px; /* Wider and cleaner */
+  max-width: none; /* full-width tabs, edge to edge */
   margin: 120px auto 80px;
   padding: 0 clamp(16px, 4vw, 40px);
   animation: fadeIn 600ms var(--ease-out);
@@ -3696,35 +3697,32 @@ body.modal-open {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 48px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--line);
   padding-bottom: 24px;
 }
 .dashboard__title {
   font-size: 42px;
   font-weight: 700;
   letter-spacing: -0.04em;
-  background: linear-gradient(135deg, #fff, #a1a1aa);
-  -webkit-background-clip: text;
-  color: transparent;
+  color: var(--fg);
 }
 .dashboard__title em {
   font-family: 'Instrument Serif', serif;
   font-style: italic;
   font-weight: 400;
-  background: linear-gradient(135deg, var(--c-rust), var(--c-amber));
-  -webkit-background-clip: text;
-  color: transparent;
+  color: var(--c-rust);
 }
 .dashboard__userinfo {
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg-dim);
+  background: var(--bg-subtle);
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
 }
 .dashboard__role-badge {
   font-family: 'JetBrains Mono', monospace;
@@ -3740,7 +3738,7 @@ body.modal-open {
 }
 .dashboard__logout-btn {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--line-strong);
   color: var(--fg-dim);
   padding: 6px 16px;
   border-radius: 999px;
@@ -3750,9 +3748,9 @@ body.modal-open {
   transition: all 0.2s var(--ease);
 }
 .dashboard__logout-btn:hover {
-  color: var(--fg);
+  color: var(--c-rust);
   border-color: var(--c-rust);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--c-rust) 8%, transparent);
 }
 
 .dashboard__grid {
@@ -3788,32 +3786,32 @@ body.modal-open {
   .dashboard__grid-2col { grid-template-columns: 1fr; }
 }
 
-/* Sticky in-page section nav with beautiful glassmorphism */
+/* Sticky in-page section nav */
 .dashboard__nav {
   position: sticky;
   top: calc(var(--nav-h) + 12px);
   z-index: 20;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: -20px 0 40px;
-  padding: 8px;
-  background: rgba(20, 20, 22, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin: 0 0 32px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--bg-elev) 80%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.25);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .dashboard__nav::-webkit-scrollbar { display: none; }
 .dashboard__nav a {
   flex: 0 0 auto;
-  padding: 10px 20px;
+  padding: 9px 18px;
   border-radius: 999px;
   font-family: 'Inter Tight', sans-serif;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--fg-dim);
   text-decoration: none;
@@ -3822,44 +3820,35 @@ body.modal-open {
 }
 .dashboard__nav a:hover,
 .dashboard__nav a:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-subtle);
   color: var(--fg);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* Anchored sections land clear of the floating nav */
-.dashboard [id^="dash-"] { scroll-margin-top: calc(var(--nav-h) + 100px); }
+.dashboard [id^="dash-"],
+.dashboard #mc-schedule-form { scroll-margin-top: calc(var(--nav-h) + 100px); }
 
-/* Premium Glassmorphism Panels */
+/* Panels — flat cards on the theme surface, no glass */
 .dashboard__panel {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 32px 40px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: transform 300ms var(--ease-out), box-shadow 300ms var(--ease-out), border-color 300ms var(--ease-out);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.18);
+  transition: border-color 250ms var(--ease-out);
   position: relative;
   overflow: hidden;
 }
-.dashboard__panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  opacity: 0.5;
+[data-theme="dark"] .dashboard__panel {
+  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.5);
 }
 .dashboard__panel:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: var(--line-strong);
 }
-.dashboard__panel-title { 
-  font-size: 22px; 
-  font-weight: 700; 
-  margin-bottom: 24px;
+.dashboard__panel-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -3869,40 +3858,35 @@ body.modal-open {
 .dashboard__panel-title::before {
   content: '';
   flex: 0 0 auto;
-  width: 6px;
-  height: 22px;
+  width: 5px;
+  height: 20px;
   border-radius: 3px;
   background: linear-gradient(180deg, var(--c-rust), var(--c-amber));
-  box-shadow: 0 0 10px rgba(228, 88, 59, 0.5);
 }
 
-/* Vibrant KPI / Stat Cards */
+/* KPI / Stat Cards */
 .dashboard .phase__weeks-block {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: 14px;
   padding: 20px;
   position: relative;
   overflow: hidden;
-  transition: all 300ms var(--ease-out);
+  transition: border-color 250ms var(--ease-out);
 }
 .dashboard .phase__weeks-block::after {
   content: '';
   position: absolute;
   bottom: 0; left: 0; width: 100%; height: 2px;
-  background: linear-gradient(90deg, var(--c-violet), var(--c-pink));
-  opacity: 0.7;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 300ms var(--ease-out);
+  background: linear-gradient(90deg, var(--c-rust), var(--c-amber));
+  opacity: 0;
+  transition: opacity 250ms var(--ease-out);
 }
 .dashboard .phase__weeks-block:hover {
-  transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.4), 0 0 20px rgba(138, 92, 246, 0.1);
+  border-color: var(--line-strong);
 }
 .dashboard .phase__weeks-block:hover::after {
-  transform: scaleX(1);
+  opacity: 0.8;
 }
 .dashboard .phase__weeks-label {
   font-size: 12px;
@@ -3911,15 +3895,13 @@ body.modal-open {
   color: var(--fg-faint);
   font-weight: 600;
 }
-.dashboard .phase__weeks { 
-  font-family: 'Inter Tight', sans-serif; 
+.dashboard .phase__weeks {
+  font-family: 'Inter Tight', sans-serif;
   font-size: 32px;
-  font-weight: 800; 
-  letter-spacing: -0.04em; 
+  font-weight: 800;
+  letter-spacing: -0.04em;
   margin-top: 8px;
-  background: linear-gradient(135deg, #fff, #a1a1aa);
-  -webkit-background-clip: text;
-  color: transparent;
+  color: var(--fg);
 }
 
 /* Beautiful Data Tables */
@@ -3930,31 +3912,29 @@ body.modal-open {
   margin-top: 10px;
 }
 .dashboard table thead th {
-  background: rgba(255, 255, 255, 0.02);
-  padding: 16px 20px;
-  font-size: 13px;
+  background: var(--bg-subtle);
+  padding: 14px 18px;
+  font-size: 12.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fg-faint);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 .dashboard table thead th:first-child { border-top-left-radius: 12px; }
 .dashboard table thead th:last-child { border-top-right-radius: 12px; }
 .dashboard table tbody td {
-  padding: 16px 20px;
+  padding: 14px 18px;
   font-size: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--line);
   color: var(--fg-dim);
 }
-.dashboard table tbody tr { 
-  transition: all 200ms var(--ease); 
+.dashboard table tbody tr {
+  transition: background 200ms var(--ease);
 }
 .dashboard table tbody tr:last-child td { border-bottom: none; }
-.dashboard table tbody tr:hover { 
-  background: rgba(255, 255, 255, 0.04); 
-  transform: scale(1.005);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.dashboard table tbody tr:hover {
+  background: var(--bg-subtle);
 }
 
 /* Refined Inputs & Controls */
@@ -3972,27 +3952,26 @@ body.modal-open {
   /* Use background-color (not the `background` shorthand) so we don't reset the
      .form-select chevron's background-image/repeat/position — that reset made
      the dropdown arrow tile across the whole control in light mode. */
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 13px 16px;
   color: var(--fg);
   font-family: 'Inter', sans-serif;
   font-size: 14px;
-  transition: all 200ms var(--ease);
+  transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease);
   width: 100%;
 }
 .dashboard .form-input:focus, .dashboard .form-select:focus {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: var(--c-violet);
-  box-shadow: 0 0 0 3px rgba(138, 92, 246, 0.2);
+  border-color: var(--c-rust);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-rust) 18%, transparent);
   outline: none;
 }
 .dashboard .form-btn {
   font-family: 'Inter Tight', sans-serif;
   text-transform: none;
   letter-spacing: normal;
-  background: linear-gradient(135deg, var(--c-violet), var(--c-pink));
+  background: var(--c-rust);
   border: none;
   border-radius: 10px;
   padding: 14px 24px;
@@ -4000,20 +3979,19 @@ body.modal-open {
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(138, 92, 246, 0.3);
-  transition: all 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--c-rust) 45%, transparent);
+  transition: all 200ms var(--ease);
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .dashboard .form-btn:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 12px 28px rgba(138, 92, 246, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-  filter: brightness(1.1);
+  filter: brightness(1.08);
+  box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--c-rust) 55%, transparent);
 }
 .dashboard .form-btn:active {
-  transform: translateY(1px) scale(0.98);
+  transform: translateY(1px);
 }
 .dashboard .roadmap-admin-module-check {
   color: var(--fg-dim);
@@ -4093,9 +4071,9 @@ body.modal-open {
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    top: max(10px, env(safe-area-inset-top));
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
+    top: env(safe-area-inset-top);
+    left: env(safe-area-inset-left);
+    right: env(safe-area-inset-right);
     padding: 6px 10px;
     /* Mobile scroll perf: a fixed element with backdrop-filter re-blurs the
        page behind it on every scroll frame, which made touch scrolling feel
@@ -4784,13 +4762,14 @@ body.modal-open {
    =============================================================== */
 .site-footer {
   position: relative;
+  /* Full-bleed footer, edge to edge on every tab */
   width: 100%;
-  max-width: 1120px;
-  margin: 120px auto 0;
+  max-width: none;
+  margin: 120px 0 0;
   padding: 80px 24px 60px;
   border-top: 1px solid var(--line);
-  border-top-left-radius: 40px;
-  border-top-right-radius: 40px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
   background: radial-gradient(40% 160px at 50% 0%, rgba(216, 90, 48, 0.08), transparent), var(--bg);
   overflow: hidden;
   transition: all 0.3s ease;
@@ -4802,8 +4781,6 @@ body.modal-open {
 
 @media (max-width: 768px) {
   .site-footer {
-    border-top-left-radius: 24px;
-    border-top-right-radius: 24px;
     padding: 60px 20px 40px;
     margin-top: 80px;
   }
@@ -5122,7 +5099,7 @@ body.modal-open {
 .v2-success-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
 
 .v2-dashboard {
-  max-width: 1120px;
+  max-width: none; /* full-width tabs, edge to edge */
   margin: calc(var(--layout-top) + 44px) auto 88px;
   padding: 0 clamp(18px, 4vw, 48px);
 }
@@ -6153,7 +6130,7 @@ body.has-promo-banner {
   --layout-top: calc(var(--top-banner-h) + var(--nav-h));
   padding-top: var(--top-banner-h);
 }
-body.has-promo-banner .nav { top: calc(var(--top-banner-h) + 10px); }
+body.has-promo-banner .nav { top: var(--top-banner-h); }
 @media (max-width: 640px) {
   body.has-promo-banner { --top-banner-h: 52px; }
 }
@@ -8564,7 +8541,7 @@ body.nav-menu-open .v2-mobile-sticky {
 
 /* ── Admin: email send-task viewer ─────────────────────────────────── */
 .email-tasks-page {
-  max-width: 860px;
+  max-width: none; /* full-width tabs, edge to edge */
   margin: 0 auto;
   padding: 96px 20px 80px;
 }
@@ -8703,11 +8680,11 @@ body.nav-menu-open .v2-mobile-sticky {
   --cv3-ink2: var(--fg-dim);
   --cv3-ink3: var(--fg-faint);
   --cv3-line: var(--line);
-  /* Blue accent (matches the hero globe artwork), scoped to the Courses page
-     only so the rest of the site keeps its rust brand color. */
-  --cv3-accent: #3560d4;
-  --cv3-accent-soft: color-mix(in srgb, #3560d4 12%, transparent);
-  --cv3-accent-on-dark: #7aa0ff;
+  /* Site rust brand accent so the Courses page matches the rest of the
+     website in both themes (on-dark uses the dark-theme rust value). */
+  --cv3-accent: var(--c-rust);
+  --cv3-accent-soft: color-mix(in srgb, var(--c-rust) 12%, transparent);
+  --cv3-accent-on-dark: #e0664c;
   /* Display serif from the course landing mock-up (Newsreader), with the
      site's Instrument Serif as fallback. */
   --cv3-serif: 'Newsreader', 'Instrument Serif', Georgia, serif;
@@ -8718,6 +8695,16 @@ body.nav-menu-open .v2-mobile-sticky {
   color: var(--cv3-ink);
   line-height: 1.55;
   padding-top: calc(var(--layout-top) + 16px);
+}
+
+/* Embedded reuse of cv3 sections (instructor on Home / Full Roadmap):
+   keep the .cv3 tokens + full-bleed, drop the page-level top padding.
+   Longhand margins only — the shorthand would clobber the full-bleed
+   margin-left: calc(50% - 50vw) above. */
+.cv3-embed {
+  padding-top: 0;
+  margin-top: 72px;
+  margin-bottom: 72px;
 }
 
 /* Buttons */
@@ -9124,10 +9111,12 @@ body.nav-menu-open .v2-mobile-sticky {
   background: none;
   border: 1px solid transparent;
   border-radius: 10px;
-  cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease;
 }
+/* Hover feedback only — the rows are plain divs, clicking does nothing. */
 .cv3-lesson:hover { background: var(--cv3-accent-soft); border-color: var(--cv3-line); }
+.cv3-lesson:hover .cv3-lesson-num { background: var(--cv3-accent); color: #fff; }
+.cv3-lesson:hover .cv3-lesson-lock { color: var(--cv3-accent); }
 .cv3-lesson-num {
   display: grid;
   place-items: center;
@@ -9140,10 +9129,8 @@ body.nav-menu-open .v2-mobile-sticky {
   font-weight: 600;
   flex: none;
 }
-.cv3-lesson:hover .cv3-lesson-num { background: var(--cv3-accent); color: #fff; }
 .cv3-lesson-text { font-size: 16px; color: var(--cv3-ink); }
 .cv3-lesson-lock { margin-left: auto; flex: none; color: var(--cv3-ink3); transition: color 0.18s ease; }
-.cv3-lesson:hover .cv3-lesson-lock { color: var(--cv3-accent); }
 
 /* Projects — dark band (site's warm deep tone, constant across themes) */
 .cv3-projects { background: var(--bg-deep); color: #f4f1ec; border-top: 1px solid var(--cv3-line); }
