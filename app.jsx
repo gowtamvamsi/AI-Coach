@@ -63,7 +63,7 @@ if (typeof firebase !== 'undefined') {
 
 // Each signed-in/account view gets its own URL so a reload restores the tab the
 // user was on (instead of every account view collapsing to /account).
-const ACCOUNT_TAB_PATHS = { mybookings: '/account', dashboard: '/dashboard', emailtasks: '/email-tasks', courses: '/courses' };
+const ACCOUNT_TAB_PATHS = { mybookings: '/account', dashboard: '/dashboard', emailtasks: '/email-tasks' };
 function accountTabForPath(pathname) {
   const p = String(pathname || '/').replace(/\/+$/, '') || '/';
   for (const tab in ACCOUNT_TAB_PATHS) {
@@ -226,7 +226,7 @@ function EmailComposer({ subjectPlaceholder, bodyPlaceholder, bodyRows, buttonLa
         onClick={handleSend}
         disabled={!canSend}
         className="form-btn form-btn--accent"
-        style={{ width: "auto", margin: 0, padding: "14px 28px", background: sending ? "var(--bg-faint)" : "var(--c-pink)", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", gap: "8px" }}
+        style={{ width: "auto", margin: 0, padding: "14px 28px", background: sending ? "var(--bg-faint)" : "var(--c-rust)", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", gap: "8px" }}
       >
         {sending ? (<><span className="ai-status__spinner"></span> Queuing…</>) : buttonLabel}
       </button>
@@ -2230,12 +2230,54 @@ function SplitPaneSyllabus({ syllabus }) {
 
 
 // ===============================================================
-// STAFF / ADMIN DASHBOARD TAB VIEW
+// ADMIN — Schedule/Edit Masterclass panel (left column of the
+// dashboard grid). Owns all form + zoom-link state locally so
+// typing here never re-renders DashboardView (see CLAUDE.md).
+// Remounted via key when the edit target changes, so field values
+// are derived from props in the useState initializers.
 // ===============================================================
+function ScheduleMasterclassPanel({ editSessionId, editSessionIsMc, sessions, masterclasses, sessionsWithRegs, combinedClasses, onCancelEdit }) {
+  // Resolve the session being edited (if any) once per mount.
+  const initSession = (() => {
+    if (!editSessionId) return null;
+    let session = editSessionIsMc
+      ? masterclasses.find(m => m.id === editSessionId)
+      : sessions.find(s => s.id === editSessionId);
+    // If not found in Firestore lists, check if it's the featured config masterclass
+    if (!session && V2_CONFIG_MASTERCLASS && editSessionId === V2_CONFIG_MASTERCLASS.id) {
+      session = {
+        title: V2_CONFIG_MASTERCLASS.title,
+        price: V2_CONFIG_MASTERCLASS.price,
+        originalPrice: V2_CONFIG_MASTERCLASS.originalPrice,
+        dateTime: V2_CONFIG_MASTERCLASS.dateTime,
+        description: V2_CONFIG_MASTERCLASS.about || V2_CONFIG_MASTERCLASS.subtitle || "",
+        videoUrl: V2_CONFIG_MASTERCLASS.videoUrl || "",
+      };
+    }
+    return session || null;
+  })();
 
-function DashboardView({ user, role, onLogout }) {
-  const [sessions, setSessions] = useState([]);
-  const [registrations, setRegistrations] = useState([]);
+  // format to datetime-local expected string 'YYYY-MM-DDTHH:MM'
+  const initDateTime = (() => {
+    if (!initSession || !initSession.dateTime) return "";
+    try {
+      const dateObj = new Date(initSession.dateTime);
+      if (isNaN(dateObj.getTime())) return "";
+      const tzoffset = dateObj.getTimezoneOffset() * 60000; //offset in milliseconds
+      return (new Date(dateObj.getTime() - tzoffset)).toISOString().slice(0, 16);
+    } catch (e) { return ""; }
+  })();
+
+  const [title, setTitle] = useState(initSession ? (initSession.title || "") : "");
+  const [description, setDescription] = useState(initSession ? (initSession.description || initSession.rawSyllabus || "") : "");
+  const [price, setPrice] = useState(initSession && initSession.price !== undefined ? initSession.price : "");            // "Offering Price" — 0 = Free
+  const [originalPrice, setOriginalPrice] = useState(initSession && initSession.originalPrice !== undefined ? initSession.originalPrice : "");
+  const [dateTime, setDateTime] = useState(initDateTime);
+  const [instructor, setInstructor] = useState((initSession && initSession.instructor) || "Balaji Chippada");
+  const [videoUrl, setVideoUrl] = useState(initSession ? (initSession.videoUrl || initSession.youtubeVideoId || initSession.videoId || "") : "");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState({ type: "", message: "" });
+
   // Zoom-link manager (per-masterclass): input value, busy + result message keyed by sessionId.
   const [zoomInputs, setZoomInputs] = useState({});
   const [zoomBusy, setZoomBusy] = useState({});
@@ -2244,6 +2286,751 @@ function DashboardView({ user, role, onLogout }) {
   const [zoomEditOpen, setZoomEditOpen] = useState(false);
   const [zoomSubject, setZoomSubject] = useState("");
   const [zoomBody, setZoomBody] = useState("");
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!db) {
+      setStatus({ type: "error", message: "Firestore database not loaded." });
+      return;
+    }
+
+    // NB: a free masterclass has price 0 — don't treat 0 as "missing" (!0 === true).
+    const priceEmpty = price === "" || price === null || price === undefined;
+    if (!title || !description || priceEmpty || !dateTime) {
+      setStatus({ type: "error", message: "Please fill in all required fields." });
+      return;
+    }
+
+    setLoading(true);
+    setStatus({ type: "", message: "" });
+
+    try {
+      const priceNum = parseFloat(price);
+      if (isNaN(priceNum) || priceNum < 0) {
+        throw new Error("Offering price must be a valid non-negative number.");
+      }
+
+      // "Actual Price" is optional — empty means "no anchor" (stored as 0, so
+      // nothing is struck through). When set it must be a non-negative number.
+      const originalPriceEmpty = originalPrice === "" || originalPrice === null || originalPrice === undefined;
+      const originalPriceNum = originalPriceEmpty ? 0 : parseFloat(originalPrice);
+      if (isNaN(originalPriceNum) || originalPriceNum < 0) {
+        throw new Error("Actual price must be a valid non-negative number.");
+      }
+
+      // Convert date to generic ISO string format
+      const formattedDate = new Date(dateTime).toISOString();
+
+      if (editSessionId) {
+        // Mode: Update Existing Session
+        const targetCollection = editSessionIsMc ? "masterclasses" : "sessions";
+        const updatePayload = {
+          title,
+          price: priceNum,
+          originalPrice: originalPriceNum,
+          dateTime: formattedDate,
+          instructor,
+          videoUrl: videoUrl.trim()
+        };
+        if (editSessionIsMc) {
+          updatePayload.rawSyllabus = description;
+        } else {
+          updatePayload.description = description;
+        }
+
+        const docRef = db.collection(targetCollection).doc(editSessionId);
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) {
+          updatePayload.deleted = false;
+          updatePayload.status = "active";
+          updatePayload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+          if (editSessionIsMc && V2_CONFIG_MASTERCLASS) {
+            updatePayload.syllabus = V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
+              index: `1.${idx + 1}`,
+              topicTitle: c.title,
+              subTopics: c.points
+            })) : [];
+          }
+          await docRef.set(updatePayload);
+        } else {
+          // If it exists, make sure we mark it as active / not deleted
+          updatePayload.deleted = false;
+          updatePayload.status = "active";
+          await docRef.update(updatePayload);
+        }
+
+        setStatus({ type: "success", message: `${editSessionIsMc ? "AI Masterclass" : "Session"} updated successfully!` });
+      } else {
+        // Mode: Create New Session
+        await db.collection("sessions").add({
+          title,
+          description,
+          price: priceNum,
+          originalPrice: originalPriceNum,
+          dateTime: formattedDate,
+          instructor,
+          videoUrl: videoUrl.trim(),
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setStatus({ type: "success", message: "New Masterclass scheduled successfully!" });
+
+        // Reset form
+        setTitle("");
+        setDescription("");
+        setPrice("");
+        setOriginalPrice("");
+        setDateTime("");
+        setVideoUrl("");
+      }
+    } catch (err) {
+      // Surface the raw error to the console so the exact Firestore/permission
+      // reason is visible when debugging a failed save.
+      console.error("Masterclass save failed:", err);
+      setStatus({ type: "error", message: (err && err.message) || "Failed to commit session to database." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buildDefaultZoomEmail = (mcTitle, mcDateTime, zoomLink) => {
+    const when = (typeof formatMcFullDateTime === 'function' && mcDateTime)
+      ? formatMcFullDateTime(mcDateTime)
+      : (mcDateTime ? new Date(mcDateTime).toLocaleString('en-IN') : 'TBA');
+    return {
+      subject: `Your Zoom link for ${mcTitle || 'the masterclass'} 🔗`,
+      body: `Hi {{name}},\n\n` +
+        `Here's your private Zoom joining link for ${mcTitle || 'the masterclass'}:\n\n` +
+        `Class: ${mcTitle || 'Masterclass'}\n` +
+        `Date & Time: ${when}\n` +
+        `Zoom link: ${zoomLink || '<add the link above>'}\n\n` +
+        `Save this email — we'll also send you a reminder on each of the 2 days before the session.\n\n` +
+        `See you live,\nBalaji Chippada Masterclass\nteam@balajichippada.com`,
+    };
+  };
+
+  const handleSendZoom = async (sessionId, registeredCount) => {
+    const zoomLink = (zoomInputs[sessionId] || '').trim();
+    if (!zoomLink) {
+      setZoomMsg(m => ({ ...m, [sessionId]: '⚠️ Enter a Zoom link first.' }));
+      return;
+    }
+    if (registeredCount > 0 && !window.confirm(`Email this Zoom link to ${registeredCount} registered student(s) now?`)) return;
+    setZoomBusy(b => ({ ...b, [sessionId]: true }));
+    setZoomMsg(m => ({ ...m, [sessionId]: '' }));
+    try {
+      const call = functions.httpsCallable('sendZoomLinkToRegistrants');
+      // Include the edited subject/body when the editor is open and filled.
+      const payload = { sessionId, zoomLink };
+      if (zoomEditOpen && zoomBody.trim()) {
+        payload.customSubject = zoomSubject.trim();
+        payload.customBody = zoomBody;
+      }
+      const res = await call(payload);
+      const d = (res && res.data) || {};
+      setZoomMsg(m => ({
+        ...m,
+        [sessionId]: d.queued > 0
+          ? `✓ Saved. Queued ${d.queued} email(s) — they'll send in the background over the next few minutes.`
+          : (d.message || '✓ Saved.'),
+      }));
+    } catch (err) {
+      setZoomMsg(m => ({ ...m, [sessionId]: `⚠️ ${err.message || 'Failed to send.'}` }));
+    } finally {
+      setZoomBusy(b => ({ ...b, [sessionId]: false }));
+    }
+  };
+
+  return (
+    <div className="dashboard__panel">
+      <h2 className="dashboard__panel-title">
+        {editSessionId ? "✎ Edit Masterclass" : "＋ Schedule New Masterclass"}
+      </h2>
+
+      <form onSubmit={handleFormSubmit}>
+        <div className="form-group">
+          <label className="form-label">Session Name / Title *</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="e.g. LangGraph Multi-Agent RAG Bootcamp"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Description & Syllabus *</label>
+          <textarea
+            className="form-input form-textarea"
+            placeholder="What will students learn in this session? Break it down..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Instructor Name</label>
+          <input
+            type="text"
+            className="form-input"
+            value={instructor}
+            onChange={(e) => setInstructor(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div className="form-group">
+            <label className="form-label">Actual Price (INR)</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="e.g. 999"
+              min="0"
+              value={originalPrice}
+              onChange={(e) => setOriginalPrice(e.target.value)}
+            />
+            <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>Shown struck-through on the homepage.</small>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Offering Price (INR) *</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="e.g. 499 (or 0 for Free)"
+              min="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+            />
+            <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>What attendees pay. 0 shows as “Free”.</small>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Date & Time *</label>
+          <input
+            type="datetime-local"
+            className="form-input"
+            value={dateTime}
+            onChange={(e) => setDateTime(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Promo Video (YouTube URL or ID)</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="e.g. https://www.youtube.com/watch?v=Eze6D8jAMjI"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+          />
+        </div>
+
+        {status.message && (
+          <div className={`status-box status-box--${status.type}`} style={{ marginBottom: "12px" }}>
+            <span>{status.type === 'success' ? '✔' : '⚠'}</span>
+            <span>{status.message}</span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button type="submit" className="form-btn" disabled={loading} style={{ flex: 1 }}>
+            {loading ? "Saving…" : editSessionId ? "Save Changes" : "Publish Masterclass"}
+          </button>
+          {editSessionId && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              style={{
+                padding: "12px 16px",
+                background: "transparent",
+                border: "1px solid var(--line-strong)",
+                color: "var(--fg-dim)",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+
+      {/* ── Zoom Link & Reminders — scoped to the masterclass being edited ── */}
+      {editSessionId && (() => {
+        const regEntry = sessionsWithRegs.find(x => x.sessionId === editSessionId);
+        const registered = regEntry ? regEntry.registered : 0;
+        const currentZoom = (combinedClasses.find(c => c.id === editSessionId) || {}).zoomLink || (regEntry && regEntry.zoomLink) || '';
+        return (
+          <div style={{ marginTop: "22px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
+            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              Zoom Link &amp; Reminders
+            </label>
+            <p style={{ fontSize: "12px", color: "var(--fg-faint)", margin: "4px 0 10px" }}>
+              Saving emails this link (with a calendar invite) to {registered} registered student(s) now, and auto-includes it for anyone who registers afterwards. Daily reminders go out automatically on the 2 days before the session.
+            </p>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <input
+                type="url"
+                className="form-input"
+                placeholder="https://zoom.us/j/…"
+                value={zoomInputs[editSessionId] ?? currentZoom}
+                onChange={e => setZoomInputs(v => ({ ...v, [editSessionId]: e.target.value }))}
+                style={{ flex: 1, minWidth: "220px", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
+              />
+              <button
+                type="button"
+                className="form-btn"
+                disabled={zoomBusy[editSessionId]}
+                onClick={() => handleSendZoom(editSessionId, registered)}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {zoomBusy[editSessionId] ? "Sending…" : `Save & email ${registered}`}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (zoomEditOpen) { setZoomEditOpen(false); return; }
+                const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
+                const def = buildDefaultZoomEmail(title, dateTime, z);
+                setZoomSubject(def.subject);
+                setZoomBody(def.body);
+                setZoomEditOpen(true);
+              }}
+              style={{ marginTop: "10px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "12px", padding: 0 }}
+            >
+              {zoomEditOpen ? "↩ Use the default email" : "✎ Edit email before sending"}
+            </button>
+
+            {zoomEditOpen && (
+              <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={zoomSubject}
+                  onChange={e => setZoomSubject(e.target.value)}
+                  placeholder="Email subject"
+                  style={{ fontSize: "13px" }}
+                />
+                <textarea
+                  className="form-input form-textarea"
+                  rows={12}
+                  value={zoomBody}
+                  onChange={e => setZoomBody(e.target.value)}
+                  style={{ fontSize: "13px", lineHeight: 1.6, fontFamily: "'Inter Tight', sans-serif", minHeight: "220px" }}
+                />
+                <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
+                  <code>{'{{name}}'}</code> is replaced with each student&apos;s name. A calendar invite (.ics) is attached automatically.
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
+                      const def = buildDefaultZoomEmail(title, dateTime, z);
+                      setZoomSubject(def.subject);
+                      setZoomBody(def.body);
+                    }}
+                    style={{ marginLeft: "8px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "11px", padding: 0 }}
+                  >
+                    ↺ Reset to default
+                  </button>
+                </div>
+              </div>
+            )}
+            {zoomMsg[editSessionId] && (
+              <div style={{
+                fontSize: "12px", marginTop: "8px",
+                color: zoomMsg[editSessionId].startsWith('⚠') ? "var(--c-rust)" : "var(--c-emerald)"
+              }}>
+                {zoomMsg[editSessionId]}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+ScheduleMasterclassPanel = React.memo(ScheduleMasterclassPanel);
+
+// ===============================================================
+// ADMIN — Marketing email broadcast modal. Owns subject/body/
+// template/sending state locally so typing here never re-renders
+// DashboardView. Mounted fresh each time the modal opens.
+// ===============================================================
+const CAMPAIGN_TEMPLATES = {
+  general: {
+    subject: "Exclusive Masterclass Invite: Command the AI Engineering Frontier",
+    body: `Hello,\n\nI wanted to reach out and invite you to our upcoming live Masterclasses at The Agent Engineer. \n\nWhether you're just starting or looking to ship production-scale multi-agent systems, our curriculum covers the exact skills demanded by elite engineering teams today.\n\nCheck out our interactive syllabus and reserve your seat here:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada\nTutor & AI Architect, The Agent Engineer`
+  },
+  cold_leads: {
+    subject: "Unlock Your Career Transition: Special AI Coach Registration Offer",
+    body: `Hello,\n\nI noticed you created an account on our AI Engineer Roadmap platform but haven't reserved your seat for an upcoming cohort yet.\n\nTo help you kickstart your journey, I'm offering an exclusive free entry / special seat reservation to our next live session. Command the tools, LangGraph orchestrations, and LLMOps that are reshaping technology.\n\nSee what's coming up and secure your access:\nhttps://balajichippada.com/\n\nTo your success,\nBalaji Chippada`
+  },
+  abandoned: {
+    subject: "Finish Setting Up Your Seat: LangGraph & Agentic AI Masterclass",
+    body: `Hi there,\n\nIt looks like you started booking a seat for our upcoming Masterclass but didn't complete the reservation. \n\nSeats in our live cohorts are strictly limited to ensure personal feedback and high-quality coaching for every student. I'd love to help you cross the finish line and master production-grade RAG and agentic tools.\n\nResume your registration and secure your seat here:\nhttps://balajichippada.com/\n\nIf you ran into any payment issues or have questions, just reply directly to this email!\n\nBest,\nBalaji Chippada`
+  },
+  professional: {
+    subject: "Enterprise LLMOps & LangGraph: Advanced Masterclasses for Pros",
+    body: `Hello,\n\nAs a working professional on our platform, you understand the speed at which AI engineering is moving. Simply prompting models is no longer enough — the industry is hiring engineers who can build robust, cost-effective, multi-agent frameworks with strict guardrails.\n\nOur upcoming sessions focus on advanced enterprise orchestration, custom Tool/MCP pipelines, and multi-agent LangGraph architectures.\n\nExplore our professional cohort curriculum:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada`
+  }
+};
+
+function BroadcastModal({ list, segmentName, onClose }) {
+  const defaultKey = (() => {
+    if (segmentName === "Cold Leads") return "cold_leads";
+    if (segmentName === "Abandoned Checkouts" || segmentName === "Abandoned Checkout") return "abandoned";
+    if (segmentName === "Working Professionals") return "professional";
+    return "general";
+  })();
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(defaultKey);
+  const [broadcastSubject, setBroadcastSubject] = useState(CAMPAIGN_TEMPLATES[defaultKey].subject);
+  const [broadcastBody, setBroadcastBody] = useState(CAMPAIGN_TEMPLATES[defaultKey].body);
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+  const [broadcastError, setBroadcastError] = useState("");
+  const [broadcastSuccess, setBroadcastSuccess] = useState("");
+  const [broadcastCampaignId, setBroadcastCampaignId] = useState("");
+  const [broadcastIsMock, setBroadcastIsMock] = useState(false);
+
+  const handleTemplateChange = (key) => {
+    setSelectedTemplateKey(key);
+    if (CAMPAIGN_TEMPLATES[key]) {
+      setBroadcastSubject(CAMPAIGN_TEMPLATES[key].subject);
+      setBroadcastBody(CAMPAIGN_TEMPLATES[key].body);
+    }
+  };
+
+  const handleLaunchBroadcast = async () => {
+    const emails = Array.from(new Set(
+      list
+        .map(u => (u.email || u.studentEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    ));
+
+    if (emails.length === 0) {
+      setBroadcastError("No valid recipient email addresses found.");
+      return;
+    }
+
+    setIsSendingBroadcast(true);
+    setBroadcastError("");
+    setBroadcastSuccess("");
+    setBroadcastCampaignId("");
+    setBroadcastIsMock(false);
+
+    try {
+      if (!functions) {
+        throw new Error("Firebase functions service is not initialized on this platform.");
+      }
+
+      const sendEmailCall = functions.httpsCallable("sendAudienceEmail");
+      const response = await sendEmailCall({
+        emails: emails,
+        subject: broadcastSubject,
+        body: broadcastBody,
+        segmentName: segmentName
+      });
+
+      const result = response.data;
+      if (result && result.success) {
+        setBroadcastSuccess(result.message || "Audience broadcast dispatched successfully.");
+        setBroadcastCampaignId(result.campaignId || "");
+        setBroadcastIsMock(!!result.isMock);
+      } else {
+        throw new Error("An unexpected error occurred: response did not indicate success.");
+      }
+    } catch (err) {
+      console.warn("Direct programmatic email dispatch failed, executing client-side fallback:", err);
+
+      try {
+        const currentUser = auth ? auth.currentUser : null;
+        let callerName = "Admin Staff";
+        if (currentUser && db) {
+          try {
+            const userDoc = await db.collection("users").doc(currentUser.uid).get();
+            if (userDoc.exists) {
+              const userData = userDoc.data();
+              callerName = userData.name || userData.email || currentUser.uid;
+            } else {
+              callerName = currentUser.email || currentUser.uid;
+            }
+          } catch (uErr) {
+            console.error("Failed to load user document details:", uErr);
+            callerName = currentUser.email || currentUser.uid;
+          }
+        }
+
+        let campaignDocId = "";
+        if (db) {
+          const campaignDocRef = await db.collection("email_campaigns").add({
+            segmentName: segmentName || "Custom Audience",
+            subject: broadcastSubject,
+            body: broadcastBody,
+            recipientCount: emails.length,
+            senderEmail: currentUser ? currentUser.email : "simulated-sender@theagentengineer.app",
+            status: "completed_via_client",
+            isMock: false,
+            sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+            sentBy: callerName,
+            sparkPlanFallback: true
+          });
+          campaignDocId = campaignDocRef.id;
+        }
+
+        // Prefill subject/body and bcc in the native client
+        const subjectEsc = encodeURIComponent(broadcastSubject);
+        const bodyEsc = encodeURIComponent(broadcastBody);
+        const bccEsc = encodeURIComponent(emails.join(","));
+        const mailtoUrl = `mailto:?bcc=${bccEsc}&subject=${subjectEsc}&body=${bodyEsc}`;
+        window.open(mailtoUrl, '_blank');
+
+        setBroadcastSuccess(
+          campaignDocId
+            ? `Audience campaign logged under ID ${campaignDocId}! Since this project's production backend is running on the Firebase Spark Plan, your default mail client has been opened to send the emails securely.`
+            : `Audience campaign generated successfully! Your default mail client has been opened to send the emails securely.`
+        );
+        if (campaignDocId) {
+          setBroadcastCampaignId(campaignDocId);
+        }
+        setBroadcastIsMock(false);
+      } catch (fallbackErr) {
+        console.error("Critical fallback failure:", fallbackErr);
+        setBroadcastError(`Failed to send broadcast: ${err.message || err}. (Fallback error: ${fallbackErr.message || fallbackErr})`);
+      }
+    } finally {
+      setIsSendingBroadcast(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 300 }}>
+      <div className="modal-container" onClick={e => e.stopPropagation()} style={{ width: "min(640px, 100%)" }}>
+        <button className="modal-close" onClick={onClose} disabled={isSendingBroadcast}>×</button>
+        <h2 className="modal-title">Send <em>Email Broadcast</em></h2>
+
+        {broadcastSuccess ? (
+          <div style={{ textAlign: "center", padding: "10px 0" }}>
+            <div style={{ fontSize: "44px", marginBottom: "16px", color: "var(--c-emerald)", lineHeight: 1 }}>✓</div>
+            <h3 className="modal-title" style={{ color: "var(--c-emerald)", fontSize: "20px", marginBottom: "10px" }}>Broadcast Successfully Launched!</h3>
+            <p className="modal-desc" style={{ fontSize: "14px", lineHeight: "1.6", color: "var(--fg)", marginBottom: "20px" }}>
+              {broadcastSuccess}
+            </p>
+            {broadcastCampaignId && (
+              <div style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--line-strong)",
+                borderRadius: "8px",
+                padding: "16px",
+                marginTop: "20px",
+                fontFamily: "monospace",
+                fontSize: "12px",
+                textAlign: "left",
+                wordBreak: "break-all"
+              }}>
+                <div style={{ marginBottom: "6px" }}><b style={{ color: "var(--fg-dim)" }}>Campaign ID:</b> <span style={{ color: "var(--c-rust)" }}>{broadcastCampaignId}</span></div>
+                <div style={{ marginBottom: "6px" }}><b style={{ color: "var(--fg-dim)" }}>Recipient Count:</b> {list.length} leads</div>
+                <div><b style={{ color: "var(--fg-dim)" }}>Mode:</b> {broadcastIsMock ? "Simulated / Mock (No SMTP Keys)" : "Real SMTP Delivery"}</div>
+              </div>
+            )}
+            {broadcastIsMock && (
+              <div style={{
+                background: "rgba(235, 94, 40, 0.1)",
+                border: "1px solid rgba(235, 94, 40, 0.25)",
+                color: "var(--c-rust)",
+                borderRadius: "8px",
+                padding: "12px",
+                marginTop: "16px",
+                fontSize: "13px",
+                lineHeight: "1.4",
+                textAlign: "left"
+              }}>
+                <b>Note:</b> SMTP credentials are not yet configured in your Firebase functions environment. The campaign has been captured successfully in the <code>/email_campaigns</code> Firestore database, and mock logs have been printed in the server logs.
+              </div>
+            )}
+            <div style={{ marginTop: "30px" }}>
+              <button
+                type="button"
+                className="form-btn form-btn--accent"
+                onClick={onClose}
+                style={{ background: "var(--c-emerald)", margin: "0 auto", padding: "12px 40px", width: "auto" }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="modal-desc" style={{ marginBottom: "20px" }}>
+              Launch a direct, programmatic email broadcast to <b>{list.length} leads</b> in the <b>"{segmentName}"</b> segment. All leads are automatically BCC'd to protect student privacy.
+            </p>
+
+            {broadcastError && (
+              <div style={{
+                background: "rgba(244, 63, 94, 0.1)",
+                border: "1px solid rgba(244, 63, 94, 0.25)",
+                color: "var(--c-rose)",
+                borderRadius: "8px",
+                padding: "12px",
+                marginBottom: "20px",
+                fontSize: "13px",
+                lineHeight: "1.4"
+              }}>
+                ❌ <b>Error:</b> {broadcastError}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Select Campaign Template</label>
+              <select
+                className="form-select"
+                value={selectedTemplateKey}
+                onChange={e => handleTemplateChange(e.target.value)}
+                disabled={isSendingBroadcast}
+              >
+                <option value="general">Masterclass Invite (General / All Leads)</option>
+                <option value="cold_leads">Special Registration Offer (Cold Leads)</option>
+                <option value="abandoned">Checkout Cart Abandonment (Retargeting)</option>
+                <option value="professional">Enterprise LLMOps Upsell (Working Professionals)</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Subject Line</label>
+              <input
+                type="text"
+                className="form-input"
+                value={broadcastSubject}
+                onChange={e => setBroadcastSubject(e.target.value)}
+                required
+                disabled={isSendingBroadcast}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Email Body (Plain Text)</label>
+              <textarea
+                className="form-textarea"
+                style={{ minHeight: "220px", fontFamily: "inherit", fontSize: "14px" }}
+                value={broadcastBody}
+                onChange={e => setBroadcastBody(e.target.value)}
+                required
+                disabled={isSendingBroadcast}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+              <button
+                type="button"
+                className="form-btn form-btn--accent"
+                onClick={handleLaunchBroadcast}
+                disabled={isSendingBroadcast}
+                style={{
+                  background: isSendingBroadcast ? "var(--bg-faint)" : "var(--c-rust)",
+                  margin: 0,
+                  flex: 2,
+                  cursor: isSendingBroadcast ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
+                }}
+              >
+                {isSendingBroadcast ? (
+                  <>
+                    <span className="ai-status__spinner"></span>
+                    Sending Broadcast...
+                  </>
+                ) : (
+                  <>Send Direct Broadcast</>
+                )}
+              </button>
+              <button
+                type="button"
+                className="dashboard__logout-btn"
+                onClick={onClose}
+                disabled={isSendingBroadcast}
+                style={{ margin: 0, flex: 1, padding: "14px", cursor: isSendingBroadcast ? "not-allowed" : "pointer" }}
+              >
+                Cancel
+              </button>
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--fg-faint)", marginTop: "14px", textAlign: "center", lineHeight: "1.4" }}>
+              <b>How it works:</b> Emails are delivered programmatically in the background directly from the admin email address (via SMTP) using a secure Firebase Cloud Function. Student privacy is fully protected since all emails are hidden via unified BCC dispatch!
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===============================================================
+// ADMIN — Saved contacts table (Marketing). Owns the search box
+// locally so typing in it never re-renders DashboardView; memoized
+// so dashboard re-renders skip the (up to 1,000-row) table.
+// ===============================================================
+const SavedContactsTable = React.memo(function SavedContactsTable({ savedContacts, onRemove }) {
+  const [savedSearch, setSavedSearch] = useState("");
+  return (
+    <React.Fragment>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "13px", color: "var(--fg-dim)" }}><b style={{ color: "var(--c-emerald)" }}>{savedContacts.length}</b> saved contact{savedContacts.length === 1 ? "" : "s"}</span>
+        <input className="form-input" style={{ maxWidth: "240px", padding: "8px 12px" }} placeholder="Search name / email…" value={savedSearch} onChange={(e) => setSavedSearch(e.target.value)} />
+      </div>
+
+      <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+        <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr style={{ textAlign: "left" }}>
+                {["Name", "Email", "Phone", "Source", ""].map((h, i) => (
+                  <th key={i} style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {savedContacts
+                .filter((c) => { const q = savedSearch.trim().toLowerCase(); if (!q) return true; return (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q); })
+                .slice(0, 1000)
+                .map((c) => (
+                  <tr key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
+                    <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{c.name || "—"}</td>
+                    <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.email}</td>
+                    <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.phone || "—"}</td>
+                    <td style={{ padding: "10px 14px", color: "var(--fg-faint)", fontSize: "12px" }}>{c.source || "—"}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                      <button type="button" onClick={() => onRemove(c.id)} title="Remove contact" style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", fontSize: "14px" }}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+});
+
+
+// ===============================================================
+// STAFF / ADMIN DASHBOARD TAB VIEW
+// ===============================================================
+
+function DashboardView({ user, role, onLogout }) {
+  const [sessions, setSessions] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  // Schedule/Edit form fields + zoom-link manager live in
+  // ScheduleMasterclassPanel (local state) so typing there never
+  // re-renders this whole component.
   const [editSessionId, setEditSessionId] = useState("");
   const [editSessionIsMc, setEditSessionIsMc] = useState(false);
   const [selectedRosterClassId, setSelectedRosterClassId] = useState("all");
@@ -2255,17 +3042,31 @@ function DashboardView({ user, role, onLogout }) {
   const [dripTestError, setDripTestError] = useState("");
   const [expandedTestLead, setExpandedTestLead] = useState(null);
 
-  // Form fields (sessions)
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");            // "Offering Price" — what attendees pay (0 = Free)
-  const [originalPrice, setOriginalPrice] = useState(""); // "Actual Price" — struck-through anchor
-  const [dateTime, setDateTime] = useState("");
-  const [instructor, setInstructor] = useState("Balaji Chippada");
-  const [videoUrl, setVideoUrl] = useState("");
-  
-  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
+
+  // Nav scroll-spy — highlights the section pill you're scrolled into.
+  // DOM-only class toggles (no state): this component must never re-render
+  // on scroll (see CLAUDE.md DashboardView warning). Sections mount late
+  // (Firestore snapshots), so links/sections are re-queried per frame.
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const links = document.querySelectorAll('.dashboard__nav a');
+        let activeId = '';
+        links.forEach((a) => {
+          const sec = document.getElementById((a.getAttribute('href') || '').slice(1));
+          if (sec && sec.getBoundingClientRect().top <= window.innerHeight * 0.35) activeId = sec.id;
+        });
+        links.forEach((a) => a.classList.toggle('is-active', (a.getAttribute('href') || '') === '#' + activeId));
+      });
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+  }, []);
 
   // ── AI Masterclass Creation State ──
   const [masterclasses, setMasterclasses] = useState([]);
@@ -2288,20 +3089,16 @@ function DashboardView({ user, role, onLogout }) {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastSegmentName, setBroadcastSegmentName] = useState("");
   const [broadcastList, setBroadcastList] = useState([]);
-  const [broadcastSubject, setBroadcastSubject] = useState("");
-  const [broadcastBody, setBroadcastBody] = useState("");
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState("general");
-  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
-  const [broadcastError, setBroadcastError] = useState("");
-  const [broadcastSuccess, setBroadcastSuccess] = useState("");
-  const [broadcastCampaignId, setBroadcastCampaignId] = useState("");
-  const [broadcastIsMock, setBroadcastIsMock] = useState(false);
+  // Subject/body/template/sending state lives in <BroadcastModal> (local
+  // state) so typing in the modal never re-renders this whole component.
 
   // ── Bulk Email from Spreadsheet (Name/Email/Phone upload) ──
   // bulkRows accumulates across multiple uploaded files (deduped by email);
   // bulkFiles tracks each file added and how many recipients it contributed.
   const [bulkRows, setBulkRows] = useState([]);          // [{ name, email, phone }]
   const [bulkFiles, setBulkFiles] = useState([]);        // [{ name, added }]
+  // Optional attachment sent with every email in the campaign (≤5MB, base64).
+  const [bulkAttachment, setBulkAttachment] = useState(null); // { filename, contentType, dataBase64, size }
   const [bulkNote, setBulkNote] = useState("");          // feedback from the last upload
   const [bulkParsing, setBulkParsing] = useState(false);
   const [bulkParseError, setBulkParseError] = useState("");
@@ -2313,48 +3110,15 @@ function DashboardView({ user, role, onLogout }) {
 
   // ── Saved marketing contacts (persisted from spreadsheet sends; reusable) ──
   const [savedContacts, setSavedContacts] = useState([]);   // [{ id(email), name, email, phone, source, lastEmailedAt, emailCount }]
-  const [savedSearch, setSavedSearch] = useState("");
-  // Saved-contacts composer fields also live in <EmailComposer> local state.
+  // Search box lives in <SavedContactsTable> (local state); composer
+  // fields live in <EmailComposer> local state.
   const [savedSending, setSavedSending] = useState(false);
   const [savedError, setSavedError] = useState("");
   const [savedSuccess, setSavedSuccess] = useState("");
 
-  // ── Roadmap Video Linker (Admin) ──
-  const [roadmapVideoDocs, setRoadmapVideoDocs] = useState([]);
-  const [rvPhaseId, setRvPhaseId] = useState(1);
-  const [rvModules, setRvModules] = useState([]);
-  const [rvUrl, setRvUrl] = useState("");
-  const [rvTitle, setRvTitle] = useState("");
-  const [rvStartTs, setRvStartTs] = useState("");
-  const [rvKind, setRvKind] = useState("deep-dive");
-  const [rvCodeUrl, setRvCodeUrl] = useState("");
-  const [rvSaving, setRvSaving] = useState(false);
-  const [rvFilter, setRvFilter] = useState("");
-  // Per-video "Link to code" (videoId → codeUrl), works for any video incl.
-  // individual videos inside a playlist.
-  const [vcUrl, setVcUrl] = useState("");
-  const [vcCodeUrl, setVcCodeUrl] = useState("");
-  const [vcSaving, setVcSaving] = useState(false);
-  const [videoCodeDocs, setVideoCodeDocs] = useState([]);
-
-  const CAMPAIGN_TEMPLATES = {
-    general: {
-      subject: "Exclusive Masterclass Invite: Command the AI Engineering Frontier",
-      body: `Hello,\n\nI wanted to reach out and invite you to our upcoming live Masterclasses at The Agent Engineer. \n\nWhether you're just starting or looking to ship production-scale multi-agent systems, our curriculum covers the exact skills demanded by elite engineering teams today.\n\nCheck out our interactive syllabus and reserve your seat here:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada\nTutor & AI Architect, The Agent Engineer`
-    },
-    cold_leads: {
-      subject: "Unlock Your Career Transition: Special AI Coach Registration Offer",
-      body: `Hello,\n\nI noticed you created an account on our AI Engineer Roadmap platform but haven't reserved your seat for an upcoming cohort yet.\n\nTo help you kickstart your journey, I'm offering an exclusive free entry / special seat reservation to our next live session. Command the tools, LangGraph orchestrations, and LLMOps that are reshaping technology.\n\nSee what's coming up and secure your access:\nhttps://balajichippada.com/\n\nTo your success,\nBalaji Chippada`
-    },
-    abandoned: {
-      subject: "Finish Setting Up Your Seat: LangGraph & Agentic AI Masterclass",
-      body: `Hi there,\n\nIt looks like you started booking a seat for our upcoming Masterclass but didn't complete the reservation. \n\nSeats in our live cohorts are strictly limited to ensure personal feedback and high-quality coaching for every student. I'd love to help you cross the finish line and master production-grade RAG and agentic tools.\n\nResume your registration and secure your seat here:\nhttps://balajichippada.com/\n\nIf you ran into any payment issues or have questions, just reply directly to this email!\n\nBest,\nBalaji Chippada`
-    },
-    professional: {
-      subject: "Enterprise LLMOps & LangGraph: Advanced Masterclasses for Pros",
-      body: `Hello,\n\nAs a working professional on our platform, you understand the speed at which AI engineering is moving. Simply prompting models is no longer enough — the industry is hiring engineers who can build robust, cost-effective, multi-agent frameworks with strict guardrails.\n\nOur upcoming sessions focus on advanced enterprise orchestration, custom Tool/MCP pipelines, and multi-agent LangGraph architectures.\n\nExplore our professional cohort curriculum:\nhttps://balajichippada.com/\n\nBest regards,\nBalaji Chippada`
-    }
-  };
+  // Roadmap Video Linker + Per-video code links state lives in
+  // RoadmapVideosAdminPanel / VideoCodeLinksAdminPanel — keeping form
+  // state out of DashboardView so typing doesn't re-render the world.
 
   const openBroadcastModal = (list, segmentName) => {
     if (list.length === 0) {
@@ -2363,29 +3127,7 @@ function DashboardView({ user, role, onLogout }) {
     }
     setBroadcastList(list);
     setBroadcastSegmentName(segmentName);
-    setIsSendingBroadcast(false);
-    setBroadcastError("");
-    setBroadcastSuccess("");
-    setBroadcastCampaignId("");
-    setBroadcastIsMock(false);
-    
-    let defaultKey = "general";
-    if (segmentName === "Cold Leads") defaultKey = "cold_leads";
-    else if (segmentName === "Abandoned Checkouts" || segmentName === "Abandoned Checkout") defaultKey = "abandoned";
-    else if (segmentName === "Working Professionals") defaultKey = "professional";
-    
-    setSelectedTemplateKey(defaultKey);
-    setBroadcastSubject(CAMPAIGN_TEMPLATES[defaultKey].subject);
-    setBroadcastBody(CAMPAIGN_TEMPLATES[defaultKey].body);
     setShowBroadcastModal(true);
-  };
-
-  const handleTemplateChange = (key) => {
-    setSelectedTemplateKey(key);
-    if (CAMPAIGN_TEMPLATES[key]) {
-      setBroadcastSubject(CAMPAIGN_TEMPLATES[key].subject);
-      setBroadcastBody(CAMPAIGN_TEMPLATES[key].body);
-    }
   };
 
   // Parse an uploaded spreadsheet (.xlsx/.xls/.csv) into recipients. Columns are
@@ -2456,9 +3198,36 @@ function DashboardView({ user, role, onLogout }) {
     }
   };
 
+  // Read the optional attachment as base64. 5MB cap keeps the callable payload
+  // well under Firebase's 10MB limit even with a 5,000-row recipient list.
+  const handleBulkAttachment = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setBulkError("");
+    if (file.size > 5 * 1024 * 1024) {
+      setBulkError(`“${file.name}” is ${(file.size / (1024 * 1024)).toFixed(1)}MB — attachments are capped at 5MB.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      // result is "data:<mime>;base64,<data>" — keep only the base64 payload.
+      const dataBase64 = String(reader.result).split(",")[1] || "";
+      setBulkAttachment({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        dataBase64,
+        size: file.size,
+      });
+    };
+    reader.onerror = () => setBulkError(`Could not read “${file.name}”.`);
+    reader.readAsDataURL(file);
+  };
+
   const handleClearBulkList = () => {
     setBulkRows([]);
     setBulkFiles([]);
+    setBulkAttachment(null);
     setBulkNote("");
     setBulkParseError("");
     setBulkError("");
@@ -2476,10 +3245,10 @@ function DashboardView({ user, role, onLogout }) {
     return () => unsub();
   }, []);
 
-  const handleRemoveSavedContact = async (email) => {
+  const handleRemoveSavedContact = React.useCallback(async (email) => {
     try { await db.collection('marketingContacts').doc(email).delete(); }
     catch (err) { setSavedError(err.message || 'Failed to remove contact.'); }
-  };
+  }, []);
 
   // Re-email the entire saved audience — reuses the same fan-out + persistence.
   // Receives the composer's fields; returns true so the composer clears itself.
@@ -2538,6 +3307,13 @@ function DashboardView({ user, role, onLogout }) {
         body,
         label: bulkFiles.map((f) => f.name).join(", ") || "Spreadsheet upload",
         recipients: bulkRows.map((r) => ({ name: r.name, email: r.email, phone: r.phone })),
+        ...(bulkAttachment && {
+          attachment: {
+            filename: bulkAttachment.filename,
+            contentType: bulkAttachment.contentType,
+            dataBase64: bulkAttachment.dataBase64,
+          },
+        }),
         // datetime-local is in the admin's local timezone; send as absolute UTC.
         ...(event && {
           event: {
@@ -2553,6 +3329,7 @@ function DashboardView({ user, role, onLogout }) {
         setBulkSuccess(`Queued ${result.queued} email${result.queued === 1 ? "" : "s"} in ${result.batches} batch${result.batches === 1 ? "" : "es"}. Track delivery in the Email Tasks section below (job ${result.jobId}).`);
         setBulkRows([]);
         setBulkFiles([]);
+        setBulkAttachment(null);
         setBulkNote("");
         return true;
       }
@@ -2597,140 +3374,6 @@ function DashboardView({ user, role, onLogout }) {
       )}
     </div>
   ), [bulkRows]);
-
-  const savedContactsTable = React.useMemo(() => (
-    <div style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
-      <div style={{ maxHeight: "320px", overflowY: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          <thead>
-            <tr style={{ textAlign: "left" }}>
-              {["Name", "Email", "Phone", "Source", ""].map((h, i) => (
-                <th key={i} style={{ padding: "10px 14px", color: "var(--fg-faint)", fontWeight: 600, position: "sticky", top: 0, background: "var(--bg-elev)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {savedContacts
-              .filter((c) => { const q = savedSearch.trim().toLowerCase(); if (!q) return true; return (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q); })
-              .slice(0, 1000)
-              .map((c) => (
-                <tr key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
-                  <td style={{ padding: "10px 14px", color: "var(--fg)" }}>{c.name || "—"}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.email}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--fg-dim)", fontFamily: "JetBrains Mono" }}>{c.phone || "—"}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--fg-faint)", fontSize: "12px" }}>{c.source || "—"}</td>
-                  <td style={{ padding: "10px 14px", textAlign: "right" }}>
-                    <button type="button" onClick={() => handleRemoveSavedContact(c.id)} title="Remove contact" style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", fontSize: "14px" }}>✕</button>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  ), [savedContacts, savedSearch]);
-
-  const handleLaunchBroadcast = async () => {
-    const emails = Array.from(new Set(
-      broadcastList
-        .map(u => (u.email || u.studentEmail || '').toLowerCase().trim())
-        .filter(Boolean)
-    ));
-    
-    if (emails.length === 0) {
-      setBroadcastError("No valid recipient email addresses found.");
-      return;
-    }
-
-    setIsSendingBroadcast(true);
-    setBroadcastError("");
-    setBroadcastSuccess("");
-    setBroadcastCampaignId("");
-    setBroadcastIsMock(false);
-
-    try {
-      if (!functions) {
-        throw new Error("Firebase functions service is not initialized on this platform.");
-      }
-
-      const sendEmailCall = functions.httpsCallable("sendAudienceEmail");
-      const response = await sendEmailCall({
-        emails: emails,
-        subject: broadcastSubject,
-        body: broadcastBody,
-        segmentName: broadcastSegmentName
-      });
-
-      const result = response.data;
-      if (result && result.success) {
-        setBroadcastSuccess(result.message || "Audience broadcast dispatched successfully.");
-        setBroadcastCampaignId(result.campaignId || "");
-        setBroadcastIsMock(!!result.isMock);
-      } else {
-        throw new Error("An unexpected error occurred: response did not indicate success.");
-      }
-    } catch (err) {
-      console.warn("Direct programmatic email dispatch failed, executing client-side fallback:", err);
-      
-      try {
-        const currentUser = auth ? auth.currentUser : null;
-        let callerName = "Admin Staff";
-        if (currentUser && db) {
-          try {
-            const userDoc = await db.collection("users").doc(currentUser.uid).get();
-            if (userDoc.exists) {
-              const userData = userDoc.data();
-              callerName = userData.name || userData.email || currentUser.uid;
-            } else {
-              callerName = currentUser.email || currentUser.uid;
-            }
-          } catch (uErr) {
-            console.error("Failed to load user document details:", uErr);
-            callerName = currentUser.email || currentUser.uid;
-          }
-        }
-
-        let campaignDocId = "";
-        if (db) {
-          const campaignDocRef = await db.collection("email_campaigns").add({
-            segmentName: broadcastSegmentName || "Custom Audience",
-            subject: broadcastSubject,
-            body: broadcastBody,
-            recipientCount: emails.length,
-            senderEmail: currentUser ? currentUser.email : "simulated-sender@theagentengineer.app",
-            status: "completed_via_client",
-            isMock: false,
-            sentAt: firebase.firestore.FieldValue.serverTimestamp(),
-            sentBy: callerName,
-            sparkPlanFallback: true
-          });
-          campaignDocId = campaignDocRef.id;
-        }
-
-        // Prefill subject/body and bcc in the native client
-        const subjectEsc = encodeURIComponent(broadcastSubject);
-        const bodyEsc = encodeURIComponent(broadcastBody);
-        const bccEsc = encodeURIComponent(emails.join(","));
-        const mailtoUrl = `mailto:?bcc=${bccEsc}&subject=${subjectEsc}&body=${bodyEsc}`;
-        window.open(mailtoUrl, '_blank');
-
-        setBroadcastSuccess(
-          campaignDocId
-            ? `Audience campaign logged under ID ${campaignDocId}! Since this project's production backend is running on the Firebase Spark Plan, your default mail client has been opened to send the emails securely.`
-            : `Audience campaign generated successfully! Your default mail client has been opened to send the emails securely.`
-        );
-        if (campaignDocId) {
-          setBroadcastCampaignId(campaignDocId);
-        }
-        setBroadcastIsMock(false);
-      } catch (fallbackErr) {
-        console.error("Critical fallback failure:", fallbackErr);
-        setBroadcastError(`Failed to send broadcast: ${err.message || err}. (Fallback error: ${fallbackErr.message || fallbackErr})`);
-      }
-    } finally {
-      setIsSendingBroadcast(false);
-    }
-  };
 
   const runDashboardAutomationTest = async () => {
     if (!db) {
@@ -3005,301 +3648,17 @@ function DashboardView({ user, role, onLogout }) {
     return () => unsubscribe();
   }, []);
 
-  // Load admin-managed roadmap video links
-  useEffect(() => {
-    if (!db) return;
-    const unsub = db.collection('roadmapVideos').onSnapshot((snap) => {
-      const list = [];
-      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-      setRoadmapVideoDocs(list);
-    }, () => setRoadmapVideoDocs([]));
-    return () => unsub();
-  }, []);
-
-  // Load per-video code links (videoCodeLinks/{videoId})
-  useEffect(() => {
-    if (!db) return;
-    const unsub = db.collection('videoCodeLinks').onSnapshot((snap) => {
-      const list = [];
-      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-      setVideoCodeDocs(list);
-    }, () => setVideoCodeDocs([]));
-    return () => unsub();
-  }, []);
-
-  const handleSaveVideoCodeLink = async (e) => {
-    e.preventDefault();
-    const H = window.ROADMAP_VIDEO_HELPERS || {};
-    const videoId = H.parseYouTubeId ? H.parseYouTubeId(vcUrl.trim()) : null;
-    const code = vcCodeUrl.trim();
-    if (!videoId) { setStatus({ type: 'error', message: 'Paste a valid YouTube VIDEO URL (a single video, not a playlist).' }); return; }
-    if (!code) { setStatus({ type: 'error', message: 'Enter the code (repo) URL.' }); return; }
-    setVcSaving(true);
-    try {
-      await db.collection('videoCodeLinks').doc(videoId).set({
-        videoId,
-        codeUrl: code,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedBy: user?.uid || '',
-      }, { merge: true });
-      setVcUrl('');
-      setVcCodeUrl('');
-      setStatus({ type: 'success', message: `Code link saved for video ${videoId}.` });
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Failed to save code link.' });
-    } finally {
-      setVcSaving(false);
-    }
-  };
-
-  const handleDeleteVideoCodeLink = async (videoId) => {
-    try { await db.collection('videoCodeLinks').doc(videoId).delete(); }
-    catch (err) { setStatus({ type: 'error', message: err.message || 'Failed to remove code link.' }); }
-  };
-
-  const rvPhaseSections = (window.ROADMAP || []).find((p) => p.id === rvPhaseId)?.sections || [];
-
-  const handleRvPhaseChange = (pid) => {
-    setRvPhaseId(Number(pid));
-    setRvModules([]);
-  };
-
-  const toggleRvModule = (modN) => {
-    setRvModules((prev) => (
-      prev.includes(modN) ? prev.filter((m) => m !== modN) : [...prev, modN]
-    ));
-  };
-
-  const fetchYouTubeTitle = async (urlOrId, isPlaylist) => {
-    try {
-      const url = isPlaylist
-        ? (urlOrId.includes('list=') ? urlOrId : `https://www.youtube.com/playlist?list=${urlOrId}`)
-        : (urlOrId.includes('youtube') ? urlOrId : `https://www.youtube.com/watch?v=${urlOrId}`);
-      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
-      if (res.ok) {
-        const data = await res.json();
-        return data.title || '';
-      }
-    } catch (_) {}
-    return '';
-  };
-
-  const handleLinkRoadmapVideo = async (e) => {
-    e.preventDefault();
-    const H = window.ROADMAP_VIDEO_HELPERS || {};
-    const playlistId = H.parseYouTubePlaylistId ? H.parseYouTubePlaylistId(rvUrl) : null;
-    const youtubeId = playlistId ? null : (H.parseYouTubeId ? H.parseYouTubeId(rvUrl) : null);
-    if (!youtubeId && !playlistId) {
-      setStatus({ type: 'error', message: 'Paste a valid YouTube video or playlist URL.' });
-      return;
-    }
-    if (!rvModules.length) {
-      setStatus({ type: 'error', message: 'Select at least one module.' });
-      return;
-    }
-    setRvSaving(true);
-    try {
-      let title = rvTitle.trim();
-      const kind = rvKind === 'playlist' || playlistId ? 'playlist' : rvKind;
-      if (!title) title = await fetchYouTubeTitle(rvUrl, Boolean(playlistId));
-      if (!title) title = playlistId ? `YouTube playlist ${playlistId}` : `YouTube video ${youtubeId}`;
-      const startSec = H.parseTimestamp ? H.parseTimestamp(rvStartTs) : 0;
-      await db.collection('roadmapVideos').add({
-        youtubeId: youtubeId || null,
-        playlistId: playlistId || null,
-        title,
-        kind,
-        phaseId: rvPhaseId,
-        capstoneId: null,
-        modules: rvModules.slice().sort(),
-        startSec,
-        endSec: null,
-        codeUrl: rvCodeUrl.trim() || null,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: user?.uid || '',
-      });
-      setRvUrl('');
-      setRvTitle('');
-      setRvStartTs('');
-      setRvCodeUrl('');
-      setRvModules([]);
-      setStatus({ type: 'success', message: 'Video linked to roadmap modules.' });
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Failed to save video link.' });
-    } finally {
-      setRvSaving(false);
-    }
-  };
-
-  const handleDeleteRoadmapVideo = async (docId, title) => {
-    if (!window.confirm(`Remove video link "${title}"?`)) return;
-    try {
-      await db.collection('roadmapVideos').doc(docId).delete();
-      setStatus({ type: 'success', message: 'Video link removed.' });
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Failed to delete.' });
-    }
-  };
-
-  // Handle selected session for editing
+  // Track which session is being edited; ScheduleMasterclassPanel derives
+  // its own field values from props (remounted via key on target change).
   const handleSelectSessionToEdit = (id, isMcCollection = false) => {
     setEditSessionId(id);
     setEditSessionIsMc(isMcCollection);
-    setZoomEditOpen(false); // collapse the email editor when switching targets
-    if (!id) {
-      // Reset form to blank creation
-      setTitle("");
-      setDescription("");
-      setPrice("");
-      setOriginalPrice("");
-      setDateTime("");
-      setVideoUrl("");
-      return;
-    }
-    let session = isMcCollection 
-      ? masterclasses.find(m => m.id === id)
-      : sessions.find(s => s.id === id);
-      
-    // If not found in Firestore lists, check if it's the featured config masterclass
-    if (!session && V2_CONFIG_MASTERCLASS && id === V2_CONFIG_MASTERCLASS.id) {
-      session = {
-        title: V2_CONFIG_MASTERCLASS.title,
-        price: V2_CONFIG_MASTERCLASS.price,
-        originalPrice: V2_CONFIG_MASTERCLASS.originalPrice,
-        dateTime: V2_CONFIG_MASTERCLASS.dateTime,
-        description: V2_CONFIG_MASTERCLASS.about || V2_CONFIG_MASTERCLASS.subtitle || "",
-        videoUrl: V2_CONFIG_MASTERCLASS.videoUrl || "",
-      };
-    }
-
-    if (session) {
-      setTitle(session.title || "");
-      setDescription(session.description || session.rawSyllabus || "");
-      setPrice(session.price !== undefined ? session.price : "");
-      setOriginalPrice(session.originalPrice !== undefined ? session.originalPrice : "");
-      setVideoUrl(session.videoUrl || session.youtubeVideoId || session.videoId || "");
-      
-      // format to datetime-local expected string 'YYYY-MM-DDTHH:MM'
-      try {
-        const dateObj = new Date(session.dateTime);
-        if (!isNaN(dateObj.getTime())) {
-          const tzoffset = dateObj.getTimezoneOffset() * 60000; //offset in milliseconds
-          const localISOTime = (new Date(dateObj.getTime() - tzoffset)).toISOString().slice(0, 16);
-          setDateTime(localISOTime);
-        } else {
-          setDateTime("");
-        }
-      } catch(e) {
-        setDateTime("");
-      }
-    }
   };
 
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    if (!db) {
-      setStatus({ type: "error", message: "Firestore database not loaded." });
-      return;
-    }
-
-    // NB: a free masterclass has price 0 — don't treat 0 as "missing" (!0 === true).
-    const priceEmpty = price === "" || price === null || price === undefined;
-    if (!title || !description || priceEmpty || !dateTime) {
-      setStatus({ type: "error", message: "Please fill in all required fields." });
-      return;
-    }
-
-    setLoading(true);
-    setStatus({ type: "", message: "" });
-
-    try {
-      const priceNum = parseFloat(price);
-      if (isNaN(priceNum) || priceNum < 0) {
-        throw new Error("Offering price must be a valid non-negative number.");
-      }
-
-      // "Actual Price" is optional — empty means "no anchor" (stored as 0, so
-      // nothing is struck through). When set it must be a non-negative number.
-      const originalPriceEmpty = originalPrice === "" || originalPrice === null || originalPrice === undefined;
-      const originalPriceNum = originalPriceEmpty ? 0 : parseFloat(originalPrice);
-      if (isNaN(originalPriceNum) || originalPriceNum < 0) {
-        throw new Error("Actual price must be a valid non-negative number.");
-      }
-
-      // Convert date to generic ISO string format
-      const formattedDate = new Date(dateTime).toISOString();
-
-      if (editSessionId) {
-        // Mode: Update Existing Session
-        const targetCollection = editSessionIsMc ? "masterclasses" : "sessions";
-        const updatePayload = {
-          title,
-          price: priceNum,
-          originalPrice: originalPriceNum,
-          dateTime: formattedDate,
-          instructor,
-          videoUrl: videoUrl.trim()
-        };
-        if (editSessionIsMc) {
-          updatePayload.rawSyllabus = description;
-        } else {
-          updatePayload.description = description;
-        }
-
-        const docRef = db.collection(targetCollection).doc(editSessionId);
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) {
-          updatePayload.deleted = false;
-          updatePayload.status = "active";
-          updatePayload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-          if (editSessionIsMc && V2_CONFIG_MASTERCLASS) {
-            updatePayload.syllabus = V2_CONFIG_MASTERCLASS.curriculum ? V2_CONFIG_MASTERCLASS.curriculum.map((c, idx) => ({
-              index: `1.${idx + 1}`,
-              topicTitle: c.title,
-              subTopics: c.points
-            })) : [];
-          }
-          await docRef.set(updatePayload);
-        } else {
-          // If it exists, make sure we mark it as active / not deleted
-          updatePayload.deleted = false;
-          updatePayload.status = "active";
-          await docRef.update(updatePayload);
-        }
-        
-        setStatus({ type: "success", message: `${editSessionIsMc ? "AI Masterclass" : "Session"} updated successfully!` });
-      } else {
-        // Mode: Create New Session
-        await db.collection("sessions").add({
-          title,
-          description,
-          price: priceNum,
-          originalPrice: originalPriceNum,
-          dateTime: formattedDate,
-          instructor,
-          videoUrl: videoUrl.trim(),
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        setStatus({ type: "success", message: "New Masterclass scheduled successfully!" });
-
-        // Reset form
-        setTitle("");
-        setDescription("");
-        setPrice("");
-        setOriginalPrice("");
-        setDateTime("");
-        setVideoUrl("");
-      }
-    } catch (err) {
-      // Surface the raw error to the console so the exact Firestore/permission
-      // reason is visible when debugging a failed save.
-      console.error("Masterclass save failed:", err);
-      setStatus({ type: "error", message: (err && err.message) || "Failed to commit session to database." });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const cancelEdit = React.useCallback(() => {
+    setEditSessionId("");
+    setEditSessionIsMc(false);
+  }, []);
 
   // Count completed registrations for a session (used for cancel confirmations).
   const completedRegCount = (sessionId) =>
@@ -3476,57 +3835,9 @@ ${mcRawSyllabus}`;
   // registrants get it automatically in their confirmation email.
   // Default zoom-link email shown in the editor. {{name}} is substituted with
   // each student's name server-side.
-  const buildDefaultZoomEmail = (mcTitle, mcDateTime, zoomLink) => {
-    const when = (typeof formatMcFullDateTime === 'function' && mcDateTime)
-      ? formatMcFullDateTime(mcDateTime)
-      : (mcDateTime ? new Date(mcDateTime).toLocaleString('en-IN') : 'TBA');
-    return {
-      subject: `Your Zoom link for ${mcTitle || 'the masterclass'} 🔗`,
-      body: `Hi {{name}},\n\n` +
-        `Here's your private Zoom joining link for ${mcTitle || 'the masterclass'}:\n\n` +
-        `Class: ${mcTitle || 'Masterclass'}\n` +
-        `Date & Time: ${when}\n` +
-        `Zoom link: ${zoomLink || '<add the link above>'}\n\n` +
-        `Save this email — we'll also send you a reminder on each of the 2 days before the session.\n\n` +
-        `See you live,\nBalaji Chippada Masterclass\nteam@balajichippada.com`,
-    };
-  };
-
-  const handleSendZoom = async (sessionId, registeredCount) => {
-    const zoomLink = (zoomInputs[sessionId] || '').trim();
-    if (!zoomLink) {
-      setZoomMsg(m => ({ ...m, [sessionId]: '⚠️ Enter a Zoom link first.' }));
-      return;
-    }
-    if (registeredCount > 0 && !window.confirm(`Email this Zoom link to ${registeredCount} registered student(s) now?`)) return;
-    setZoomBusy(b => ({ ...b, [sessionId]: true }));
-    setZoomMsg(m => ({ ...m, [sessionId]: '' }));
-    try {
-      const call = functions.httpsCallable('sendZoomLinkToRegistrants');
-      // Include the edited subject/body when the editor is open and filled.
-      const payload = { sessionId, zoomLink };
-      if (zoomEditOpen && zoomBody.trim()) {
-        payload.customSubject = zoomSubject.trim();
-        payload.customBody = zoomBody;
-      }
-      const res = await call(payload);
-      const d = (res && res.data) || {};
-      setZoomMsg(m => ({
-        ...m,
-        [sessionId]: d.queued > 0
-          ? `✓ Saved. Queued ${d.queued} email(s) — they'll send in the background over the next few minutes.`
-          : (d.message || '✓ Saved.'),
-      }));
-    } catch (err) {
-      setZoomMsg(m => ({ ...m, [sessionId]: `⚠️ ${err.message || 'Failed to send.'}` }));
-    } finally {
-      setZoomBusy(b => ({ ...b, [sessionId]: false }));
-    }
-  };
-
   // Masterclasses that have at least one registration (covers both Firestore
   // and config-only masterclasses, since both produce registration docs).
-  const sessionsWithRegs = (() => {
+  const sessionsWithRegs = React.useMemo(() => {
     const map = new Map();
     (registrations || []).forEach(r => {
       if (!r.sessionId) return;
@@ -3538,10 +3849,10 @@ ${mcRawSyllabus}`;
       if (r.zoomLink && !e.zoomLink) e.zoomLink = r.zoomLink;
     });
     return [...map.values()];
-  })();
+  }, [registrations]);
 
   // Compute all scheduled and virtual default config masterclasses/sessions in a unified list (excluding soft deleted ones)
-  const combinedClasses = (() => {
+  const combinedClasses = React.useMemo(() => {
     const list = [];
     const seen = new Set();
     
@@ -3588,7 +3899,7 @@ ${mcRawSyllabus}`;
       }
     });
     return list;
-  })();
+  }, [masterclasses, sessions]);
 
   // Compute active registrations (excluding those for soft-deleted sessions/masterclasses)
   const activeRegistrations = registrations.filter(r => {
@@ -3615,7 +3926,7 @@ ${mcRawSyllabus}`;
   const totalSeats = filteredRegistrations
     .filter(r => r.status === 'completed').length;
 
-  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase());
 
   // ── Marketing Segmentation & Deduplication Computations ──
@@ -3770,145 +4081,14 @@ ${mcRawSyllabus}`;
         <a href="#dash-classes">Masterclasses</a>
         <a href="#mc-schedule-form">{isAdmin ? 'Schedule' : 'Overview'}</a>
         {isAdmin && <a href="#dash-marketing">Marketing</a>}
-        {isAdmin && <a href="#dash-enquiries">Enquiries</a>}
+        {isAdmin && <a href="#dash-enquiries">Enquiries<EnquiryCountBadge /></a>}
       </nav>
 
-{/* ── Roadmap Video Linker (Admin) ── */}
-      {isAdmin && (
-        <div id="dash-videos" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
-          <h2 className="dashboard__panel-title">Roadmap Videos</h2>
-          <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)' }}>
-            Link YouTube videos to phases and modules. Changes appear on the Full Roadmap tab immediately.
-          </p>
-          <form className="roadmap-admin-form" onSubmit={handleLinkRoadmapVideo}>
-            <div className="form-group">
-              <label className="form-label">Phase</label>
-              <select className="form-select" value={rvPhaseId} onChange={(e) => handleRvPhaseChange(e.target.value)}>
-                {(window.ROADMAP || []).map((p) => (
-                  <option key={p.id} value={p.id}>Phase {String(p.id).padStart(2, '0')} · {p.title}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Modules (select all covered in this video)</label>
-              <div className="roadmap-admin-modules">
-                {rvPhaseSections.map((s) => (
-                  <label key={s.n} className="roadmap-admin-module-check">
-                    <input
-                      type="checkbox"
-                      checked={rvModules.includes(s.n)}
-                      onChange={() => toggleRvModule(s.n)}
-                    />
-                    <span>{s.n} · {s.title}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label className="form-label">YouTube URL</label>
-                <input className="form-input" value={rvUrl} onChange={(e) => setRvUrl(e.target.value)} placeholder="Video or playlist URL" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Title (optional — auto-fetched)</label>
-                <input className="form-input" value={rvTitle} onChange={(e) => setRvTitle(e.target.value)} placeholder="Video title" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Start timestamp (MM:SS)</label>
-                <input className="form-input" value={rvStartTs} onChange={(e) => setRvStartTs(e.target.value)} placeholder="14:38" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Kind</label>
-                <select className="form-select" value={rvKind} onChange={(e) => setRvKind(e.target.value)}>
-                  <option value="deep-dive">Deep dive</option>
-                  <option value="playlist">Playlist</option>
-                  <option value="overview">Overview</option>
-                  <option value="capstone">Capstone</option>
-                  <option value="supplement">Supplement</option>
-                </select>
-              </div>
-              {rvKind !== 'playlist' && (
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Link to code (optional — this single video's GitHub / repo URL)</label>
-                  <input className="form-input" value={rvCodeUrl} onChange={(e) => setRvCodeUrl(e.target.value)} placeholder="https://github.com/…" />
-                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--fg-faint)', margin: '6px 0 0' }}>For playlists, add a code link per video in the “Per-video code links” section below.</p>
-                </div>
-              )}
-            </div>
-            <button type="submit" className="form-btn" disabled={rvSaving}>{rvSaving ? 'Linking…' : 'Link video'}</button>
-          </form>
+{/* ── Roadmap Video Linker (Admin) — own component so typing doesn't re-render DashboardView ── */}
+      {isAdmin && <RoadmapVideosAdminPanel user={user} />}
 
-          <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px' }}>Linked videos ({roadmapVideoDocs.length})</h3>
-              <input className="form-input" style={{ maxWidth: '220px' }} placeholder="Filter…" value={rvFilter} onChange={(e) => setRvFilter(e.target.value)} />
-            </div>
-            {roadmapVideoDocs.filter((d) => {
-              if (!rvFilter.trim()) return true;
-              const q = rvFilter.toLowerCase();
-              return (d.title || '').toLowerCase().includes(q) || (d.modules || []).join(' ').includes(q);
-            }).map((doc) => (
-              <div key={doc.id} className="roadmap-admin-list-item">
-                <div>
-                  <strong>{doc.title}</strong>
-                  <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px' }}>
-                    Phase {doc.phaseId} · {(doc.modules || []).join(', ')} · {doc.kind}
-                    {doc.playlistId ? ` · playlist ${doc.playlistId}` : ''}
-                    {doc.startSec ? ` · @ ${(window.ROADMAP_VIDEO_HELPERS || {}).formatTimestamp?.(doc.startSec) || doc.startSec}` : ''}
-                    {doc.codeUrl ? <> · <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>code ↗</a></> : ''}
-                  </div>
-                </div>
-                <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteRoadmapVideo(doc.id, doc.title)}>Remove</button>
-              </div>
-            ))}
-            {roadmapVideoDocs.length === 0 && (
-              <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No admin-linked videos yet. Seed data from videos.js still shows on the roadmap.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      
 {/* ── Per-video "Link to code" manager (Admins only) ── */}
-      {isAdmin && (
-        <div id="dash-code-links" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
-          <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
-          <p style={{ fontSize: '13px', color: 'var(--fg-dim)', margin: '0 0 16px' }}>
-            Add a “Link to code” button to any individual video by its URL — including each video inside a playlist. Paste the single video’s YouTube link (not the playlist link).
-          </p>
-          <form className="roadmap-admin-form" onSubmit={handleSaveVideoCodeLink}>
-            <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label className="form-label">YouTube video URL</label>
-                <input className="form-input" value={vcUrl} onChange={(e) => setVcUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Code (repo) URL</label>
-                <input className="form-input" value={vcCodeUrl} onChange={(e) => setVcCodeUrl(e.target.value)} placeholder="https://github.com/…" required />
-              </div>
-            </div>
-            <button type="submit" className="form-btn" disabled={vcSaving}>{vcSaving ? 'Saving…' : 'Save code link'}</button>
-          </form>
-
-          <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>Saved code links ({videoCodeDocs.length})</h3>
-            {videoCodeDocs.map((doc) => (
-              <div key={doc.id} className="roadmap-admin-list-item">
-                <div style={{ minWidth: 0 }}>
-                  <strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{doc.id}</strong>
-                  <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px', wordBreak: 'break-all' }}>
-                    <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>{doc.codeUrl}</a>
-                  </div>
-                </div>
-                <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteVideoCodeLink(doc.id)}>Remove</button>
-              </div>
-            ))}
-            {videoCodeDocs.length === 0 && (
-              <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No per-video code links yet.</p>
-            )}
-          </div>
-        </div>
-      )}
+      {isAdmin && <VideoCodeLinksAdminPanel user={user} />}
 
       {/* ── Sessions Management Section (Admins only) ── */}
       {isAdmin && (
@@ -3918,7 +4098,6 @@ ${mcRawSyllabus}`;
             if (combinedClasses.length === 0) {
               return (
                 <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--fg-faint)", border: "1px dashed var(--line)", borderRadius: "10px" }}>
-                  <div style={{ fontSize: "36px", marginBottom: "10px" }}>📭</div>
                   <p style={{ margin: 0, fontSize: "14px" }}>No masterclasses yet. Use the form below to schedule your first session.</p>
                 </div>
               );
@@ -3931,8 +4110,8 @@ ${mcRawSyllabus}`;
                   const isEditing = editSessionId === s.id;
                   return (
                     <div key={s.id} style={{
-                      background: isEditing ? "rgba(var(--c-violet-rgb, 138,92,246),0.08)" : "var(--bg-elev)",
-                      border: `1px solid ${isEditing ? "var(--c-violet, #8a5cf6)" : "var(--line)"}`,
+                      background: isEditing ? "color-mix(in srgb, var(--c-rust) 8%, var(--bg-elev))" : "var(--bg-elev)",
+                      border: `1px solid ${isEditing ? "var(--c-rust)" : "var(--line)"}`,
                       borderRadius: "12px",
                       padding: "16px",
                       display: "flex",
@@ -3943,27 +4122,27 @@ ${mcRawSyllabus}`;
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                         <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--fg)", lineHeight: 1.3, flex: 1 }}>{s.title}</h3>
                         {isEditing && (
-                          <span style={{ fontSize: "10px", background: "var(--c-violet, #8a5cf6)", color: "#fff", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap" }}>Editing</span>
+                          <span style={{ fontSize: "10px", background: "var(--c-rust)", color: "#fff", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap" }}>Editing</span>
                         )}
                       </div>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", color: "var(--fg-dim)" }}>👤 {s.instructor || "—"}</span>
+                        <span style={{ fontSize: "11px", color: "var(--fg-dim)" }}>{s.instructor || "—"}</span>
                         <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-amber, #f59e0b)" }}>₹{(s.price || 0).toLocaleString()}</span>
                         <span style={{ 
                           fontSize: "9px", 
-                          background: s.isMc ? "rgba(236, 72, 153, 0.1)" : "rgba(138, 92, 246, 0.1)", 
-                          color: s.isMc ? "var(--c-pink)" : "var(--c-violet, #8a5cf6)", 
+                          background: s.isMc ? "color-mix(in srgb, var(--c-rust) 12%, transparent)" : "color-mix(in srgb, var(--c-amber) 12%, transparent)",
+                          color: s.isMc ? "var(--c-rust)" : "var(--c-amber)", 
                           borderRadius: "4px", 
                           padding: "1px 6px",
                           fontWeight: "700",
                           textTransform: "uppercase"
                         }}>
-                          {s.isMc ? "✨ AI Masterclass" : "📅 Session"}
+                          {s.isMc ? "AI Masterclass" : "Session"}
                         </span>
                       </div>
                       {sessionDate && (
                         <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
-                          📅 {sessionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {sessionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           {" · "}{sessionDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       )}
@@ -3982,9 +4161,9 @@ ${mcRawSyllabus}`;
                             padding: "7px 12px",
                             fontSize: "12px",
                             fontWeight: "600",
-                            border: "1px solid var(--c-violet, #8a5cf6)",
-                            background: isEditing ? "var(--c-violet, #8a5cf6)" : "transparent",
-                            color: isEditing ? "#fff" : "var(--c-violet, #8a5cf6)",
+                            border: "1px solid var(--c-rust)",
+                            background: isEditing ? "var(--c-rust)" : "transparent",
+                            color: isEditing ? "#fff" : "var(--c-rust)",
                             borderRadius: "8px",
                             cursor: "pointer",
                             transition: "all 0.15s"
@@ -4006,7 +4185,7 @@ ${mcRawSyllabus}`;
                             transition: "all 0.15s"
                           }}
                         >
-                          🗑 Delete
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -4048,7 +4227,7 @@ ${mcRawSyllabus}`;
                       color: "var(--c-rust)", borderRadius: "8px", cursor: "pointer"
                     }}
                   >
-                    🗑 Delete
+                    Delete
                   </button>
                 </div>
               ))}
@@ -4060,221 +4239,16 @@ ${mcRawSyllabus}`;
       <div className="dashboard__grid" id="mc-schedule-form">
         {/* Left Panel: Form (Only visible to Administrators) */}
         {isAdmin ? (
-          <div className="dashboard__panel">
-            <h2 className="dashboard__panel-title">
-              {editSessionId ? "✎ Edit Masterclass" : "＋ Schedule New Masterclass"}
-            </h2>
-            
-            <form onSubmit={handleFormSubmit}>
-              <div className="form-group">
-                <label className="form-label">Session Name / Title *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. LangGraph Multi-Agent RAG Bootcamp"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Description & Syllabus *</label>
-                <textarea 
-                  className="form-input form-textarea" 
-                  placeholder="What will students learn in this session? Break it down..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Instructor Name</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={instructor}
-                  onChange={(e) => setInstructor(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="form-group">
-                  <label className="form-label">Actual Price (INR)</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    placeholder="e.g. 999"
-                    min="0"
-                    value={originalPrice}
-                    onChange={(e) => setOriginalPrice(e.target.value)}
-                  />
-                  <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>Shown struck-through on the homepage.</small>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Offering Price (INR) *</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    placeholder="e.g. 499 (or 0 for Free)"
-                    min="0"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    required
-                  />
-                  <small style={{ color: "var(--fg-faint)", fontSize: "11px" }}>What attendees pay. 0 shows as “Free”.</small>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Date & Time *</label>
-                <input
-                  type="datetime-local"
-                  className="form-input"
-                  value={dateTime}
-                  onChange={(e) => setDateTime(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Promo Video (YouTube URL or ID)</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. https://www.youtube.com/watch?v=Eze6D8jAMjI"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                />
-              </div>
-
-              {status.message && (
-                <div className={`status-box status-box--${status.type}`} style={{ marginBottom: "12px" }}>
-                  <span>{status.type === 'success' ? '✔' : '⚠'}</span>
-                  <span>{status.message}</span>
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button type="submit" className="form-btn" disabled={loading} style={{ flex: 1 }}>
-                  {loading ? "Saving..." : editSessionId ? "💾 Save Changes" : "🚀 Publish Masterclass"}
-                </button>
-                {editSessionId && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectSessionToEdit("")}
-                    style={{
-                      padding: "12px 16px",
-                      background: "transparent",
-                      border: "1px solid var(--line)",
-                      borderRadius: "10px",
-                      color: "var(--fg-dim)",
-                      cursor: "pointer",
-                      fontSize: "14px"
-                    }}
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {/* ── Zoom Link & Reminders — scoped to the masterclass being edited ── */}
-            {editSessionId && (() => {
-              const regEntry = sessionsWithRegs.find(x => x.sessionId === editSessionId);
-              const registered = regEntry ? regEntry.registered : 0;
-              const currentZoom = (combinedClasses.find(c => c.id === editSessionId) || {}).zoomLink || (regEntry && regEntry.zoomLink) || '';
-              return (
-                <div style={{ marginTop: "22px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
-                  <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>🔗</span> Zoom Link &amp; Reminders
-                  </label>
-                  <p style={{ fontSize: "12px", color: "var(--fg-faint)", margin: "4px 0 10px" }}>
-                    Saving emails this link (with a calendar invite) to {registered} registered student(s) now, and auto-includes it for anyone who registers afterwards. Daily reminders go out automatically on the 2 days before the session.
-                  </p>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <input
-                      type="url"
-                      className="form-input"
-                      placeholder="https://zoom.us/j/…"
-                      value={zoomInputs[editSessionId] ?? currentZoom}
-                      onChange={e => setZoomInputs(v => ({ ...v, [editSessionId]: e.target.value }))}
-                      style={{ flex: 1, minWidth: "220px", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
-                    />
-                    <button
-                      type="button"
-                      className="form-btn"
-                      disabled={zoomBusy[editSessionId]}
-                      onClick={() => handleSendZoom(editSessionId, registered)}
-                      style={{ whiteSpace: "nowrap" }}
-                    >
-                      {zoomBusy[editSessionId] ? "Sending…" : `Save & email ${registered}`}
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (zoomEditOpen) { setZoomEditOpen(false); return; }
-                      const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
-                      const def = buildDefaultZoomEmail(title, dateTime, z);
-                      setZoomSubject(def.subject);
-                      setZoomBody(def.body);
-                      setZoomEditOpen(true);
-                    }}
-                    style={{ marginTop: "10px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "12px", padding: 0 }}
-                  >
-                    {zoomEditOpen ? "↩ Use the default email" : "✎ Edit email before sending"}
-                  </button>
-
-                  {zoomEditOpen && (
-                    <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={zoomSubject}
-                        onChange={e => setZoomSubject(e.target.value)}
-                        placeholder="Email subject"
-                        style={{ fontSize: "13px" }}
-                      />
-                      <textarea
-                        className="form-input form-textarea"
-                        rows={12}
-                        value={zoomBody}
-                        onChange={e => setZoomBody(e.target.value)}
-                        style={{ fontSize: "13px", lineHeight: 1.6, fontFamily: "'Inter Tight', sans-serif", minHeight: "220px" }}
-                      />
-                      <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>
-                        <code>{'{{name}}'}</code> is replaced with each student&apos;s name. A calendar invite (.ics) is attached automatically.
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const z = (zoomInputs[editSessionId] ?? currentZoom) || '';
-                            const def = buildDefaultZoomEmail(title, dateTime, z);
-                            setZoomSubject(def.subject);
-                            setZoomBody(def.body);
-                          }}
-                          style={{ marginLeft: "8px", background: "none", border: "none", color: "var(--c-rust)", cursor: "pointer", fontSize: "11px", padding: 0 }}
-                        >
-                          ↺ Reset to default
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {zoomMsg[editSessionId] && (
-                    <div style={{
-                      fontSize: "12px", marginTop: "8px",
-                      color: zoomMsg[editSessionId].startsWith('⚠') ? "var(--c-rust)" : "var(--c-emerald)"
-                    }}>
-                      {zoomMsg[editSessionId]}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
+          <ScheduleMasterclassPanel
+            key={(editSessionIsMc ? "mc:" : "s:") + (editSessionId || "new")}
+            editSessionId={editSessionId}
+            editSessionIsMc={editSessionIsMc}
+            sessions={sessions}
+            masterclasses={masterclasses}
+            sessionsWithRegs={sessionsWithRegs}
+            combinedClasses={combinedClasses}
+            onCancelEdit={cancelEdit}
+          />
         ) : (
           <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "50px 30px" }}>
             <div style={{ fontSize: "56px", marginBottom: "20px" }}>🔒</div>
@@ -4308,10 +4282,10 @@ ${mcRawSyllabus}`;
               }}
               className="roster-select"
             >
-              <option value="all">🌐 All Scheduled Classes</option>
+              <option value="all">All Scheduled Classes</option>
               {combinedClasses.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.isMc ? "✨ " : "📅 "} {c.title}
+                  {c.title}
                 </option>
               ))}
             </select>
@@ -4377,7 +4351,7 @@ ${mcRawSyllabus}`;
       {isAdmin && (
       <div id="dash-marketing" className="dashboard__panel" style={{ marginTop: "28px" }}>
         <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-          📈 Marketing & Audience Management
+          Marketing & Audience Management
         </h2>
         <p className="hero__sub" style={{ marginTop: "4px", fontSize: "14px", color: "var(--fg-dim)", maxWidth: "100%" }}>
           Deduplicate, filter, and organize student accounts, registrants, and failed checkouts. Export segmented contacts into HubSpot, Klaviyo, or custom audiences.
@@ -4390,9 +4364,9 @@ ${mcRawSyllabus}`;
             <div className="phase__weeks" style={{ fontSize: "28px", marginTop: "4px" }}>{totalLeads}</div>
             <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Unique email profiles</div>
           </div>
-          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-pink)" }}>
+          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-rust)" }}>
             <div className="phase__weeks-label">Paid Customers</div>
-            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-pink)", marginTop: "4px" }}>{totalPayingStudents}</div>
+            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-rust)", marginTop: "4px" }}>{totalPayingStudents}</div>
             <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Completed bookings</div>
           </div>
           <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-emerald)" }}>
@@ -4416,10 +4390,10 @@ ${mcRawSyllabus}`;
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "32px" }}>
           
           {/* Segment 1: Paid Customers */}
-          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="dashboard__role-badge" style={{ background: "rgba(232,90,122,0.12)", color: "var(--c-pink)", borderColor: "var(--c-pink)" }}>Warm Segment</span>
+                <span className="dashboard__role-badge" style={{ background: "rgba(194,83,60,0.12)", color: "var(--c-rust)", borderColor: "var(--c-rust)" }}>Warm Segment</span>
                 <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{paidCustomersList.length} Contacts</span>
               </div>
               <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Paid Customers</h4>
@@ -4433,23 +4407,23 @@ ${mcRawSyllabus}`;
                 className="form-btn" 
                 style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
               >
-                📥 CSV
+                CSV
               </button>
               <button 
                 onClick={() => openBroadcastModal(paidCustomersList, "Paid Customers")}
                 className="form-btn form-btn--accent" 
-                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
               >
-                ✉ Email
+                Email
               </button>
             </div>
           </div>
 
           {/* Segment 2: Cold Leads */}
-          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="dashboard__role-badge" style={{ background: "rgba(107,77,128,0.12)", color: "var(--c-purple)", borderColor: "var(--c-purple)" }}>Cold Segment</span>
+                <span className="dashboard__role-badge" style={{ background: "transparent", color: "var(--fg-dim)", borderColor: "var(--line-strong)" }}>Cold Segment</span>
                 <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{coldLeadsList.length} Contacts</span>
               </div>
               <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Cold Leads</h4>
@@ -4463,20 +4437,20 @@ ${mcRawSyllabus}`;
                 className="form-btn" 
                 style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
               >
-                📥 CSV
+                CSV
               </button>
               <button 
                 onClick={() => openBroadcastModal(coldLeadsList, "Cold Leads")}
                 className="form-btn form-btn--accent" 
-                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
               >
-                ✉ Email
+                Email
               </button>
             </div>
           </div>
 
           {/* Segment 3: Working Professionals */}
-          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="dashboard__role-badge" style={{ background: "rgba(209,138,42,0.12)", color: "var(--c-amber)", borderColor: "var(--c-amber)" }}>B2B Enterprise</span>
@@ -4493,23 +4467,23 @@ ${mcRawSyllabus}`;
                 className="form-btn" 
                 style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
               >
-                📥 CSV
+                CSV
               </button>
               <button 
                 onClick={() => openBroadcastModal(professionalsList, "Working Professionals")}
                 className="form-btn form-btn--accent" 
-                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
               >
-                ✉ Email
+                Email
               </button>
             </div>
           </div>
 
           {/* Segment 4: Academic Students */}
-          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="dashboard__role-badge" style={{ background: "rgba(45,166,179,0.12)", color: "var(--c-teal)", borderColor: "var(--c-teal)" }}>B2C Career Prep</span>
+                <span className="dashboard__role-badge" style={{ background: "rgba(90,141,118,0.12)", color: "var(--c-emerald)", borderColor: "var(--c-emerald)" }}>B2C Career Prep</span>
                 <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{academicStudentsList.length} Contacts</span>
               </div>
               <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>Academic Students</h4>
@@ -4523,20 +4497,20 @@ ${mcRawSyllabus}`;
                 className="form-btn" 
                 style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
               >
-                📥 CSV
+                CSV
               </button>
               <button 
                 onClick={() => openBroadcastModal(academicStudentsList, "Academic Students")}
                 className="form-btn form-btn--accent" 
-                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
               >
-                ✉ Email
+                Email
               </button>
             </div>
           </div>
 
           {/* Segment 5: Abandoned Checkouts */}
-          <div style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="dashboard__role-badge" style={{ background: "rgba(194,83,60,0.12)", color: "var(--c-rust)", borderColor: "var(--c-rust)" }}>Retargeting</span>
@@ -4553,14 +4527,14 @@ ${mcRawSyllabus}`;
                 className="form-btn" 
                 style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
               >
-                📥 CSV
+                CSV
               </button>
               <button 
                 onClick={() => openBroadcastModal(abandonedCheckoutsList, "Abandoned Checkouts")}
                 className="form-btn form-btn--accent" 
-                style={{ background: "var(--c-pink)", margin: 0, flex: 1, padding: "10px" }}
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
               >
-                ✉ Email
+                Email
               </button>
             </div>
           </div>
@@ -4622,7 +4596,7 @@ ${mcRawSyllabus}`;
                   cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
                 }}
               >
-                📥 Export CSV
+                Export CSV
               </button>
               <button 
                 type="button"
@@ -4645,31 +4619,31 @@ ${mcRawSyllabus}`;
                   width: "auto", 
                   margin: 0, 
                   padding: "14px 24px", 
-                  background: "var(--c-pink)",
+                  background: "var(--c-rust)",
                   cursor: selectedMcCampaignId ? "pointer" : "not-allowed"
                 }}
               >
-                ✉ Send Email
+                Send Email
               </button>
             </div>
           </div>
           {selectedMcCampaignId && (
             <div style={{ marginTop: "12px", fontSize: "13px", color: "var(--fg-dim)" }}>
-              📊 Campaign Status: <b>{sessionCampaignRoster.length} total registrations</b> recorded for <i>"{activeMcCampaignSession ? activeMcCampaignSession.title : 'Selected Masterclass'}"</i>.
+              Campaign Status: <b>{sessionCampaignRoster.length} total registrations</b> recorded for <i>"{activeMcCampaignSession ? activeMcCampaignSession.title : 'Selected Masterclass'}"</i>.
             </div>
           )}
         </div>
 
         {/* ── Bulk Email from Spreadsheet (Name / Email / Phone upload) ── */}
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: "24px", marginTop: "24px" }}>
-          <h3 className="form-label" style={{ marginBottom: "6px" }}>📤 Bulk Email from Spreadsheet</h3>
+          <h3 className="form-label" style={{ marginBottom: "6px" }}>Bulk Email from Spreadsheet</h3>
           <p style={{ margin: "0 0 16px", fontSize: "13px", color: "var(--fg-dim)", lineHeight: 1.5 }}>
             Upload an Excel/CSV file with <b>Name</b>, <b>Email</b>, and <b>Phone number</b> columns, then email everyone in one click. Sends go out in batches from a secure Cloud Function — use <code style={{ fontFamily: "JetBrains Mono", fontSize: "12px", color: "var(--c-amber)" }}>{"{{name}}"}</code> in the body to personalize.
           </p>
 
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
             <label className="form-btn" style={{ width: "auto", margin: 0, padding: "12px 20px", background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", cursor: bulkParsing ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}>
-              {bulkRows.length > 0 ? "➕ Add another file" : "📎 Choose .xlsx / .csv"}
+              {bulkRows.length > 0 ? "+ Add another file" : "Choose .xlsx / .csv"}
               <input type="file" accept=".xlsx,.xls,.csv" onChange={handleBulkFile} disabled={bulkParsing || bulkSending} style={{ display: "none" }} />
             </label>
             {bulkParsing && <span style={{ fontSize: "13px", color: "var(--fg-dim)" }}>Parsing…</span>}
@@ -4706,11 +4680,26 @@ ${mcRawSyllabus}`;
 
               {bulkPreviewTable}
 
+              {/* Optional attachment — sent with every email in this campaign. */}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px", margin: "16px 0 4px" }}>
+                {bulkAttachment ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "12px", fontFamily: "JetBrains Mono", color: "var(--fg-dim)", background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "6px", padding: "6px 10px" }}>
+                    {bulkAttachment.filename} <span style={{ color: "var(--fg-faint)" }}>({(bulkAttachment.size / 1024).toFixed(0)}KB)</span>
+                    <button type="button" onClick={() => setBulkAttachment(null)} disabled={bulkSending} title="Remove attachment" style={{ background: "transparent", border: "none", color: "var(--c-rust)", cursor: bulkSending ? "not-allowed" : "pointer", padding: 0, fontSize: "13px" }}>✕</button>
+                  </span>
+                ) : (
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--fg-dim)", cursor: bulkSending ? "wait" : "pointer", textDecoration: "underline" }}>
+                    Attach a file (optional, ≤5MB)
+                    <input type="file" onChange={handleBulkAttachment} disabled={bulkSending} style={{ display: "none" }} />
+                  </label>
+                )}
+              </div>
+
               <EmailComposer
                 subjectPlaceholder="e.g. A new AI Engineering cohort is opening 🚀"
                 bodyPlaceholder={"Hi {{name}},\n\nWe just opened enrollment for…"}
                 bodyRows={8}
-                buttonLabel={`✉ Send to ${bulkRows.length} recipient${bulkRows.length === 1 ? "" : "s"}`}
+                buttonLabel={`Send to ${bulkRows.length} recipient${bulkRows.length === 1 ? "" : "s"}`}
                 sending={bulkSending}
                 onSend={handleSendBulkEmail}
               />
@@ -4727,7 +4716,7 @@ ${mcRawSyllabus}`;
 
         {/* ── Saved Contacts (reusable audience built from spreadsheet sends) ── */}
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: "24px", marginTop: "24px" }}>
-          <h3 className="form-label" style={{ marginBottom: "6px" }}>💾 Saved Contacts</h3>
+          <h3 className="form-label" style={{ marginBottom: "6px" }}>Saved Contacts</h3>
           <p style={{ fontSize: "13px", color: "var(--fg-dim)", margin: "0 0 14px" }}>
             Every recipient you email via spreadsheet upload is saved here (deduped by email). Re-email the whole list anytime — no re-upload needed.
           </p>
@@ -4736,18 +4725,13 @@ ${mcRawSyllabus}`;
             <p style={{ fontSize: "13px", color: "var(--fg-faint)" }}>No saved contacts yet. Send a spreadsheet campaign above and its recipients will appear here.</p>
           ) : (
             <React.Fragment>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "13px", color: "var(--fg-dim)" }}><b style={{ color: "var(--c-emerald)" }}>{savedContacts.length}</b> saved contact{savedContacts.length === 1 ? "" : "s"}</span>
-                <input className="form-input" style={{ maxWidth: "240px", padding: "8px 12px" }} placeholder="Search name / email…" value={savedSearch} onChange={(e) => setSavedSearch(e.target.value)} />
-              </div>
-
-              {savedContactsTable}
+              <SavedContactsTable savedContacts={savedContacts} onRemove={handleRemoveSavedContact} />
 
               <EmailComposer
                 subjectPlaceholder="Re-engage your saved audience…"
                 bodyPlaceholder={"Hi {{name}},\n\nWe just opened a new cohort…"}
                 bodyRows={7}
-                buttonLabel={`✉ Email all ${savedContacts.length} saved contact${savedContacts.length === 1 ? "" : "s"}`}
+                buttonLabel={`Email all ${savedContacts.length} saved contact${savedContacts.length === 1 ? "" : "s"}`}
                 sending={savedSending}
                 onSend={handleEmailSavedContacts}
               />
@@ -4765,164 +4749,11 @@ ${mcRawSyllabus}`;
 
       {/* 5. Marketing Email Broadcast Modal — admin only */}
       {isAdmin && showBroadcastModal && (
-        <div className="modal-overlay" style={{ zIndex: 300 }}>
-          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ width: "min(640px, 100%)" }}>
-            <button className="modal-close" onClick={() => setShowBroadcastModal(false)} disabled={isSendingBroadcast}>×</button>
-            <h2 className="modal-title">✉ Send <em>Email Broadcast</em></h2>
-            
-            {broadcastSuccess ? (
-              <div style={{ textAlign: "center", padding: "10px 0" }}>
-                <div style={{ fontSize: "56px", marginBottom: "16px" }}>🎉</div>
-                <h3 className="modal-title" style={{ color: "var(--c-emerald)", fontSize: "20px", marginBottom: "10px" }}>Broadcast Successfully Launched!</h3>
-                <p className="modal-desc" style={{ fontSize: "14px", lineHeight: "1.6", color: "var(--fg)", marginBottom: "20px" }}>
-                  {broadcastSuccess}
-                </p>
-                {broadcastCampaignId && (
-                  <div style={{
-                    background: "var(--bg-subtle)",
-                    border: "1px solid var(--line-strong)",
-                    borderRadius: "8px",
-                    padding: "16px",
-                    marginTop: "20px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    textAlign: "left",
-                    wordBreak: "break-all"
-                  }}>
-                    <div style={{ marginBottom: "6px" }}><b style={{ color: "var(--fg-dim)" }}>Campaign ID:</b> <span style={{ color: "var(--c-pink)" }}>{broadcastCampaignId}</span></div>
-                    <div style={{ marginBottom: "6px" }}><b style={{ color: "var(--fg-dim)" }}>Recipient Count:</b> {broadcastList.length} leads</div>
-                    <div><b style={{ color: "var(--fg-dim)" }}>Mode:</b> {broadcastIsMock ? "🧪 Simulated / Mock (No SMTP Keys)" : "📧 Real SMTP Delivery"}</div>
-                  </div>
-                )}
-                {broadcastIsMock && (
-                  <div style={{
-                    background: "rgba(235, 94, 40, 0.1)",
-                    border: "1px solid rgba(235, 94, 40, 0.25)",
-                    color: "var(--c-rust)",
-                    borderRadius: "8px",
-                    padding: "12px",
-                    marginTop: "16px",
-                    fontSize: "13px",
-                    lineHeight: "1.4",
-                    textAlign: "left"
-                  }}>
-                    💡 <b>Note:</b> SMTP credentials are not yet configured in your Firebase functions environment. The campaign has been captured successfully in the <code>/email_campaigns</code> Firestore database, and mock logs have been printed in the server logs.
-                  </div>
-                )}
-                <div style={{ marginTop: "30px" }}>
-                  <button 
-                    type="button" 
-                    className="form-btn form-btn--accent" 
-                    onClick={() => setShowBroadcastModal(false)}
-                    style={{ background: "var(--c-emerald)", margin: "0 auto", padding: "12px 40px", width: "auto" }}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="modal-desc" style={{ marginBottom: "20px" }}>
-                  Launch a direct, programmatic email broadcast to <b>{broadcastList.length} leads</b> in the <b>"{broadcastSegmentName}"</b> segment. All leads are automatically BCC'd to protect student privacy.
-                </p>
-
-                {broadcastError && (
-                  <div style={{
-                    background: "rgba(244, 63, 94, 0.1)",
-                    border: "1px solid rgba(244, 63, 94, 0.25)",
-                    color: "var(--c-rose)",
-                    borderRadius: "8px",
-                    padding: "12px",
-                    marginBottom: "20px",
-                    fontSize: "13px",
-                    lineHeight: "1.4"
-                  }}>
-                    ❌ <b>Error:</b> {broadcastError}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label">Select Campaign Template</label>
-                  <select 
-                    className="form-select"
-                    value={selectedTemplateKey}
-                    onChange={e => handleTemplateChange(e.target.value)}
-                    disabled={isSendingBroadcast}
-                  >
-                    <option value="general">Masterclass Invite (General / All Leads)</option>
-                    <option value="cold_leads">Special Registration Offer (Cold Leads)</option>
-                    <option value="abandoned">Checkout Cart Abandonment (Retargeting)</option>
-                    <option value="professional">Enterprise LLMOps Upsell (Working Professionals)</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Subject Line</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={broadcastSubject}
-                    onChange={e => setBroadcastSubject(e.target.value)}
-                    required
-                    disabled={isSendingBroadcast}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Email Body (Plain Text)</label>
-                  <textarea 
-                    className="form-textarea" 
-                    style={{ minHeight: "220px", fontFamily: "inherit", fontSize: "14px" }}
-                    value={broadcastBody}
-                    onChange={e => setBroadcastBody(e.target.value)}
-                    required
-                    disabled={isSendingBroadcast}
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
-                  <button 
-                    type="button" 
-                    className="form-btn form-btn--accent" 
-                    onClick={handleLaunchBroadcast}
-                    disabled={isSendingBroadcast}
-                    style={{ 
-                      background: isSendingBroadcast ? "var(--bg-faint)" : "var(--c-pink)", 
-                      margin: 0, 
-                      flex: 2,
-                      cursor: isSendingBroadcast ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    {isSendingBroadcast ? (
-                      <>
-                        <span className="ai-status__spinner"></span>
-                        Sending Broadcast...
-                      </>
-                    ) : (
-                      <>✉ Send Direct Broadcast</>
-                    )}
-                  </button>
-                  <button 
-                    type="button" 
-                    className="dashboard__logout-btn" 
-                    onClick={() => setShowBroadcastModal(false)}
-                    disabled={isSendingBroadcast}
-                    style={{ margin: 0, flex: 1, padding: "14px", cursor: isSendingBroadcast ? "not-allowed" : "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--fg-faint)", marginTop: "14px", textAlign: "center", lineHeight: "1.4" }}>
-                  💡 <b>How it works:</b> Emails are delivered programmatically in the background directly from the admin email address (via SMTP) using a secure Firebase Cloud Function. Student privacy is fully protected since all emails are hidden via unified BCC dispatch!
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <BroadcastModal
+          list={broadcastList}
+          segmentName={broadcastSegmentName}
+          onClose={() => setShowBroadcastModal(false)}
+        />
       )}
 
     </div>
@@ -4959,6 +4790,18 @@ function CoursesEnquiryCard() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  // Inline validation — errors surface as fields blur, not only on submit
+  const [fieldErr, setFieldErr] = useState({});
+  const validators = {
+    name: (v) => V2_VALIDATE.nameError(v),
+    email: (v) => V2_VALIDATE.emailError(v),
+    phone: (v) => V2_VALIDATE.phoneError(v, false),
+  };
+  const blurCheck = (field, value) => {
+    if (!value.trim()) return; // empty untouched fields stay quiet until submit
+    setFieldErr((prev) => ({ ...prev, [field]: validators[field](value) || '' }));
+  };
+  const clearErr = (field) => setFieldErr((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
 
   const submit = async () => {
     const err = V2_VALIDATE.nameError(name) || V2_VALIDATE.emailError(email) || V2_VALIDATE.phoneError(phone, false);
@@ -4992,18 +4835,21 @@ function CoursesEnquiryCard() {
           <p className="cv3-enquiry-success">✓ Thanks — we got your message and will get back to you within 24 hours.</p>
         ) : (
           <div className="cv3-enquiry-fields">
-            <label className="cv3-field">
+            <label className={`cv3-field ${fieldErr.name ? 'cv3-field--invalid' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
-              <input type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input type="text" placeholder="Your Name" value={name} aria-invalid={!!fieldErr.name} onChange={(e) => { setName(e.target.value); clearErr('name'); }} onBlur={(e) => blurCheck('name', e.target.value)} />
             </label>
-            <label className="cv3-field">
+            {fieldErr.name && <p className="cv3-field-err">{fieldErr.name}</p>}
+            <label className={`cv3-field ${fieldErr.email ? 'cv3-field--invalid' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-              <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input type="email" placeholder="Email Address" value={email} aria-invalid={!!fieldErr.email} onChange={(e) => { setEmail(e.target.value); clearErr('email'); }} onBlur={(e) => blurCheck('email', e.target.value)} />
             </label>
-            <label className="cv3-field">
+            {fieldErr.email && <p className="cv3-field-err">{fieldErr.email}</p>}
+            <label className={`cv3-field ${fieldErr.phone ? 'cv3-field--invalid' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" /></svg>
-              <input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input type="tel" placeholder="Phone Number" value={phone} aria-invalid={!!fieldErr.phone} onChange={(e) => { setPhone(e.target.value); clearErr('phone'); }} onBlur={(e) => blurCheck('phone', e.target.value)} />
             </label>
+            {fieldErr.phone && <p className="cv3-field-err">{fieldErr.phone}</p>}
             <label className="cv3-field cv3-field--select">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M9 3h6" /></svg>
               <select value={role} onChange={(e) => setRole(e.target.value)}>
@@ -5060,7 +4906,7 @@ function CoursesCurriculumV3() {
             </button>
           ))}
         </div>
-        <div className="cv3-curriculum-detail">
+        <div className="cv3-curriculum-detail" key={m.n}>
           <div className="cv3-eyebrow">Module {m.n}</div>
           <div className="cv3-detail-rule" />
           <h3 className="cv3-detail-title">{m.title}</h3>
@@ -5111,7 +4957,7 @@ function CoursesFAQ() {
   if (!faqs.length) return null;
   return (
     <section className="cv3-section cv3-section--narrow" id="cv3-faq">
-      <CoursesSectionHead eyebrow="FAQ" title="Questions, answered" />
+      <CoursesSectionHead eyebrow="Got questions?" title="Frequently Asked Questions" />
       <div className="cv3-faq-list">
         {faqs.map((f, i) => {
           const isOpen = open === i;
@@ -5134,6 +4980,60 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
   const instr = window.COURSE_INSTRUCTOR || {};
+
+  // Runtime-only motion: scroll reveal + hero stat count-up. Gated on
+  // navigator.webdriver so the prerender (puppeteer) never bakes hidden
+  // reveal classes or mid-animation numbers into the static SEO HTML.
+  // Classes are stripped after settle so hover transforms keep working.
+  useEffect(() => {
+    if (navigator.webdriver) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let io = null;
+    if (!reduced && 'IntersectionObserver' in window) {
+      const targets = document.querySelectorAll('.cv3-section, .cv3-trust-inner, .cv3-projects-inner, .cv3-instructor-inner');
+      io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (!en.isIntersecting) return;
+          en.target.classList.add('cv3-in');
+          io.unobserve(en.target);
+          setTimeout(() => en.target.classList.remove('cv3-armed', 'cv3-in'), 1400);
+        });
+      }, { threshold: 0.06, rootMargin: '0px 0px -40px' });
+      targets.forEach((el) => {
+        // never arm anything already on screen — no flash, hero untouched
+        if (el.getBoundingClientRect().top > window.innerHeight) {
+          el.classList.add('cv3-armed');
+          io.observe(el);
+        }
+      });
+    }
+
+    // Count-up on the hero stats ("26K+" → 0→26 keeping the K+ suffix)
+    const raf = [];
+    if (!reduced) {
+      document.querySelectorAll('.cv3-stat-num').forEach((el) => {
+        const m = (el.textContent || '').match(/^([^0-9]*)([0-9]+)(.*)$/);
+        if (!m) return;
+        const target = parseInt(m[2], 10);
+        const t0 = performance.now();
+        const dur = 900;
+        const tick = (t) => {
+          const p = Math.min(1, (t - t0) / dur);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = m[1] + Math.round(target * eased) + m[3];
+          if (p < 1) raf.push(requestAnimationFrame(tick));
+        };
+        raf.push(requestAnimationFrame(tick));
+      });
+    }
+
+    return () => {
+      if (io) io.disconnect();
+      raf.forEach((id) => cancelAnimationFrame(id));
+      document.querySelectorAll('.cv3-armed').forEach((el) => el.classList.remove('cv3-armed', 'cv3-in'));
+    };
+  }, []);
   const priceFmt = (n) => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN') : n);
   const scrollToId = (id) => (e) => {
     e.preventDefault();
@@ -5162,8 +5062,8 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
     <div className="cv3">
       {/* HERO — pitch left, enquiry form right */}
       <header className="cv3-hero">
-        <img className="cv3-hero-bg cv3-hero-bg--light" src="uploads/hero_Section_bacground.png" alt="" aria-hidden="true" loading="eager" decoding="async" />
-        <img className="cv3-hero-bg cv3-hero-bg--dark" src="uploads/hero_Section_bacground_dark_mode.png" alt="" aria-hidden="true" loading="eager" decoding="async" />
+        <img className="cv3-hero-bg cv3-hero-bg--light" src="uploads/hero_Section_bacground.png" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" />
+        <img className="cv3-hero-bg cv3-hero-bg--dark" src="uploads/hero_Section_bacground_dark_mode.png" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" />
         <div className="cv3-hero-left">
           <h1 className="cv3-hero-title">Build production-grade<br /><em>Agentic AI</em> that ships.</h1>
           <p className="cv3-hero-sub">
@@ -5314,7 +5214,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           <div className="cv3-pricing-name">{info.flagshipName}</div>
           <div className="cv3-pricing-price">{priceFmt(info.price)}</div>
           <div className="cv3-price-note">One-time payment · Inclusive of GST · No subscription</div>
-          <a href={info.enrollUrl} target="_blank" rel="noopener noreferrer" className="cv3-btn cv3-btn--accent cv3-pricing-cta">Enroll now</a>
+          <button type="button" className="cv3-btn cv3-btn--accent cv3-pricing-cta" disabled style={{ cursor: "default", opacity: 0.7 }}>Enrollment opening soon</button>
           <div className="cv3-pricing-features">
             {(info.pricingIncludes || []).map((feat) => (
               <div key={feat} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{feat}</div>
@@ -5336,10 +5236,456 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
 // form), message text shown in full. Owns its own state — don't
 // fold this into DashboardView (see CLAUDE.md re-render warning).
 // ===============================================================
+// ===============================================================
+// ADMIN — Roadmap Video Linker. Own component (not DashboardView
+// state) so typing in these fields only re-renders this panel —
+// see the DashboardView re-render warning in CLAUDE.md.
+// ===============================================================
+function RoadmapVideosAdminPanel({ user }) {
+  const [roadmapVideoDocs, setRoadmapVideoDocs] = useState([]);
+  const [rvPhaseId, setRvPhaseId] = useState(1);
+  const [rvModules, setRvModules] = useState([]);
+  const [rvUrl, setRvUrl] = useState("");
+  const [rvTitle, setRvTitle] = useState("");
+  const [rvStartTs, setRvStartTs] = useState("");
+  const [rvKind, setRvKind] = useState("deep-dive");
+  const [rvCodeUrl, setRvCodeUrl] = useState("");
+  const [rvSaving, setRvSaving] = useState(false);
+  const [rvFilter, setRvFilter] = useState("");
+  const [status, setStatus] = useState({ type: '', message: '' });
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('roadmapVideos').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setRoadmapVideoDocs(list);
+    }, () => setRoadmapVideoDocs([]));
+    return () => unsub();
+  }, []);
+
+  const rvPhaseSections = (window.ROADMAP || []).find((p) => p.id === rvPhaseId)?.sections || [];
+
+  const handleRvPhaseChange = (pid) => {
+    setRvPhaseId(Number(pid));
+    setRvModules([]);
+  };
+
+  const toggleRvModule = (modN) => {
+    setRvModules((prev) => (
+      prev.includes(modN) ? prev.filter((m) => m !== modN) : [...prev, modN]
+    ));
+  };
+
+  const fetchYouTubeTitle = async (urlOrId, isPlaylist) => {
+    try {
+      const url = isPlaylist
+        ? (urlOrId.includes('list=') ? urlOrId : `https://www.youtube.com/playlist?list=${urlOrId}`)
+        : (urlOrId.includes('youtube') ? urlOrId : `https://www.youtube.com/watch?v=${urlOrId}`);
+      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.title || '';
+      }
+    } catch (_) {}
+    return '';
+  };
+
+  const handleLinkRoadmapVideo = async (e) => {
+    e.preventDefault();
+    const H = window.ROADMAP_VIDEO_HELPERS || {};
+    const playlistId = H.parseYouTubePlaylistId ? H.parseYouTubePlaylistId(rvUrl) : null;
+    const youtubeId = playlistId ? null : (H.parseYouTubeId ? H.parseYouTubeId(rvUrl) : null);
+    if (!youtubeId && !playlistId) {
+      setStatus({ type: 'error', message: 'Paste a valid YouTube video or playlist URL.' });
+      return;
+    }
+    if (!rvModules.length) {
+      setStatus({ type: 'error', message: 'Select at least one module.' });
+      return;
+    }
+    setRvSaving(true);
+    try {
+      let title = rvTitle.trim();
+      const kind = rvKind === 'playlist' || playlistId ? 'playlist' : rvKind;
+      if (!title) title = await fetchYouTubeTitle(rvUrl, Boolean(playlistId));
+      if (!title) title = playlistId ? `YouTube playlist ${playlistId}` : `YouTube video ${youtubeId}`;
+      const startSec = H.parseTimestamp ? H.parseTimestamp(rvStartTs) : 0;
+      await db.collection('roadmapVideos').add({
+        youtubeId: youtubeId || null,
+        playlistId: playlistId || null,
+        title,
+        kind,
+        phaseId: rvPhaseId,
+        capstoneId: null,
+        modules: rvModules.slice().sort(),
+        startSec,
+        endSec: null,
+        codeUrl: rvCodeUrl.trim() || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: user?.uid || '',
+      });
+      setRvUrl('');
+      setRvTitle('');
+      setRvStartTs('');
+      setRvCodeUrl('');
+      setRvModules([]);
+      setStatus({ type: 'success', message: 'Video linked to roadmap modules.' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to save video link.' });
+    } finally {
+      setRvSaving(false);
+    }
+  };
+
+  const handleDeleteRoadmapVideo = async (docId, title) => {
+    if (!window.confirm(`Remove video link "${title}"?`)) return;
+    try {
+      await db.collection('roadmapVideos').doc(docId).delete();
+      setStatus({ type: 'success', message: 'Video link removed.' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to delete.' });
+    }
+  };
+
+  return (
+    <div id="dash-videos" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+      <h2 className="dashboard__panel-title">Roadmap Videos</h2>
+      <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)' }}>
+        Link YouTube videos to phases and modules. Changes appear on the Full Roadmap tab immediately.
+      </p>
+      {status.message && (
+        <div className={`status-box status-box--${status.type}`}>
+          <span>{status.type === 'success' ? '✔' : '⚠'}</span>
+          <span>{status.message}</span>
+        </div>
+      )}
+      <form className="roadmap-admin-form" onSubmit={handleLinkRoadmapVideo}>
+        <div className="form-group">
+          <label className="form-label">Phase</label>
+          <select className="form-select" value={rvPhaseId} onChange={(e) => handleRvPhaseChange(e.target.value)}>
+            {(window.ROADMAP || []).map((p) => (
+              <option key={p.id} value={p.id}>Phase {String(p.id).padStart(2, '0')} · {p.title}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Modules (select all covered in this video)</label>
+          <div className="roadmap-admin-modules">
+            {rvPhaseSections.map((s) => (
+              <label key={s.n} className="roadmap-admin-module-check">
+                <input
+                  type="checkbox"
+                  checked={rvModules.includes(s.n)}
+                  onChange={() => toggleRvModule(s.n)}
+                />
+                <span>{s.n} · {s.title}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">YouTube URL</label>
+            <input className="form-input" value={rvUrl} onChange={(e) => setRvUrl(e.target.value)} placeholder="Video or playlist URL" required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Title (optional — auto-fetched)</label>
+            <input className="form-input" value={rvTitle} onChange={(e) => setRvTitle(e.target.value)} placeholder="Video title" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Start timestamp (MM:SS)</label>
+            <input className="form-input" value={rvStartTs} onChange={(e) => setRvStartTs(e.target.value)} placeholder="14:38" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Kind</label>
+            <select className="form-select" value={rvKind} onChange={(e) => setRvKind(e.target.value)}>
+              <option value="deep-dive">Deep dive</option>
+              <option value="playlist">Playlist</option>
+              <option value="overview">Overview</option>
+              <option value="capstone">Capstone</option>
+              <option value="supplement">Supplement</option>
+            </select>
+          </div>
+          {rvKind !== 'playlist' && (
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Link to code (optional — this single video's GitHub / repo URL)</label>
+              <input className="form-input" value={rvCodeUrl} onChange={(e) => setRvCodeUrl(e.target.value)} placeholder="https://github.com/…" />
+              <p className="form-hint" style={{ fontSize: '12px', color: 'var(--fg-faint)', margin: '6px 0 0' }}>For playlists, add a code link per video in the “Per-video code links” section below.</p>
+            </div>
+          )}
+        </div>
+        <button type="submit" className="form-btn" disabled={rvSaving}>{rvSaving ? 'Linking…' : 'Link video'}</button>
+      </form>
+
+      <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, fontSize: '15px' }}>Linked videos ({roadmapVideoDocs.length})</h3>
+          <input className="form-input" style={{ maxWidth: '220px' }} placeholder="Filter…" value={rvFilter} onChange={(e) => setRvFilter(e.target.value)} />
+        </div>
+        {roadmapVideoDocs.filter((d) => {
+          if (!rvFilter.trim()) return true;
+          const q = rvFilter.toLowerCase();
+          return (d.title || '').toLowerCase().includes(q) || (d.modules || []).join(' ').includes(q);
+        }).map((doc) => (
+          <div key={doc.id} className="roadmap-admin-list-item">
+            <div>
+              <strong>{doc.title}</strong>
+              <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px' }}>
+                Phase {doc.phaseId} · {(doc.modules || []).join(', ')} · {doc.kind}
+                {doc.playlistId ? ` · playlist ${doc.playlistId}` : ''}
+                {doc.startSec ? ` · @ ${(window.ROADMAP_VIDEO_HELPERS || {}).formatTimestamp?.(doc.startSec) || doc.startSec}` : ''}
+                {doc.codeUrl ? <> · <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>code ↗</a></> : ''}
+              </div>
+            </div>
+            <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteRoadmapVideo(doc.id, doc.title)}>Remove</button>
+          </div>
+        ))}
+        {roadmapVideoDocs.length === 0 && (
+          <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No admin-linked videos yet. Seed data from videos.js still shows on the roadmap.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===============================================================
+// ADMIN — Per-video "Link to code" manager. Same extraction
+// rationale as RoadmapVideosAdminPanel.
+// ===============================================================
+function VideoCodeLinksAdminPanel({ user }) {
+  const [vcUrl, setVcUrl] = useState("");
+  const [vcCodeUrl, setVcCodeUrl] = useState("");
+  const [vcSaving, setVcSaving] = useState(false);
+  const [videoCodeDocs, setVideoCodeDocs] = useState([]);
+  const [status, setStatus] = useState({ type: '', message: '' });
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('videoCodeLinks').onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setVideoCodeDocs(list);
+    }, () => setVideoCodeDocs([]));
+    return () => unsub();
+  }, []);
+
+  const handleSaveVideoCodeLink = async (e) => {
+    e.preventDefault();
+    const H = window.ROADMAP_VIDEO_HELPERS || {};
+    const videoId = H.parseYouTubeId ? H.parseYouTubeId(vcUrl.trim()) : null;
+    const code = vcCodeUrl.trim();
+    if (!videoId) { setStatus({ type: 'error', message: 'Paste a valid YouTube VIDEO URL (a single video, not a playlist).' }); return; }
+    if (!code) { setStatus({ type: 'error', message: 'Enter the code (repo) URL.' }); return; }
+    setVcSaving(true);
+    try {
+      await db.collection('videoCodeLinks').doc(videoId).set({
+        videoId,
+        codeUrl: code,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: user?.uid || '',
+      }, { merge: true });
+      setVcUrl('');
+      setVcCodeUrl('');
+      setStatus({ type: 'success', message: `Code link saved for video ${videoId}.` });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to save code link.' });
+    } finally {
+      setVcSaving(false);
+    }
+  };
+
+  const handleDeleteVideoCodeLink = async (videoId) => {
+    try { await db.collection('videoCodeLinks').doc(videoId).delete(); }
+    catch (err) { setStatus({ type: 'error', message: err.message || 'Failed to remove code link.' }); }
+  };
+
+  return (
+    <div id="dash-code-links" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+      <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
+      <p style={{ fontSize: '13px', color: 'var(--fg-dim)', margin: '0 0 16px' }}>
+        Add a “Link to code” button to any individual video by its URL — including each video inside a playlist. Paste the single video’s YouTube link (not the playlist link).
+      </p>
+      {status.message && (
+        <div className={`status-box status-box--${status.type}`}>
+          <span>{status.type === 'success' ? '✔' : '⚠'}</span>
+          <span>{status.message}</span>
+        </div>
+      )}
+      <form className="roadmap-admin-form" onSubmit={handleSaveVideoCodeLink}>
+        <div className="dashboard__grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">YouTube video URL</label>
+            <input className="form-input" value={vcUrl} onChange={(e) => setVcUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Code (repo) URL</label>
+            <input className="form-input" value={vcCodeUrl} onChange={(e) => setVcCodeUrl(e.target.value)} placeholder="https://github.com/…" required />
+          </div>
+        </div>
+        <button type="submit" className="form-btn" disabled={vcSaving}>{vcSaving ? 'Saving…' : 'Save code link'}</button>
+      </form>
+
+      <div className="roadmap-admin-list" style={{ marginTop: '24px' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>Saved code links ({videoCodeDocs.length})</h3>
+        {videoCodeDocs.map((doc) => (
+          <div key={doc.id} className="roadmap-admin-list-item">
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{doc.id}</strong>
+              <div style={{ fontSize: '12px', color: 'var(--fg-dim)', marginTop: '4px', wordBreak: 'break-all' }}>
+                <a href={doc.codeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-rust)' }}>{doc.codeUrl}</a>
+              </div>
+            </div>
+            <button type="button" className="dashboard__logout-btn" onClick={() => handleDeleteVideoCodeLink(doc.id)}>Remove</button>
+          </div>
+        ))}
+        {videoCodeDocs.length === 0 && (
+          <p style={{ color: 'var(--fg-faint)', fontSize: '13px' }}>No per-video code links yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+RoadmapVideosAdminPanel = React.memo(RoadmapVideosAdminPanel);
+VideoCodeLinksAdminPanel = React.memo(VideoCodeLinksAdminPanel);
+
+// Live enquiry count for the dashboard nav. Same query as
+// AdminEnquiriesPanel — Firestore shares the listener, so this
+// costs no extra reads. Own component so DashboardView never
+// re-renders on new enquiries (see CLAUDE.md re-render warning).
+function EnquiryCountBadge() {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    if (!db) return;
+    const unsub = db.collection('leads')
+      .where('source', '==', 'course_enquiry')
+      .onSnapshot((snap) => setCount(snap.size), () => {});
+    return () => unsub();
+  }, []);
+  if (count == null) return null;
+  return (
+    <span style={{ marginLeft: '6px', padding: '1px 8px', borderRadius: '999px', background: 'var(--c-rust)', color: '#fff', fontSize: '11px', fontFamily: 'JetBrains Mono', fontWeight: 600 }}>
+      {count}
+    </span>
+  );
+}
+
+EnquiryCountBadge = React.memo(EnquiryCountBadge);
+
+// Per-enquiry reply composer. Reuses the sendBulkEmail callable with a
+// single recipient — same Resend pipeline, admin-gated server-side, and
+// the send shows up in Email Tasks like any other job. Owns its own
+// state so typing never re-renders the enquiries list.
+function EnquiryReplyBox({ enquiry }) {
+  const [open, setOpen] = useState(false);
+  const [subject, setSubject] = useState('Re: Your course enquiry');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState(null); // { ok, msg }
+
+  const send = async () => {
+    if (!subject.trim() || !body.trim()) {
+      setStatus({ ok: false, msg: 'Subject and message are both required.' });
+      return;
+    }
+    setSending(true);
+    setStatus(null);
+    try {
+      await functions.httpsCallable('sendBulkEmail')({
+        subject: subject.trim(),
+        body,
+        label: `Enquiry reply — ${enquiry.email}`,
+        recipients: [{ name: enquiry.name || '', email: enquiry.email }],
+      });
+      // Log the reply on the lead doc so the conversation thread survives.
+      // arrayUnion can't hold serverTimestamp, so sentAt is client epoch ms.
+      try {
+        await db.collection('leads').doc(enquiry.id).update({
+          replies: firebase.firestore.FieldValue.arrayUnion({
+            direction: 'out',
+            subject: subject.trim(),
+            body,
+            sentAt: Date.now(),
+            by: (auth && auth.currentUser && auth.currentUser.email) || 'admin',
+          }),
+        });
+      } catch (logErr) {
+        console.error('[ENQUIRY REPLY] sent but could not log to thread:', logErr);
+      }
+      setStatus({ ok: true, msg: `Reply sent to ${enquiry.email}.` });
+      setBody('');
+      setOpen(false);
+    } catch (e) {
+      console.error('[ENQUIRY REPLY] send failed:', e);
+      setStatus({ ok: false, msg: e.message || 'Could not send the reply.' });
+    }
+    setSending(false);
+  };
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      {!open && (
+        <button
+          className="form-btn"
+          onClick={() => { setOpen(true); setStatus(null); }}
+          style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg)', margin: 0, padding: '7px 14px', fontSize: '13px', width: 'auto' }}
+        >
+          Reply
+        </button>
+      )}
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+          <input
+            className="form-input"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Subject"
+            style={{ fontSize: '13px' }}
+          />
+          <textarea
+            className="form-input"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={`Hi ${enquiry.name || 'there'},\n\nThanks for reaching out…`}
+            rows={5}
+            style={{ fontSize: '13px', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="form-btn"
+              onClick={send}
+              disabled={sending}
+              style={{ margin: 0, padding: '8px 18px', fontSize: '13px', width: 'auto' }}
+            >
+              {sending ? 'Sending…' : `Send to ${enquiry.email}`}
+            </button>
+            <button
+              className="form-btn"
+              onClick={() => setOpen(false)}
+              disabled={sending}
+              style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg-dim)', margin: 0, padding: '8px 14px', fontSize: '13px', width: 'auto' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {status && (
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: status.ok ? 'var(--c-green, #3a9d5d)' : 'var(--c-rust)' }}>
+          {status.ok ? '✔' : '⚠'} {status.msg}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AdminEnquiriesPanel() {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     if (!db) return;
@@ -5364,13 +5710,36 @@ function AdminEnquiriesPanel() {
     return d ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
   };
 
+  const exportCsv = () => {
+    const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const rows = enquiries.map((q) =>
+      [q.name, q.email, q.phone, q.occupation, q.message, fmtDate(q.createdAt)].map(esc).join(',')
+    );
+    const blob = new Blob(['Name,Email,Phone,Occupation,Message,Date\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'course_enquiries.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div id="dash-enquiries" className="dashboard__panel" style={{ marginTop: '28px' }}>
       <h2 className="dashboard__panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-        📨 Course Enquiries
+        Course Enquiries
         <span style={{ fontSize: '13px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono', fontWeight: 400 }}>
           {loading ? '…' : `${enquiries.length} total`}
         </span>
+        {enquiries.length > 0 && (
+          <button
+            onClick={exportCsv}
+            className="form-btn"
+            style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg)', margin: '0 0 0 auto', padding: '8px 14px', fontSize: '13px', width: 'auto' }}
+          >
+            Export CSV
+          </button>
+        )}
       </h2>
       <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)', maxWidth: '100%' }}>
         Messages from the &ldquo;Enquire About This Course&rdquo; form on the Courses page. Live — new enquiries appear as they arrive.
@@ -5379,14 +5748,27 @@ function AdminEnquiriesPanel() {
       {!loading && !error && enquiries.length === 0 && (
         <p style={{ fontSize: '14px', color: 'var(--fg-faint)', marginTop: '16px' }}>No enquiries yet.</p>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '18px' }}>
-        {enquiries.map((q) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '18px', maxHeight: '560px', overflowY: 'auto', paddingRight: '6px' }}>
+        {enquiries.map((q) => {
+          const expanded = expandedId === q.id;
+          const replies = Array.isArray(q.replies) ? q.replies : [];
+          return (
           <div key={q.id} style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: '12px', padding: '18px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
+            <div
+              onClick={() => setExpandedId(expanded ? null : q.id)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px', cursor: 'pointer' }}
+              title={expanded ? 'Collapse conversation' : 'View conversation'}
+            >
               <div style={{ fontSize: '15px', fontWeight: 600 }}>
+                <span style={{ fontSize: '11px', color: 'var(--fg-faint)', marginRight: '8px' }}>{expanded ? '▾' : '▸'}</span>
                 {q.name || '(no name)'}
                 {q.occupation && (
                   <span className="dashboard__role-badge" style={{ marginLeft: '10px', fontSize: '11px' }}>{q.occupation}</span>
+                )}
+                {replies.length > 0 && (
+                  <span style={{ marginLeft: '10px', fontSize: '11px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono', fontWeight: 400 }}>
+                    {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+                  </span>
                 )}
               </div>
               <span style={{ fontSize: '12px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono' }}>{fmtDate(q.createdAt)}</span>
@@ -5400,12 +5782,41 @@ function AdminEnquiriesPanel() {
             ) : (
               <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--fg-faint)', fontStyle: 'italic' }}>No message left.</p>
             )}
+            {expanded && replies.length > 0 && (
+              <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {replies.slice().sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0)).map((r, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      borderLeft: `3px solid ${r.direction === 'in' ? 'var(--line-strong)' : 'var(--c-rust)'}`,
+                      background: 'var(--bg)',
+                      borderRadius: '8px',
+                      padding: '12px 16px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px', fontFamily: 'JetBrains Mono', color: 'var(--fg-faint)' }}>
+                      <span>{r.direction === 'in' ? (q.name || q.email) : `You (${r.by || 'admin'})`}</span>
+                      <span>{r.sentAt ? new Date(r.sentAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</span>
+                    </div>
+                    {r.subject && <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px' }}>{r.subject}</div>}
+                    <p style={{ margin: '6px 0 0', fontSize: '13px', lineHeight: 1.6, color: 'var(--fg)', whiteSpace: 'pre-wrap' }}>{r.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {expanded && replies.length === 0 && (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--fg-faint)', fontStyle: 'italic' }}>No replies sent yet.</p>
+            )}
+            {expanded && q.email && <EnquiryReplyBox enquiry={q} />}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
+
+AdminEnquiriesPanel = React.memo(AdminEnquiriesPanel);
 
 // ===============================================================
 // ADMIN — Email send-task viewer. Lists every bulk-email job
@@ -5952,7 +6363,7 @@ function App() {
         try {
           const userDoc = await db.collection('users').doc(u.uid).get();
           const emailLower = (u.email || '').toLowerCase();
-          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com';
+          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com';
           
           let role = 'client';
           let hasProfile = false;
@@ -5985,7 +6396,7 @@ function App() {
               await db.collection('users').doc(u.uid).set({
                 email: u.email,
                 role: 'admin',
-                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' ? 'Balaji Chippada' : 'Gowtam Singulur')
+                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' ? 'Balaji Chippada' : emailLower === 'bhargavsinguluri@gmail.com' ? 'Bhargav Singuluri' : 'Gowtam Singulur')
               });
               setUserRole('admin');
               role = 'admin';
@@ -6013,7 +6424,7 @@ function App() {
         } catch (err) {
           console.error("Error reading role document:", err);
           const emailLower = (u.email || '').toLowerCase();
-          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com') {
+          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com') {
             setUserRole('admin');
           } else {
             setUserRole('client');
@@ -7031,7 +7442,7 @@ function App() {
   // Expose whether the signed-in user may add/edit per-video "Code" links inline
   // in the roadmap. Mirrors the videoCodeLinks Firestore rule (admins / bootstrap
   // emails). Set during render so the video players (v2.jsx) read it immediately.
-  const CODE_ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+  const CODE_ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
   if (typeof window !== 'undefined') {
     window.__CODE_ADMIN = !!(user && !user.isAnonymous &&
       (userRole === 'admin' || CODE_ADMIN_EMAILS.includes((user.email || '').toLowerCase())));
@@ -7075,6 +7486,7 @@ function App() {
   // ── Path-based routing (crawlable URLs for /roadmap, /masterclasses, /about) ──
   const tabToPath = (tab) => {
     if (tab === 'roadmap') return '/roadmap';
+    if (tab === 'masterclass') return '/masterclasses';
     if (ACCOUNT_TAB_PATHS[tab]) return ACCOUNT_TAB_PATHS[tab];
     return '/';
   };
@@ -7082,11 +7494,11 @@ function App() {
   // Keep the URL + document title in sync whenever the active tab changes
   // (covers every setActiveMainTab call site, not just switchMainTab).
   useEffect(() => {
-    const sectionRoutes = ['/masterclasses', '/about'];
+    const sectionRoutes = ['/about'];
     const current = window.location.pathname.replace(/\/+$/, '') || '/';
     const target = tabToPath(activeMainTab);
-    // Don't clobber a section landing route while still on the home tab.
-    const onSectionLanding = activeMainTab === 'home' && sectionRoutes.includes(current);
+    // Don't clobber a section landing route while still on the masterclass tab.
+    const onSectionLanding = activeMainTab === 'masterclass' && sectionRoutes.includes(current);
     if (!onSectionLanding && current !== target) {
       try { window.history.pushState({ tab: activeMainTab }, '', target); } catch (e) {}
     }
@@ -7139,6 +7551,14 @@ function App() {
       </button>
       <button
         role="tab"
+        aria-selected={activeMainTab === 'masterclass'}
+        className={`nav__tab-btn ${activeMainTab === 'masterclass' ? 'active' : ''}`}
+        onClick={() => switchMainTab('masterclass')}
+      >
+        Masterclass
+      </button>
+      <button
+        role="tab"
         aria-selected={activeMainTab === 'roadmap'}
         className={`nav__tab-btn ${activeMainTab === 'roadmap' ? 'active' : ''}`}
         onClick={() => switchMainTab('roadmap')}
@@ -7173,16 +7593,6 @@ function App() {
           onClick={() => switchMainTab('emailtasks')}
         >
           Email Tasks
-        </button>
-      )}
-      {canSeeAdminTabs && (
-        <button
-          role="tab"
-          aria-selected={activeMainTab === 'courses'}
-          className={`nav__tab-btn ${activeMainTab === 'courses' ? 'active' : ''}`}
-          onClick={() => switchMainTab('courses')}
-        >
-          Courses
         </button>
       )}
     </React.Fragment>
@@ -7327,7 +7737,9 @@ function App() {
       {!nextMcReserved && (
         <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} onResolve={handleWelcomeResolved} />
       )}
-      <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} canShow={welcomeResolved && !nextMcReserved} />
+      {V2_CONFIG.showTopBanner && (
+        <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} canShow={welcomeResolved && !nextMcReserved} />
+      )}
 
       {motion ? (
         <motion.nav
@@ -7479,7 +7891,7 @@ function App() {
       </aside>
 
       {/* Render Main Views based on active tab state */}
-      {activeMainTab === 'home' && (
+      {activeMainTab === 'masterclass' && (
         <main id="main" className="coaching-home">
           {/* ── V2 Hero (2-column: copy + CTA left, video right) ── */}
           <V2HeroSection
@@ -7650,7 +8062,7 @@ function App() {
           roadmapProgress={roadmapProgress}
           deletedSessionIds={deletedSessionIds}
           onGoToRoadmap={handleGoToRoadmap}
-          onReserve={() => { setActiveMainTab('home'); openBooking(nextMasterclass); }}
+          onReserve={() => { setActiveMainTab('masterclass'); openBooking(nextMasterclass); }}
         />
       )}
 
@@ -7668,7 +8080,7 @@ function App() {
         </div>
       )}
 
-      {activeMainTab === 'courses' && canSeeAdminTabs && (
+      {activeMainTab === 'home' && (
         <CoursesTabView setActiveMainTab={setActiveMainTab} setLegalPage={setLegalPage} />
       )}
 

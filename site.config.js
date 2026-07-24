@@ -33,7 +33,7 @@ window.SITE_CONFIG = {
     tagline: 'The Agent Engineer',
     handle: '@balajichippada',
     youtubeChannel: 'https://www.youtube.com/@balajichippada',
-    roadmapVideoId: 'Mf_J_PVGTdA', // homepage hero embed
+    roadmapVideoId: 'q0doXVA18-A', // homepage hero embed
     roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
     whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
@@ -239,7 +239,8 @@ We will dive into the architectural patterns required to build autonomous, produ
   // Feature flags — global on/off switches for homepage sections
   // ─────────────────────────────────────────────────────────────────
   featureFlags: {
-    showWelcomePopup: true,
+    showWelcomePopup: false,
+    showTopBanner: false,
     showHowItWorks: true,
     showWhereToStart: true,
     showHeroSecondaryCta: true,    // "Explore the curriculum" button next to primary

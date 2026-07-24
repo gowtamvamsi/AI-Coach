@@ -60,6 +60,9 @@ window.SEO_CONFIG = {
     '/': {
       tab: 'home',
     },
+    '/courses': {
+      tab: 'home', // legacy URL — courses content now lives on the home tab
+    },
     '/roadmap': {
       tab: 'roadmap',
       title: 'Agentic AI Engineer Roadmap (2026) — 26 Weeks, 9 Phases · Balaji Chippada',
@@ -67,14 +70,13 @@ window.SEO_CONFIG = {
         'The complete free 26-week agentic AI engineer roadmap: Python foundations, LLM mental models, prompt engineering, RAG with evaluation, MCP & tools, memory, LangGraph multi-agent systems, guardrails, LLMOps, and AWS deployment — interactive, with embedded YouTube lessons and progress tracking.',
     },
     '/masterclasses': {
-      tab: 'home',
-      scrollTo: 'masterclasses',
+      tab: 'masterclass',
       title: 'Live Agentic AI Masterclasses — Demo-First Builds · Balaji Chippada',
       description:
         'Live, demo-first masterclasses where you ship a production-grade AI agent on the call: RAG, Claude Code, LangGraph, multi-agent systems, guardrails, and deployment. First class free, recording + certificate included, 100% refund within 24 hours.',
     },
     '/about': {
-      tab: 'home',
+      tab: 'masterclass',
       scrollTo: 'instructor',
       title: 'About Balaji Chippada — The Agent Engineer (170K+ roadmap views)',
       description:

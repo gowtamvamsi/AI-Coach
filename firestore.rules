@@ -72,7 +72,7 @@ service cloud.firestore {
     function isBootstrapUser() {
       return isAuthenticated() && 
         'email' in request.auth.token &&
-        request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+        request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
     }
     
     // Validate required fields exist
@@ -139,7 +139,7 @@ service cloud.firestore {
       function isBootstrapAdmin() {
         return isAuthenticated() &&
           request.auth.token.email != null &&
-          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
       }
 
       allow create: if isBootstrapAdmin();
@@ -176,7 +176,7 @@ service cloud.firestore {
       function isMcBootstrapAdmin() {
         return isAuthenticated() &&
           request.auth.token.email != null &&
-          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com'];
+          request.auth.token.email.lower() in ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
       }
 
       allow create: if isMcBootstrapAdmin();

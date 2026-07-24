@@ -1,8 +1,8 @@
 const admin=require('firebase-admin');const fs=require('fs');
 const sa=require(process.env.KEY);admin.initializeApp({credential:admin.credential.cert(sa)});
 const P=sa.project_id,LOC='us-central1',API='https://cloudfunctions.googleapis.com/v1';
-const TARGETS=['sendAudienceEmail','onUserSignupWelcome'];
-const zip=fs.readFileSync('/tmp/fn_src.zip');
+const TARGETS=['sendBulkEmail','processEmailBatch','retryEmailJob'];
+const zip=fs.readFileSync(process.env.ZIP||'/tmp/fn_src.zip');
 async function tk(){return (await admin.credential.cert(sa).getAccessToken()).access_token;}
 async function jf(m,u,b,t){const h={authorization:'Bearer '+t};let p=b;if(b!==undefined){h['content-type']='application/json';p=JSON.stringify(b);}const r=await fetch(u,{method:m,headers:h,body:p});const x=await r.text();if(!r.ok)throw new Error(m+' '+r.status+' '+x.slice(0,300));return x?JSON.parse(x):{};}
 async function waitOp(name,t){for(let i=0;i<90;i++){const o=await jf('GET',`https://cloudfunctions.googleapis.com/v1/${name}`,undefined,t);if(o.done){if(o.error)throw new Error('op error: '+JSON.stringify(o.error));return o;}await new Promise(r=>setTimeout(r,4000));}throw new Error('op timeout '+name);}

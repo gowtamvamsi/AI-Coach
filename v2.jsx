@@ -528,6 +528,7 @@ const _SC = (typeof window !== 'undefined' && window.SITE_CONFIG) || {};
 const _FF = _SC.featureFlags || {};
 const V2_CONFIG = {
   showWelcomePopup: _FF.showWelcomePopup !== false,
+  showTopBanner: _FF.showTopBanner !== false,
   welcomePopupDelayMs: (_SC.welcomePopup && _SC.welcomePopup.delayMs) || 1800,
   showQuoteBand: _FF.showQuoteBand === true,
   showSuccessStories: _FF.showSuccessStories === true,
@@ -2168,7 +2169,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
         )}
       </section>
 
-      <h2 className="v2-dashboard-subtitle">My Masterclasses</h2>
+      <div className="v2-account-sessions-grid">
       <section className="v2-dash-section v2-account-card">
         <h2>Upcoming Sessions</h2>
         {upcoming.length === 0 ? (
@@ -2212,6 +2213,7 @@ function V2StudentDashboard({ user, db, onReserve, onGoToRoadmap, roadmapProgres
           </div>
         ))}
       </section>
+      </div>
       <div className="v2-account-support-grid">
         <section className="v2-dash-section v2-account-card">
           <h2>Profile</h2>

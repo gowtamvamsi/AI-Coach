@@ -97,9 +97,12 @@ test('public site — masterclass meeting-link timing copy is current', () => {
   assert.doesNotMatch(publicText, /Instant confirmation · Zoom link sent by email/i, 'old instant confirmation microcopy is removed');
 });
 
-test('homepage — masterclass duration is 120 minutes', () => {
-  const html = read('index.html');
+test('masterclass duration is 120 minutes', () => {
+  // The masterclass hero moved off the prerendered homepage (home now shows
+  // Courses); duration renders at runtime from site.config.js, so assert there.
+  const config = read('site.config.js');
+  assert.match(config, /duration:\s*120\b/, 'site.config.js masterclass duration is 120');
 
-  assert.match(html, /\b120 min\b/, 'homepage shows 120 min duration');
-  assert.doesNotMatch(html, /\b180 min\b/, 'homepage no longer shows 180 min duration');
+  const html = read('index.html') + read('roadmap.html');
+  assert.doesNotMatch(html, /\b180 min\b/, 'prerendered pages no longer show 180 min duration');
 });

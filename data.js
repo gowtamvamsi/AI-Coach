@@ -71,9 +71,9 @@ window.ROADMAP = [
     endState: "You can build a RAG system, measure why it's wrong, and fix it with data instead of vibes.",
     sections: [
       { n: "4.1", title: "Why RAG exists", items: ["LLMs can't see your private data", "The brain-in-a-windowless-room reaches its limit", "Use cases: internal docs, company policies, recent data"] },
-      { n: "4.2", title: "Embeddings", items: ["What an embedding actually is (vector in N-dim space)", "Cosine similarity, dot product, Euclidean distance", "Embedding models — Titan Multimodal, SentenceTransformer, OpenAI ada/text-embedding-3, Cohere", "Choosing dimensions vs cost"] },
+      { n: "4.2", title: "Chunking strategies", items: ["Fixed-width chunking and why it breaks", "Semantic chunking by structure", "Overlap windows", "Parent-child chunking", "Late chunking — embed first, chunk later — preserves context across boundaries", "Chunk size vs retrieval quality tradeoff"] },
       { n: "4.3", title: "Document ingestion pipeline", items: ["Layout identification with Docling (headers, paragraphs, tables, code blocks, formulas)", "Serialization to structured objects", "Why PyMuPDF alone fails on complex PDFs"] },
-      { n: "4.4", title: "Chunking strategies", items: ["Fixed-width chunking and why it breaks", "Semantic chunking by structure", "Overlap windows", "Parent-child chunking", "Late chunking — embed first, chunk later — preserves context across boundaries", "Chunk size vs retrieval quality tradeoff"] },
+      { n: "4.4", title: "Embeddings", items: ["What an embedding actually is (vector in N-dim space)", "Cosine similarity, dot product, Euclidean distance", "Embedding models — Titan Multimodal, SentenceTransformer, OpenAI ada/text-embedding-3, Cohere", "Choosing dimensions vs cost"] },
       { n: "4.5", title: "Chunk enrichment", items: ["PII detection and redaction", "NER for entities", "Key-phrase extraction", "Metadata for hybrid search"] },
       { n: "4.6", title: "Vector databases", items: ["Pinecone, Weaviate, pgvector", "Chroma for local dev", "S3 Vector Buckets, OpenSearch", "HNSW vs IVF indexes", "Decision matrix: managed (Pinecone) vs self-hosted (Weaviate, Qdrant) vs in-process (Chroma, FAISS) vs already-in-your-stack (pgvector)"] },
       { n: "4.7", title: "Hybrid retrieval & next-gen retrievers", items: ["Vector search + BM25 keyword", "Reranking with cross-encoders (Cohere Rerank, BGE)", "Metadata filtering", "Query expansion", "Late-interaction retrievers — ColBERT (text), ColPali (multimodal/PDF pages as images) — when they beat dense retrieval and what they cost"] },
@@ -298,6 +298,37 @@ window.NEXT_STEPS = [
 window.COURSE_CURRICULUM = [
   {
     n: "00",
+    title: "Python Fundamentals",
+    tagline: "The Python you actually need before touching an LLM — from Colab setup to file handling.",
+    project: "Command your Python basics: data structures, control flow, functions & file I/O",
+    tools: ["Python", "Google Colab"],
+    submodules: [
+      { n: "0.1", title: "Google Colab Tutorial: Step-by-Step Guide for Beginners", lessons: ["Google Colab Tutorial: Step-by-Step Guide for Beginners"] },
+      { n: "0.2", title: "Keywords, Identifiers & Comments", lessons: ["Keywords, Identifiers & Comments"] },
+      { n: "0.3", title: "Indentation, Statements & Variables", lessons: ["Indentation, Statements & Variables"] },
+      { n: "0.4", title: "Data Types vs Data Structures Explained", lessons: ["Data Types vs Data Structures Explained"] },
+      { n: "0.5", title: "Numeric Data Types & Strings", lessons: ["Numeric Data Types & Strings"] },
+      { n: "0.6", title: "Lists in Python: Methods & Manipulation", lessons: ["Lists in Python: Methods & Manipulation"] },
+      { n: "0.7", title: "Tuples in Python: Mastering Immutable Data Structures", lessons: ["Tuples in Python: Mastering Immutable Data Structures"] },
+      { n: "0.8", title: "Sets in Python: Methods & Manipulations", lessons: ["Sets in Python: Methods & Manipulations"] },
+      { n: "0.9", title: "Dictionaries in Python: Methods & Manipulation", lessons: ["Dictionaries in Python: Methods & Manipulation"] },
+      { n: "0.10", title: "Type Casting in Python (Very Easy)", lessons: ["Type Casting in Python (Very Easy)"] },
+      { n: "0.11", title: "Operators in Python — Part 1", lessons: ["Operators in Python — Part 1"] },
+      { n: "0.12", title: "Bitwise Operators in Python & 2's Complement", lessons: ["Bitwise Operators in Python & 2's Complement"] },
+      { n: "0.13", title: "If-Else Statement Tutorial in Python", lessons: ["If-Else Statement Tutorial in Python"] },
+      { n: "0.14", title: "While Loops in Python: How to Avoid Infinite Loops", lessons: ["While Loops in Python: How to Avoid Infinite Loops"] },
+      { n: "0.15", title: "Python For Loop Tutorial: Real-Life Examples", lessons: ["Python For Loop Tutorial: Real-Life Examples"] },
+      { n: "0.16", title: "Break vs Continue vs Pass Statement in Python", lessons: ["Break vs Continue vs Pass Statement in Python"] },
+      { n: "0.17", title: "Functions in Python", lessons: ["Functions in Python"] },
+      { n: "0.18", title: "Arguments vs Parameters in Functions (args vs kwargs)", lessons: ["Arguments vs Parameters in Functions (args vs kwargs)"] },
+      { n: "0.19", title: "Map, Reduce & Filter in Python: Inbuilt vs User-Defined", lessons: ["Map, Reduce & Filter in Python: Inbuilt vs User-Defined"] },
+      { n: "0.20", title: "Recursive Functions & Lambda Functions in Python", lessons: ["Recursive Functions & Lambda Functions in Python"] },
+      { n: "0.21", title: "Exception Handling in Python: try / except / finally", lessons: ["Exception Handling in Python: try / except / finally"] },
+      { n: "0.22", title: "File Handling in Python: Reading & Writing to Files", lessons: ["File Handling in Python: Reading & Writing to Files"] }
+    ]
+  },
+  {
+    n: "01",
     title: "Build a Full Working Agent",
     tagline: "Ship a working agent on day one — before the fundamentals grind.",
     project: "Atlas v0 — a working agent in 40 lines, no frameworks",
@@ -308,7 +339,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "01",
+    n: "02",
     title: "NLP Basics, Intuition-First",
     tagline: "Understand what text becomes before an LLM ever sees it.",
     project: "Semantic search over your own notes",
@@ -325,7 +356,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "02",
+    n: "03",
     title: "LLMs: Internals, Parameters, Benchmarking & Cost",
     tagline: "Pick and control the right model for a job — and predict its cost.",
     project: "A provider-agnostic LLM client (cloud + local via Ollama)",
@@ -340,7 +371,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "03",
+    n: "04",
     title: "Prompt Engineering",
     tagline: "Reliably get the behavior you want — the skill every agent call depends on.",
     project: "A prompt toolkit you'll reuse in every agent call",
@@ -355,7 +386,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "04",
+    n: "05",
     title: "Foundations of Agentic Systems",
     tagline: "Understand the agent loop deeply — because you built it by hand.",
     project: "Atlas gets a ReAct brain, live tools, and self-correction",
@@ -370,7 +401,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "05",
+    n: "06",
     title: "RAG — Retrieval-Augmented Generation",
     tagline: "Answer from your own documents — grounded and cited, not from memory.",
     project: "Document intelligence for Atlas — grounded, cited answers",
@@ -385,7 +416,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "06",
+    n: "07",
     title: "MCP — Model Context Protocol",
     tagline: "Connect your agent to anything through one universal standard.",
     project: "An MCP server from scratch + a Gmail & Calendar MCP for Atlas",
@@ -400,7 +431,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "07",
+    n: "08",
     title: "Memory & Optimization",
     tagline: "Remember across sessions without blowing the context window.",
     project: "Atlas remembers your preferences across sessions — on a token budget",
@@ -414,7 +445,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "08",
+    n: "09",
     title: "State Machines & DAGs (LangGraph)",
     tagline: "Control an agent's flow deterministically — and pause for a human.",
     project: "Atlas re-architected on LangGraph with approval checkpoints",
@@ -427,7 +458,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "09",
+    n: "10",
     title: "Evaluation",
     tagline: "Prove your agent works and catch regressions before users do.",
     project: "A regression suite that blocks bad Atlas changes",
@@ -440,7 +471,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "10",
+    n: "11",
     title: "Multi-Agent Orchestration",
     tagline: "Make specialized agents collaborate without burning $400 in a loop.",
     project: "Atlas becomes a researcher + writer + critic team",
@@ -453,7 +484,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "11",
+    n: "12",
     title: "Security & Guardrails",
     tagline: "Survive malicious users and handle sensitive data safely.",
     project: "Atlas locked down — guardrails, least privilege, PII redaction",
@@ -468,7 +499,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "12",
+    n: "13",
     title: "Deployment (incl. FastAPI)",
     tagline: "Real users can use your agent over the internet.",
     project: "Atlas live on the internet with a chat UI",
@@ -482,7 +513,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "13",
+    n: "14",
     title: "Monitoring & Operations",
     tagline: "See what your live agent is doing, what it costs, and how to improve it.",
     project: "A cost & quality dashboard for live Atlas",
@@ -495,7 +526,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "14",
+    n: "15",
     title: "Capstone Projects & Portfolio",
     tagline: "Ship and monitor your OWN agentic product — portfolio-ready.",
     project: "Your own agentic product — built, deployed, monitored",
@@ -517,8 +548,7 @@ window.COURSE_INFO = {
   moduleCount: 15,
   submoduleCount: 73,
   lessonCount: 144,
-  price: 29999,
-  enrollUrl: "https://balajichippadacourse.edmingle.com/course/GenerativeAgenticAIEngineering-111299",
+  price: "Will reveal soon", // ponytail: string passes through priceFmt as-is; restore a number to show ₹ again
   // Flagship-card fact grid (label/value pairs)
   facts: [
     { k: "Format", v: "Self-paced" },
@@ -558,12 +588,18 @@ window.COURSE_PROJECTS = [
 
 // Courses tab FAQ.
 window.COURSE_FAQ = [
-  { q: "Do I need prior AI/ML experience?", a: "No. You can start from scratch — we build the AI intuition from first principles and take you all the way to advanced production topics." },
-  { q: "Is the course self-paced?", a: "Yes. Every lesson is pre-recorded and yours for life. Move as fast or as slow as you like, on your own schedule." },
-  { q: "How long do I have access?", a: "Lifetime. You keep access to all recordings, materials, and future updates — with a single one-time payment." },
-  { q: "Is this just LangChain tutorials?", a: "No. We stay framework-aware but focus on the durable engineering — architecture, evals, guardrails, and ops — that outlasts any single library." },
-  { q: "Will this help me get a job?", a: "The capstone is designed to be an interview-ready portfolio piece, backed by mock interviews and resume prep assistance." },
-  { q: "What if I get stuck?", a: "Every doubt is answered within 24 hours, and you get the private community plus code reviews whenever you need a second pair of eyes." }
+  { q: "Is this course beginner-friendly?", a: "Yes, completely. You can join with zero coding or AI background — we start from absolute scratch, including Python, and build up step by step until you're shipping production-grade agents. Every module is built on the previous one, so you're never dropped into a topic without the foundation for it. After every video there's a quick quiz, so you'll know immediately whether a concept landed or you just nodded along. And you're never stuck alone — post a doubt and we clear it within 24 hours." },
+  { q: "I already watch your YouTube videos. How is this course different?", a: "My YouTube channel and the free 26-week roadmap will always stay free, and they're great for understanding concepts. But YouTube is one-way — I can't check whether you actually built anything, clear your doubts, or hold you to a sequence, which is why most people jump between videos and get stuck at the \"I understand it but can't build it\" stage. The course fixes exactly that: one structured path with quizzes, assignments, capstone projects, and one real product you keep upgrading from the first module to the last. Add doubt support within 24 hours, weekly live sessions, and biweekly updates. Simply put, YouTube tells you what to learn; the course makes sure you actually build it." },
+  { q: "How much does the course cost?", a: "We haven't announced the price yet — we'll be revealing it in the first week of August. What I can tell you now: we're deliberately keeping it affordable compared to market alternatives, because I want serious students to be able to join, not just those with deep pockets. Whatever the number is, it covers everything — all modules, quizzes, assignments, capstones, doubt support within 24 hours, weekly live sessions, mock interviews, resume prep, and biweekly updates. And if you want to start today without spending anything, the free 26-week roadmap on this site is always open." },
+  { q: "Can anyone join, or are there prerequisites?", a: "None. You don't need Python, an AI background, a CS degree, or work experience — the course starts from absolute scratch and takes you all the way to production level. Python itself is taught inside the course, so \"I don't know coding\" is not a reason to wait. I've mentored students from every branch, non-IT folks, and working professionals switching tracks, and the path works the same for all of them. The only thing I can't supply is discipline — bring daily consistency, and everything else is covered inside." },
+  { q: "What exactly do I get inside the course?", a: "The biggest one is the structure: every module is built on top of the previous module, so the course flows as one continuous journey, and you carry one real product through it, upgrading it as your skills grow. After every video there's a quiz to check you actually understood rather than just watched. Every module has multiple assignments designed like real engineering tasks — concrete inputs, a clear deliverable, and \"done when\" criteria. Across the course you'll complete 3 capstone projects and 2 personal projects, so you finish with working systems you can demo in an interview, not empty repos. Around all of this sits the support layer: doubts cleared within 24 hours, weekly live sessions, mock interviews, resume prep, and biweekly updates." },
+  { q: "I'm a working professional with experience. Is this still useful for me?", a: "Very much — a large chunk of my mentees are working professionals, and the course is built with high-demand roles like Forward Deployed Engineer (FDE) in mind. The gap I keep seeing with experienced folks: they can code and they've played with ChatGPT, but they've never taken an agent to production. That last mile — evaluation, observability, guardrails, memory, cost control, deployment — is exactly what companies are hiring for, and it's what most tutorials skip. The course spends serious time there instead of stopping at \"build a chatbot in 10 minutes\" demos. If you already ship software, this is the fastest route from \"I use AI tools\" to \"I build AI systems.\"" },
+  { q: "Do I need prior AI/ML experience?", a: "No — you don't need to have trained a single ML model to become a strong agentic AI engineer. Classical ML, the math-heavy model-training track, is a different lane from what we do here. This course is about engineering with large language models: prompting them properly, giving them tools and memory, grounding them with RAG, and shipping all of it reliably. We build your LLM mental model from scratch in the early modules, so words like \"token\" and \"context window\" stop being intimidating very quickly. If you do have ML experience it won't hurt, but curiosity and consistency matter far more here than any background." },
+  { q: "Will I get the code and resources?", a: "Yes — everything we build on screen, you get. Every lesson ships with its complete code, so you're never pausing a video to retype things from my editor. Assignments, notes, and resource guides are collected in one place instead of scattered across video descriptions, and since the course is updated biweekly, the code stays current too. One request though: don't just download and hoard. Run the code, break it, rebuild it — that's where the real learning happens." },
+  { q: "What happens when I get stuck? How are doubts cleared?", a: "Post your doubt and we'll clear it within 24 hours — that's the promise. On top of that, we run weekly live doubt-clearing sessions where we take up the trickier questions, share screens, and debug together. You're also learning alongside a community working through the same modules, so you're never stuck alone at 1 AM wondering if you're the only one confused. One suggestion: spend 15–20 minutes genuinely trying to solve it yourself first, then ask with what you tried — that struggle is where debugging skill gets built." },
+  { q: "Do I get a certificate?", a: "Yes, you'll receive a certificate once you complete the course. But I tell this to every student honestly: the certificate is not what gets you hired. Recruiters care about what you can build and how you explain it — your capstones, your GitHub, your ability to reason about why an agent failed and how you fixed it. The certificate is proof you finished something end to end, which does say something about your consistency. Just don't join for the certificate — join for the skills, and treat the certificate as the receipt." },
+  { q: "Will this course get me a job?", a: "Honest answer, not the marketing one: nobody can guarantee you a job, and you should be suspicious of anyone who does. What I can tell you is that the skills in this course — RAG, agents, MCP, evaluation, deployment — are exactly what the market is hiring for right now, and there's a real shortage of people who can do this work at a production level. We also prepare you for the hiring process itself: mock interviews so the real one isn't your first attempt, and resume prep so your projects are presented the way recruiters actually read them. Your capstones and personal projects give you real, demo-able work to talk about instead of just \"I completed a course.\" The rest depends on you — my job is to make sure that when the interview comes, you're ready to crack it." },
+  { q: "AI changes every week. Will the course stay updated?", a: "It has to be — AI moves at a pace where a six-month-old tutorial can already feel dated. So we update the course biweekly: refreshing lessons, swapping in current tools and model versions, and adding new content when something genuinely important lands, not for every shiny launch on social media. There's a balance I'm careful about, though: tools churn, but the underlying concepts — how agents reason, how RAG works, how you evaluate and deploy — transfer across whatever framework is trending. So the course is anchored in fundamentals that last, and the updates keep the tools and code you practice on current. You put in the learning once; the course keeps pace with the ecosystem for you." }
 ];
 
 // Real student testimonials for the Courses tab. Leave empty until real

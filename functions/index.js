@@ -837,6 +837,8 @@ function getSmtpTransporter(smtpEmail, smtpPass) {
   return _smtpTransporter;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpEmail, smtpPass, from, attachments }) {
   // From-address resolution. Resend rejects sending from an unverified domain
   // (e.g. a gmail.com SMTP login), so when Resend is active we must use the
@@ -866,17 +868,26 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
         content_type: a.contentType,
       }));
     }
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    if (response.ok) return;
-    const errText = await response.text();
-    throw new Error(`Resend failed (${response.status}): ${errText}`);
+    // A 429 (rate-limited) is transient — wait out Resend's Retry-After and
+    // retry in place, so a brief burst never lands a recipient in `failures`.
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) return;
+      if (response.status === 429 && attempt < 3) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        await sleep((retryAfter > 0 ? retryAfter * 1000 : 1000 * (attempt + 1)) + 250);
+        continue;
+      }
+      const errText = await response.text();
+      throw new Error(`Resend failed (${response.status}): ${errText}`);
+    }
   }
 
   if (smtpEmail && smtpPass) {
@@ -1216,6 +1227,7 @@ const BOOTSTRAP_ADMIN_EMAILS = [
   "gowtamsbh1234@gmail.com",
   "balajichippada.20@gmail.com",
   "mayupatil199@gmail.com",
+  "bhargavsinguluri@gmail.com",
 ];
 
 // ===============================================================
@@ -1869,7 +1881,7 @@ exports.processEmailBatch = functions
     rateLimits: { maxConcurrentDispatches: 3, maxDispatchesPerSecond: 1 },
   })
   .onDispatch(async (payload) => {
-    const { jobId, flagField, extraUpdate, subjectTpl, bodyTpl, baseVars, ics, recipients } = payload || {};
+    const { jobId, flagField, extraUpdate, subjectTpl, bodyTpl, baseVars, ics, attachment, recipients } = payload || {};
     if (!Array.isArray(recipients) || recipients.length === 0) return;
 
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -1878,6 +1890,23 @@ exports.processEmailBatch = functions
     const attachments = ics
       ? [{ filename: "masterclass.ics", content: ics, contentType: "text/calendar; method=PUBLISH; charset=UTF-8" }]
       : [];
+    // Bulk-campaign file attachment: reassemble the base64 chunks stored under
+    // the job (see sendBulkEmail) once per dispatch. A missing blob fails the
+    // whole dispatch — Cloud Tasks retries it — rather than silently sending
+    // the campaign without its attachment.
+    if (jobId && attachment && attachment.chunks > 0) {
+      const parts = [];
+      for (let i = 0; i < attachment.chunks; i++) {
+        const c = await db.collection("emailJobs").doc(jobId).collection("blobs").doc(`att-${i}`).get();
+        if (!c.exists) throw new Error(`Attachment chunk att-${i} missing for job ${jobId}`);
+        parts.push(c.data().data || "");
+      }
+      attachments.push({
+        filename: attachment.filename,
+        content: Buffer.from(parts.join(""), "base64"),
+        contentType: attachment.contentType,
+      });
+    }
     let sent = 0, errors = 0, skipped = 0;
     const failures = []; // { email, name, error } for the admin task viewer
 
@@ -1946,6 +1975,11 @@ exports.processEmailBatch = functions
         failures.push({ email: r.email, name: r.name || "", error: msg });
         errors++;
       }
+      // Pace to Resend's 10 emails/sec account limit: 3 concurrent workers
+      // (maxConcurrentDispatches above) × ~2.9 sends/sec each ≈ 8.5/sec, with
+      // headroom for confirmations/OTP emails sent outside this queue. Skipped
+      // recipients `continue` before this — they make no API call.
+      await sleep(350);
       if (pendingIdx.length >= 10) await flushDelivered();
     }
     await flushDelivered();
@@ -2091,6 +2125,31 @@ exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB"
     if (!ics) throw new functions.https.HttpsError("invalid-argument", "The calendar event date/time could not be parsed.");
   }
 
+  // Optional file attachment: { filename, contentType, dataBase64 }. Too big for
+  // a Cloud Tasks payload (1MB) or the job doc itself, so it's stored as base64
+  // chunks in a subcollection under the job; workers reassemble it per dispatch.
+  const rawAttachment = (data && data.attachment) || null;
+  let attachment = null; // { filename, contentType, chunks } — metadata only
+  let attachmentChunks = [];
+  if (rawAttachment) {
+    const filename = String(rawAttachment.filename || "").trim().slice(0, 200);
+    const dataBase64 = String(rawAttachment.dataBase64 || "");
+    if (!filename || !dataBase64) {
+      throw new functions.https.HttpsError("invalid-argument", "The attachment needs a filename and file content.");
+    }
+    // ~5MB binary ≈ 7M base64 chars; matches the client-side cap.
+    if (dataBase64.length > 7 * 1024 * 1024) {
+      throw new functions.https.HttpsError("invalid-argument", "The attachment is too large — the limit is 5MB.");
+    }
+    const CHUNK = 700000; // chars per Firestore doc, safely under the 1MB doc limit
+    for (let i = 0; i < dataBase64.length; i += CHUNK) attachmentChunks.push(dataBase64.slice(i, i + CHUNK));
+    attachment = {
+      filename,
+      contentType: String(rawAttachment.contentType || "application/octet-stream").slice(0, 100),
+      chunks: attachmentChunks.length,
+    };
+  }
+
   // Validate each row (skip empty / malformed emails). No de-duplication: every
   // uploaded recipient is kept, matching exactly what the admin sees in the list
   // — two people can legitimately share one inbox, each with their own {{name}}.
@@ -2146,10 +2205,17 @@ exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB"
     // Kept on the job so retryEmailJob can re-send to undelivered recipients.
     bodyTpl: body,
     ics: ics || null,
+    attachment,
     deliveredIdx: [],
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: (context.auth && context.auth.uid) || "emulator",
   });
+
+  // Attachment content lives beside the job so batch workers (and retries) can
+  // reassemble it. Written before any task is enqueued so no worker races it.
+  for (let i = 0; i < attachmentChunks.length; i++) {
+    await jobRef.collection("blobs").doc(`att-${i}`).set({ data: attachmentChunks[i] });
+  }
 
   // Fan out into processEmailBatch tasks (no regId/flagField → direct send).
   // Each recipient carries its index in the job's recipient list so delivery
@@ -2165,6 +2231,7 @@ exports.sendBulkEmail = functions.runWith({ timeoutSeconds: 540, memory: "512MB"
       bodyTpl: body,
       baseVars: {},
       ics,
+      attachment,
       recipients: indexed.slice(i, i + EMAIL_BATCH_SIZE),
     });
     batches++;
@@ -2236,6 +2303,7 @@ exports.retryEmailJob = functions.runWith({ timeoutSeconds: 300, memory: "512MB"
       bodyTpl: job.bodyTpl,
       baseVars: {},
       ics: job.ics || null,
+      attachment: job.attachment || null,
       recipients: undelivered.slice(i, i + EMAIL_BATCH_SIZE),
     });
     batches++;
