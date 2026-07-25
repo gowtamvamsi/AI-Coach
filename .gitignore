@@ -5,6 +5,10 @@
 .claude/
 node_modules/
 
+# Python bytecode cache (e.g. .agents/skills/*/scripts/__pycache__)
+__pycache__/
+*.pyc
+
 # Firebase service-account keys — NEVER commit these
 serviceAccountKey.json
 **/serviceAccountKey.json
