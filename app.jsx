@@ -4808,7 +4808,7 @@ function CoursesSectionHead({ eyebrow, title, sub }) {
   );
 }
 
-function CoursesEnquiryCard() {
+function CoursesEnquiryCard({ onClose }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -4819,10 +4819,11 @@ function CoursesEnquiryCard() {
   const [error, setError] = useState('');
   // Inline validation — errors surface as fields blur, not only on submit
   const [fieldErr, setFieldErr] = useState({});
+  const closeRef = useRef(null);
   const validators = {
     name: (v) => V2_VALIDATE.nameError(v),
     email: (v) => V2_VALIDATE.emailError(v),
-    phone: (v) => V2_VALIDATE.phoneError(v, false),
+    phone: (v) => V2_VALIDATE.phoneError(v, true),
   };
   const blurCheck = (field, value) => {
     if (!value.trim()) return; // empty untouched fields stay quiet until submit
@@ -4830,8 +4831,24 @@ function CoursesEnquiryCard() {
   };
   const clearErr = (field) => setFieldErr((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
 
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus?.();
+    };
+  }, [onClose]);
+
   const submit = async () => {
-    const err = V2_VALIDATE.nameError(name) || V2_VALIDATE.emailError(email) || V2_VALIDATE.phoneError(phone, false);
+    const err = V2_VALIDATE.nameError(name) || V2_VALIDATE.emailError(email) || V2_VALIDATE.phoneError(phone, true);
     if (err) { setError(err); return; }
     setLoading(true); setError('');
     try {
@@ -4855,57 +4872,72 @@ function CoursesEnquiryCard() {
   };
 
   return (
-    <div className="cv3-hero-right">
-      <div className="cv3-enquiry-card">
-        <h3 className="cv3-enquiry-title">Enquire About This Course</h3>
-        {sent ? (
-          <p className="cv3-enquiry-success">✓ Thanks — we got your message and will get back to you within 24 hours.</p>
-        ) : (
-          <div className="cv3-enquiry-fields">
-            <label className={`cv3-field ${fieldErr.name ? 'cv3-field--invalid' : ''}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
-              <input type="text" placeholder="Your Name" value={name} aria-invalid={!!fieldErr.name} onChange={(e) => { setName(e.target.value); clearErr('name'); }} onBlur={(e) => blurCheck('name', e.target.value)} />
-            </label>
-            {fieldErr.name && <p className="cv3-field-err">{fieldErr.name}</p>}
-            <label className={`cv3-field ${fieldErr.email ? 'cv3-field--invalid' : ''}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-              <input type="email" placeholder="Email Address" value={email} aria-invalid={!!fieldErr.email} onChange={(e) => { setEmail(e.target.value); clearErr('email'); }} onBlur={(e) => blurCheck('email', e.target.value)} />
-            </label>
-            {fieldErr.email && <p className="cv3-field-err">{fieldErr.email}</p>}
-            <label className={`cv3-field ${fieldErr.phone ? 'cv3-field--invalid' : ''}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" /></svg>
-              <input type="tel" placeholder="Phone Number" value={phone} aria-invalid={!!fieldErr.phone} onChange={(e) => { setPhone(e.target.value); clearErr('phone'); }} onBlur={(e) => blurCheck('phone', e.target.value)} />
-            </label>
-            {fieldErr.phone && <p className="cv3-field-err">{fieldErr.phone}</p>}
-            <label className="cv3-field cv3-field--select">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M9 3h6" /></svg>
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="">I am a…</option>
-                <option>Working professional</option>
-                <option>Student</option>
-                <option>Homemaker</option>
-                <option>Founder / entrepreneur</option>
-                <option>Other</option>
-              </select>
-              <svg className="cv3-field-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-            </label>
-            <label className="cv3-field cv3-field--textarea">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-4 3v-3H4z" /></svg>
-              <textarea placeholder="Your Message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
-            </label>
-            <button type="button" className="cv3-enquiry-send" onClick={submit} disabled={loading}>
-              {loading ? 'SENDING…' : 'SEND MESSAGE'}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
-            </button>
-            {error && <p className="cv3-enquiry-error">{error}</p>}
-            <div className="cv3-enquiry-note">Your information is secure with us</div>
-          </div>
+    <div className="cv3-advisor-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="cv3-advisor-dialog" role="dialog" aria-modal="true" aria-labelledby="cv3-advisor-title">
+        <button ref={closeRef} type="button" className="cv3-advisor-close" onClick={onClose} aria-label="Close advisor form">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+        <div className="cv3-enquiry-card">
+          <div className="cv3-eyebrow">Course guidance</div>
+          <h3 className="cv3-enquiry-title" id="cv3-advisor-title">Talk to a Course Advisor</h3>
+          {sent ? (
+            <div className="cv3-advisor-success">
+              <span className="cv3-advisor-success-icon" aria-hidden="true">✓</span>
+              <p className="cv3-enquiry-success">Thanks—your request is in. A course advisor will call you within 24 hours.</p>
+              <button type="button" className="cv3-enquiry-send" onClick={onClose}>Close</button>
+            </div>
+          ) : (
+            <>
+              <p className="cv3-advisor-intro">Share your details and we’ll help you decide whether this course is the right fit.</p>
+              <div className="cv3-enquiry-fields">
+                <label className={`cv3-field ${fieldErr.name ? 'cv3-field--invalid' : ''}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
+                  <input type="text" placeholder="Your Name" aria-label="Your name" value={name} aria-invalid={!!fieldErr.name} onChange={(e) => { setName(e.target.value); clearErr('name'); }} onBlur={(e) => blurCheck('name', e.target.value)} />
+                </label>
+                {fieldErr.name && <p className="cv3-field-err">{fieldErr.name}</p>}
+                <label className={`cv3-field ${fieldErr.email ? 'cv3-field--invalid' : ''}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                  <input type="email" placeholder="Email Address" aria-label="Email address" value={email} aria-invalid={!!fieldErr.email} onChange={(e) => { setEmail(e.target.value); clearErr('email'); }} onBlur={(e) => blurCheck('email', e.target.value)} />
+                </label>
+                {fieldErr.email && <p className="cv3-field-err">{fieldErr.email}</p>}
+                <label className={`cv3-field ${fieldErr.phone ? 'cv3-field--invalid' : ''}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" /></svg>
+                  <input type="tel" placeholder="Phone Number *" aria-label="Phone number" required value={phone} aria-invalid={!!fieldErr.phone} onChange={(e) => { setPhone(e.target.value); clearErr('phone'); }} onBlur={(e) => blurCheck('phone', e.target.value)} />
+                </label>
+                {fieldErr.phone && <p className="cv3-field-err">{fieldErr.phone}</p>}
+                <label className="cv3-field cv3-field--select">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M9 3h6" /></svg>
+                  <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Your occupation">
+                    <option value="">I am a…</option>
+                    <option>Working professional</option>
+                    <option>Student</option>
+                    <option>Homemaker</option>
+                    <option>Founder / entrepreneur</option>
+                    <option>Other</option>
+                  </select>
+                  <svg className="cv3-field-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                </label>
+                <label className="cv3-field cv3-field--textarea">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-4 3v-3H4z" /></svg>
+                  <textarea placeholder="Anything you’d like us to know? (optional)" aria-label="Message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+                </label>
+                <button type="button" className="cv3-enquiry-send" onClick={submit} disabled={loading}>
+                  {loading ? 'SENDING…' : 'REQUEST A CALLBACK'}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
+                </button>
+                {error && <p className="cv3-enquiry-error">{error}</p>}
+                <div className="cv3-enquiry-note">Your information is secure with us</div>
+              </div>
+            </>
+          )}
+        </div>
+        {!sent && (
+          <a href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer" className="cv3-whatsapp-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.004c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.94 1.35-.5.05-1.13.24-3.66-.77-3.08-1.24-5.06-4.4-5.22-4.6-.15-.2-1.25-1.66-1.25-3.17s.79-2.25 1.07-2.56c.28-.3.61-.38.82-.38.2 0 .41 0 .59.01.19.01.44-.07.69.53.24.6.83 2.06.9 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.28.1 1.76.83 2.06.98.3.15.5.22.57.35.07.13.07.73-.17 1.4z" /></svg>
+            Talk to us on WhatsApp
+          </a>
         )}
       </div>
-      <a href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer" className="cv3-whatsapp-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.004c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.94 1.35-.5.05-1.13.24-3.66-.77-3.08-1.24-5.06-4.4-5.22-4.6-.15-.2-1.25-1.66-1.25-3.17s.79-2.25 1.07-2.56c.28-.3.61-.38.82-.38.2 0 .41 0 .59.01.19.01.44-.07.69.53.24.6.83 2.06.9 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.28.1 1.76.83 2.06.98.3.15.5.22.57.35.07.13.07.73-.17 1.4z" /></svg>
-        Talk to us on WhatsApp
-      </a>
     </div>
   );
 }
@@ -4959,6 +4991,7 @@ function CoursesCurriculumV3() {
   // Keep the detail panel on a module that's still visible after filtering.
   const m = modules[sel] || modules[0] || { submodules: [] };
   const active = shown.some((x) => x.idx === sel) ? m : (shown[0] || m);
+  const activeHasDuration = active.secs != null;
 
   // Below the master/detail breakpoint the panel is rendered inline, right under
   // the module you tapped, instead of in a second column far below the list.
@@ -4984,25 +5017,30 @@ function CoursesCurriculumV3() {
         </p>
       )}
       <div className="cv3-detail-meta">
-        <div><Cv3Icon name="play" size={16} fill /><div><b>{D.long(active.secs)}</b><span>Total Duration</span></div></div>
+        {activeHasDuration && (
+          <div><Cv3Icon name="play" size={16} fill /><div><b>{D.long(active.secs)}</b><span>Total Duration</span></div></div>
+        )}
         <div><Cv3Icon name="book" size={16} /><div><b>{active.submodules.length}</b><span>{active.submodules.length === 1 ? 'Lesson' : 'Lessons'}</span></div></div>
       </div>
       <div className="cv3-detail-lessonhead">
         <span>Lessons in this module</span>
-        <span>Duration</span>
+        {activeHasDuration && <span>Duration</span>}
       </div>
       <div className="cv3-detail-lessons">
-        {(active.submodules || []).map((sm, i) => (
-          <div key={sm.n} className="cv3-lesson">
-            <span className="cv3-lesson-num">{i + 1}</span>
-            <Cv3Icon name="play" size={13} fill />
-            <span className="cv3-lesson-text">{sm.title}</span>
-            <span className="cv3-lesson-dur">{D.clock(D.lessonSecs(sm))}</span>
-            {sm.preview
-              ? <><span className="cv3-lesson-badge">Preview</span><span className="cv3-lesson-lock"><Cv3Icon name="eye" size={15} /></span></>
-              : <span className="cv3-lesson-lock"><Cv3Icon name="lock" size={15} /></span>}
-          </div>
-        ))}
+        {(active.submodules || []).map((sm, i) => {
+          const lessonDuration = D.lessonSecs(sm);
+          return (
+            <div key={sm.n} className="cv3-lesson">
+              <span className="cv3-lesson-num">{i + 1}</span>
+              <Cv3Icon name="play" size={13} fill />
+              <span className="cv3-lesson-text">{sm.title}</span>
+              {lessonDuration != null && <span className="cv3-lesson-dur">{D.clock(lessonDuration)}</span>}
+              {sm.preview
+                ? <><span className="cv3-lesson-badge">Preview</span><span className="cv3-lesson-lock"><Cv3Icon name="eye" size={15} /></span></>
+                : <span className="cv3-lesson-lock"><Cv3Icon name="lock" size={15} /></span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -5048,7 +5086,7 @@ function CoursesCurriculumV3() {
                   <span className="cv3-mod-title">{mod.title}</span>
                   <span className="cv3-mod-meta">
                     <span><Cv3Icon name="book" size={14} /> {mod.submodules.length} lesson{mod.submodules.length === 1 ? '' : 's'}</span>
-                    <span><Cv3Icon name="clock" size={14} /> {D.long(mod.secs)}</span>
+                    {mod.secs != null && <span><Cv3Icon name="clock" size={14} /> {D.long(mod.secs)}</span>}
                   </span>
                 </button>
                 {stacked && mod.idx === active.idx && detail}
@@ -5088,6 +5126,115 @@ function CoursesTestimonials() {
   );
 }
 
+function CoursesCertificateSection() {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const closeRef = useRef(null);
+  const previousFocusRef = useRef(null);
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    previousFocusRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setPreviewOpen(false);
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        closeRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus();
+    };
+  }, [previewOpen]);
+
+  const requirements = [
+    'Complete the full course',
+    'Have every assignment reviewed and approved',
+    'Complete all mock interviews',
+  ];
+
+  return (
+    <section className="cv3-section cv3-certificate" id="cv3-certificate" aria-labelledby="cv3-certificate-title">
+      <div className="cv3-certificate-layout">
+        <div className="cv3-certificate-copy">
+          <div className="cv3-eyebrow">Course credential</div>
+          <h2 className="cv3-h2" id="cv3-certificate-title">Earn a certificate <em>that means something.</em></h2>
+          <p className="cv3-certificate-intro">
+            This is not a participation certificate. It is awarded only after you demonstrate that you completed the work.
+          </p>
+          <div className="cv3-certificate-requirements">
+            {requirements.map((requirement) => (
+              <div className="cv3-certificate-requirement" key={requirement}>
+                <span className="cv3-certificate-check" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+                </span>
+                <span>{requirement}</span>
+              </div>
+            ))}
+          </div>
+          <p className="cv3-certificate-note">
+            That standard protects the certificate&rsquo;s authenticity and ensures it represents demonstrated, practical skills.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="cv3-certificate-preview"
+          aria-haspopup="dialog"
+          aria-controls="cv3-certificate-preview-dialog"
+          onClick={() => setPreviewOpen(true)}
+        >
+          <span className="cv3-certificate-sample">Sample certificate</span>
+          <img
+            className="cv3-certificate-image"
+            src="logos/FLA Course Completion Certificate.svg"
+            alt="Sample Forward Learning Academy course completion certificate"
+            loading="lazy"
+            decoding="async"
+          />
+          <span className="cv3-certificate-view">
+            View full size
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+            </svg>
+          </span>
+        </button>
+      </div>
+
+      {previewOpen && (
+        <div className="cv3-certificate-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}>
+          <div
+            className="cv3-certificate-dialog"
+            id="cv3-certificate-preview-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cv3-certificate-preview-title"
+          >
+            <div className="cv3-certificate-dialog-head">
+              <h3 id="cv3-certificate-preview-title">Sample course completion certificate</h3>
+              <button ref={closeRef} type="button" className="cv3-certificate-close" onClick={() => setPreviewOpen(false)} aria-label="Close certificate preview">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+              </button>
+            </div>
+            <img
+              className="cv3-certificate-dialog-image"
+              src="logos/FLA Course Completion Certificate.svg"
+              alt="Sample Forward Learning Academy course completion certificate"
+            />
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CoursesFAQ() {
   const faqs = window.COURSE_FAQ || [];
   const [open, setOpen] = useState(-1);
@@ -5117,6 +5264,8 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
   const instr = window.COURSE_INSTRUCTOR || {};
+  const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
   // Runtime-only motion: scroll reveal + hero stat count-up. Gated on
   // navigator.webdriver so the prerender (puppeteer) never bakes hidden
@@ -5146,7 +5295,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
       });
     }
 
-    // Count-up on the hero stats ("26K+" → 0→26 keeping the K+ suffix)
+    // Count-up on the hero stats ("35K+" → 0→35 keeping the K+ suffix)
     const raf = [];
     if (!reduced) {
       document.querySelectorAll('.cv3-stat-num').forEach((el) => {
@@ -5197,27 +5346,48 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
 
   return (
     <div className="cv3">
-      {/* HERO — pitch left, enquiry form right */}
+      {/* HERO — creator-led pitch + course outcomes orbit */}
       <header className="cv3-hero">
-        <img className="cv3-hero-bg cv3-hero-bg--light" src="uploads/hero_Section_bacground.png" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" />
-        <img className="cv3-hero-bg cv3-hero-bg--dark" src="uploads/hero_Section_bacground_dark_mode.png" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" />
         <div className="cv3-hero-left">
-          <h1 className="cv3-hero-title">Build production-grade<br /><em>Agentic AI</em> that ships.</h1>
+          <h1 className="cv3-hero-title">Build production-grade <em>Agentic AI</em> with someone who ships it.</h1>
           <p className="cv3-hero-sub">
-            Go beyond demos. Learn to architect, evaluate, and deploy reliable AI agents the way real engineering teams do — from first principles to production monitoring.
-          </p>
-          <p className="cv3-hero-sub cv3-hero-sub--alumni">
-            Built by alumni from{' '}
-            {['IIT', 'IIM', 'NIT', 'DAU', 'Amazon', 'Warner Bros. Discovery', 'T-Mobile', 'Infosys', 'Swisscom', 'Applied AI Course'].map((name, i, arr) => (
-              <React.Fragment key={name}>
-                <b className="cv3-hero-highlight">{name}</b>{i < arr.length - 1 ? ', ' : '.'}
-              </React.Fragment>
-            ))}
+            Learn directly from Balaji Chippada to architect, evaluate, and deploy reliable AI agents — from first principles to production monitoring.
           </p>
           <div className="cv3-hero-ctas">
-            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
-            <a href="#cv3-curriculum" className="cv3-btn cv3-btn--ghost" onClick={scrollToId('cv3-curriculum')}>View curriculum →</a>
+            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>
+              Enroll Now
+              <svg className="cv3-hero-cta-chevrons" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m5 5 7 7-7 7" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </a>
+            <button type="button" className="cv3-btn cv3-btn--advisor" onClick={() => setAdvisorOpen(true)}>
+              <svg className="cv3-advisor-cta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" />
+              </svg>
+              Talk to an Advisor
+            </button>
           </div>
+        </div>
+        <div className="cv3-creator-visual">
+          <img
+            className="cv3-creator-art cv3-creator-art--light"
+            src="uploads/Hero_section_light.png"
+            alt="Balaji Chippada surrounded by the Agentic AI skills taught in the course"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+          <img
+            className="cv3-creator-art cv3-creator-art--dark"
+            src="uploads/Hero_Section_Dark_mODE.png"
+            alt="Balaji Chippada surrounded by the Agentic AI skills taught in the course"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </div>
+        <div className="cv3-hero-proof">
           <div className="cv3-hero-stats">
             {heroStats.map(([num, label, icon]) => (
               <div key={label} className="cv3-hero-stat">
@@ -5226,19 +5396,9 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
               </div>
             ))}
           </div>
-          {(instr.heroChips || []).length > 0 && (
-            <div className="cv3-hero-chips">
-              {instr.heroChips.map((chip) => (
-                <span key={chip} className="cv3-hero-chip">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--cv3-accent)" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" stroke="#fff" strokeWidth="2" fill="none" /></svg>
-                  {chip}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
-        <CoursesEnquiryCard />
       </header>
+      {advisorOpen && <CoursesEnquiryCard onClose={() => setAdvisorOpen(false)} />}
 
       {/* TRUST BAR */}
       <section className="cv3-trust">
@@ -5291,6 +5451,59 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
         </div>
       </section>
 
+      {/* CURRICULUM — master/detail */}
+      <CoursesCurriculumV3 />
+
+      {/* PROJECTS — dark band */}
+      <section className="cv3-projects" id="cv3-projects">
+        <div className="cv3-projects-inner">
+          <div className="cv3-section-head">
+            <div className="cv3-eyebrow cv3-eyebrow--on-dark">Hands-on</div>
+            <h2 className="cv3-h2 cv3-h2--on-dark">Projects <em>you will build.</em></h2>
+            <p className="cv3-section-sub cv3-section-sub--on-dark">Every module ends with something running. You leave with a portfolio of production-grade agents.</p>
+          </div>
+          <div className="cv3-projects-grid" id="cv3-projects-grid">
+            {projects.slice(0, showAllProjects ? projects.length : 6).map((p) => (
+              <div key={p.num} className="cv3-project">
+                <div className={`cv3-project-visual ${p.lightImage && p.darkImage ? 'cv3-project-visual--art' : ''}`} aria-hidden="true">
+                  {p.lightImage && p.darkImage ? (
+                    <>
+                      <img className="cv3-project-art cv3-project-art--light" src={p.lightImage} alt="" loading="lazy" decoding="async" />
+                      <img className="cv3-project-art cv3-project-art--dark" src={p.darkImage} alt="" loading="lazy" decoding="async" />
+                    </>
+                  ) : (
+                    <>
+                      <div className="cv3-project-dots"><span /><span /><span /></div>
+                      <div className="cv3-project-lines"><i /><i /><i /></div>
+                    </>
+                  )}
+                </div>
+                <div className="cv3-project-num">{p.num}</div>
+                <div className="cv3-project-title">{p.title}</div>
+                <div className="cv3-project-desc">{p.desc}</div>
+                <div className="cv3-project-tags">
+                  {(p.tags || []).map((tag) => <span key={tag} className="cv3-project-tag">{tag}</span>)}
+                </div>
+              </div>
+            ))}
+          </div>
+          {projects.length > 6 && (
+            <button
+              type="button"
+              className="cv3-btn cv3-btn--advisor cv3-projects-more"
+              aria-expanded={showAllProjects}
+              aria-controls="cv3-projects-grid"
+              onClick={() => setShowAllProjects((visible) => !visible)}
+            >
+              {showAllProjects ? 'Show fewer projects' : `View all ${projects.length} projects`}
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* CERTIFICATE — earned after approved assignments + mock interviews */}
+      <CoursesCertificateSection />
+
       {/* HIGHLIGHTS */}
       <section className="cv3-section" id="cv3-highlights">
         <CoursesSectionHead eyebrow="What you'll get" title="Course highlights" sub="Everything you need to build, ship and scale production-grade AI agents" />
@@ -5304,36 +5517,6 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* CURRICULUM — master/detail */}
-      <CoursesCurriculumV3 />
-
-      {/* PROJECTS — dark band */}
-      <section className="cv3-projects" id="cv3-projects">
-        <div className="cv3-projects-inner">
-          <div className="cv3-section-head">
-            <div className="cv3-eyebrow cv3-eyebrow--on-dark">Hands-on</div>
-            <h2 className="cv3-h2 cv3-h2--on-dark">Projects <em>you will build.</em></h2>
-            <p className="cv3-section-sub cv3-section-sub--on-dark">Every module ends with something running. You leave with a portfolio of production-grade agents.</p>
-          </div>
-          <div className="cv3-projects-grid">
-            {projects.map((p) => (
-              <div key={p.num} className="cv3-project">
-                <div className="cv3-project-visual" aria-hidden="true">
-                  <div className="cv3-project-dots"><span /><span /><span /></div>
-                  <div className="cv3-project-lines"><i /><i /><i /></div>
-                </div>
-                <div className="cv3-project-num">{p.num}</div>
-                <div className="cv3-project-title">{p.title}</div>
-                <div className="cv3-project-desc">{p.desc}</div>
-                <div className="cv3-project-tags">
-                  {(p.tags || []).map((tag) => <span key={tag} className="cv3-project-tag">{tag}</span>)}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -6343,16 +6526,38 @@ function AdminEmailTasks() {
 // MAIN APPLICATION ROOT COMPONENT
 // ===============================================================
 
+function SiteContactBar() {
+  return (
+    <div className="site-contact-bar" role="region" aria-label="Contact information">
+      <div className="site-contact-bar__inner">
+        <span className="site-contact-bar__prompt">Have a question?</span>
+        <span className="site-contact-bar__item" aria-label="Temporary contact number +91 XXXXXXXXXX">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z" />
+          </svg>
+          <span>+91 XXXXXXXXXX</span>
+        </span>
+        <a className="site-contact-bar__item" href="mailto:team@balajichippada.com">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+          <span>team@balajichippada.com</span>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [dockVisible, setDockVisible] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false); // for nav blur
   const [navMenuOpen, setNavMenuOpen] = useState(false);
 
-  // Welcome popup → promo banner handoff. Banner stays hidden until the popup
-  // resolves (closed, already-dismissed, or disabled), so they never stack.
-  const [welcomeResolved, setWelcomeResolved] = useState(false);
-  const handleWelcomeResolved = React.useCallback(() => setWelcomeResolved(true), []);
+  // The popup callback remains stable, but the old enrollment banner has been
+  // replaced by the permanent contact strip above navigation.
+  const handleWelcomeResolved = React.useCallback(() => {}, []);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
     const stored = localStorage.getItem('roadmap-theme');
@@ -7981,16 +8186,11 @@ function App() {
 
   return (
     <React.Fragment>
-      {/* Interruption ladder: welcome popup first → (on close) promo banner → (on close) nothing.
-          The banner only appears once the popup has been resolved (shown+closed, already
-          dismissed on a prior visit, or disabled). */}
-      {/* Skip the sales popup entirely once the seat is reserved (banner is
-          independently hidden via canShow below). */}
+      <SiteContactBar />
+
+      {/* Skip the sales popup entirely once the seat is reserved. */}
       {!nextMcReserved && (
         <V2WelcomePopup nextMc={nextMasterclass} onReserve={openBooking} onResolve={handleWelcomeResolved} />
-      )}
-      {V2_CONFIG.showTopBanner && (
-        <V2TopBanner nextMc={nextMasterclass} onReserve={openBooking} canShow={welcomeResolved && !nextMcReserved} />
       )}
 
       {motion ? (

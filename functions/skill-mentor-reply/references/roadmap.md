@@ -63,7 +63,7 @@ Reuse this when a student asks "how do I actually get hired?"
 
 ## Other channels to mention when it fits
 
-- YouTube: `@balajichippada` (26K+ subs; the roadmap walkthrough has 170K+ views)
+- YouTube: `@balajichippada` (35K+ subs; the roadmap walkthrough has 230K+ views)
 - WhatsApp community: `chat.whatsapp.com/GASHZYf7wBA23nQvb39lIP`
 - LinkedIn: `linkedin.com/in/balaji-chippada-0317/`
 

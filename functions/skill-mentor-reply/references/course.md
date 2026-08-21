@@ -58,7 +58,7 @@ Note the order: an agent gets built in **Module 01**, before NLP and LLM interna
 
 ## Credibility to cite (only when relevant, never as a brag list)
 
-9+ years production AI/ML · 5,000+ mentored over three years · 26K+ YouTube subscribers · 170K+ roadmap views · production experience at Swisscom, Warner Bros. Discovery, T-Mobile, Infosys · team includes alumni from IIT, IIM, NIT, DAU, Amazon, Applied AI Course.
+9+ years production AI/ML · 5,000+ mentored over three years · 35K+ YouTube subscribers · 230K+ roadmap views · production experience at Swisscom, Warner Bros. Discovery, T-Mobile, Infosys · team includes alumni from IIT, IIM, NIT, DAU, Amazon, Applied AI Course.
 
 ## Established answers to the common objections
 

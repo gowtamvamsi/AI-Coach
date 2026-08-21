@@ -554,8 +554,8 @@ const V2_BRAND = Object.assign({
 }, (_SC.brand || {}));
 
 const V2_SOCIAL = Object.assign({
-  youtubeSubs: '26K+',
-  roadmapViews: '170K+',
+  youtubeSubs: '35K+',
+  roadmapViews: '230K+',
   studentsTrained: '3000+',
 }, ((_SC.brand && _SC.brand.stats) || {}));
 

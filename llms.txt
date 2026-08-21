@@ -1,6 +1,6 @@
 # The Agent Engineer — Balaji Chippada
 
-> Free 26-week Agentic AI Engineer roadmap (170K+ YouTube views) and live demo-first masterclasses. Production RAG, LangGraph, MCP, multi-agent systems, guardrails, AWS deployment — not tutorial fluff.
+> Free 26-week Agentic AI Engineer roadmap (230K+ YouTube views) and live demo-first masterclasses. Production RAG, LangGraph, MCP, multi-agent systems, guardrails, AWS deployment — not tutorial fluff.
 
 Balaji Chippada teaches software engineers to ship production-grade agentic AI systems. This website combines an interactive roadmap with embedded video lessons, progress tracking, and live cohort masterclasses.
 
@@ -46,7 +46,7 @@ Balaji Chippada teaches software engineers to ship production-grade agentic AI s
 
 - **Name**: Balaji Chippada
 - **Role**: Production agentic AI engineer & educator (8 years in AI/ML)
-- **YouTube**: https://www.youtube.com/@balajichippada (26K+ subscribers, 170K+ roadmap views)
+- **YouTube**: https://www.youtube.com/@balajichippada (35K+ subscribers, 230K+ roadmap views)
 - **LinkedIn**: https://www.linkedin.com/in/balaji-chippada-0317/
 
 ## Optional — extended curriculum detail

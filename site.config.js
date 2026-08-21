@@ -40,8 +40,8 @@ window.SITE_CONFIG = {
     instagram: 'https://www.instagram.com/balajichippada',
     github: 'https://github.com/ch-balaji',
     stats: {
-      youtubeSubs: '26K+',
-      roadmapViews: '170K+',
+      youtubeSubs: '35K+',
+      roadmapViews: '230K+',
       studentsTrained: '3000+',
     },
   },
@@ -51,11 +51,11 @@ window.SITE_CONFIG = {
   // ─────────────────────────────────────────────────────────────────
   instructor: {
     name: 'Balaji Chippada',
-    title: '8 years in AI/ML · Production agentic AI · 26K+ YouTube',
+    title: '8 years in AI/ML · Production agentic AI · 35K+ YouTube',
     photo: 'uploads/balaji-chippada-avatar.webp', // optimized 256px avatar (full-res PNG kept for og:image). Leave empty for initials avatar
-    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (170K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
+    bio: 'I build production-scale agentic applications and teach engineers what actually matters when systems leave the demo stage. The free 26-week roadmap (230K+ views) is open source with no paywall — live masterclasses are where we build together on specific phases: RAG, Claude Code, multi-agent orchestration, guardrails and deployment.',
     quote: 'I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.',
-    chips: ['170K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
+    chips: ['230K+ roadmap views', 'LangGraph', 'ReAct · MCP', 'Production RAG', 'Multi-Agent', 'LLMOps'],
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     youtube: 'https://www.youtube.com/@balajichippada',
   },
