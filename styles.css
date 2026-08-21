@@ -9532,6 +9532,58 @@ body.nav-menu-open .v2-mobile-sticky {
 .cv3-field select { appearance: none; -webkit-appearance: none; cursor: pointer; color: var(--cv3-ink2); }
 .cv3-field select option { color: #1a1814; }
 .cv3-field-chevron { pointer-events: none; }
+.advisor-widget-phone-field { gap: 0; }
+.advisor-widget-phone-field > svg:first-child { flex: none; margin-right: 10px; }
+.advisor-widget-phone-country {
+  position: relative;
+  width: 88px;
+  min-width: 88px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  color: var(--cv3-ink2);
+}
+.advisor-widget-phone-country-display {
+  display: block;
+  max-width: 68px;
+  overflow: hidden;
+  color: var(--cv3-ink);
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.advisor-widget-phone-country-select {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.advisor-widget-phone-country-caret {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cv3-ink3);
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+.advisor-widget-phone-divider {
+  width: 1px;
+  height: 24px;
+  flex: none;
+  margin: 0 10px;
+  background: var(--cv3-line);
+}
+.advisor-widget-phone-field input { min-width: 0; }
+.advisor-widget-phone-field:focus-within .advisor-widget-phone-country-display {
+  color: var(--cv3-accent);
+}
 .cv3-field--textarea { align-items: flex-start; padding-top: 12px; }
 .cv3-field--textarea svg { margin-top: 2px; }
 .cv3-field textarea { padding: 2px 0 12px; resize: none; }

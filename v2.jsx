@@ -176,7 +176,7 @@ if (typeof window !== 'undefined') window.V2_VALIDATE = V2_VALIDATE;
 // India first (default selection); the rest alphabetical by name for findability.
 // `max` overrides the default 10-digit national-number cap where a country runs
 // longer (e.g. China/Germany mobiles can be 11).
-const V2_DIAL_CODES = [
+const V2_DIAL_CODES_FALLBACK = [
   { iso: 'IN', dial: '+91', name: 'India' },
   { iso: 'AF', dial: '+93', name: 'Afghanistan' },
   { iso: 'AL', dial: '+355', name: 'Albania' },
@@ -381,8 +381,12 @@ const V2_DIAL_CODES = [
   { iso: 'ZM', dial: '+260', name: 'Zambia' },
   { iso: 'ZW', dial: '+263', name: 'Zimbabwe' },
 ];
+const V2_DIAL_CODES = Array.isArray(window.PHONE_COUNTRIES) && window.PHONE_COUNTRIES.length
+  ? window.PHONE_COUNTRIES
+  : V2_DIAL_CODES_FALLBACK;
 // Flag emoji from an ISO-2 code (regional indicator letters).
 function v2Flag(iso) {
+  if (window.PHONE_COUNTRY_UTILS?.flag) return window.PHONE_COUNTRY_UTILS.flag(iso);
   try { return String.fromCodePoint(...[...iso.toUpperCase()].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)); }
   catch (e) { return ''; }
 }

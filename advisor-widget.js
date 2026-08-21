@@ -42,6 +42,35 @@
     return String(contact.recaptchaSiteKey || '').trim();
   }
 
+  function getPhoneCountries() {
+    if (Array.isArray(window.PHONE_COUNTRIES) && window.PHONE_COUNTRIES.length) {
+      return window.PHONE_COUNTRIES;
+    }
+    return [{ iso: 'IN', dial: '+91', name: 'India' }];
+  }
+
+  function getPhoneCountry(iso) {
+    var countries = getPhoneCountries();
+    return countries.find(function (country) { return country.iso === iso; }) || countries[0];
+  }
+
+  function phoneFlag(iso) {
+    if (window.PHONE_COUNTRY_UTILS && window.PHONE_COUNTRY_UTILS.flag) {
+      return window.PHONE_COUNTRY_UTILS.flag(iso);
+    }
+    return iso === 'IN' ? '\uD83C\uDDEE\uD83C\uDDF3' : '';
+  }
+
+  function inferPhoneCountry() {
+    var languages = navigator.languages && navigator.languages.length
+      ? navigator.languages
+      : [navigator.language];
+    if (window.PHONE_COUNTRY_UTILS && window.PHONE_COUNTRY_UTILS.inferIso) {
+      return window.PHONE_COUNTRY_UTILS.inferIso(languages);
+    }
+    return 'IN';
+  }
+
   function normalizePathname(pathname) {
     return String(pathname || '/').replace(/\/+$/, '') || '/';
   }
@@ -399,6 +428,83 @@
       return input;
     }
 
+    function addPhoneField() {
+      var countries = getPhoneCountries();
+      var initialIso = inferPhoneCountry();
+      var wrap = document.createElement('div');
+      wrap.className = 'advisor-widget-field advisor-widget-phone-field cv3-field';
+      wrap.setAttribute('role', 'group');
+      wrap.setAttribute('aria-label', 'Phone number');
+      wrap.appendChild(createSvgIcon([
+        { tag: 'path', attrs: { d: 'M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z' } },
+      ], { size: 18, strokeWidth: 1.8 }));
+
+      var countryWrap = document.createElement('span');
+      countryWrap.className = 'advisor-widget-phone-country';
+      var countryDisplay = document.createElement('span');
+      countryDisplay.className = 'advisor-widget-phone-country-display';
+      countryDisplay.setAttribute('aria-hidden', 'true');
+      var countrySelect = document.createElement('select');
+      countrySelect.name = 'phoneCountry';
+      countrySelect.className = 'advisor-widget-phone-country-select';
+      countrySelect.setAttribute('aria-label', 'Country code');
+      countrySelect.setAttribute('autocomplete', 'tel-country-code');
+      countries.forEach(function (country) {
+        var option = document.createElement('option');
+        option.value = country.iso;
+        option.textContent = country.name + ' (' + country.dial + ')';
+        countrySelect.appendChild(option);
+      });
+      countrySelect.value = getPhoneCountry(initialIso).iso;
+      var caret = document.createElement('span');
+      caret.className = 'advisor-widget-phone-country-caret';
+      caret.setAttribute('aria-hidden', 'true');
+      caret.textContent = '\u25BE';
+      countryWrap.appendChild(countryDisplay);
+      countryWrap.appendChild(countrySelect);
+      countryWrap.appendChild(caret);
+
+      var divider = document.createElement('span');
+      divider.className = 'advisor-widget-phone-divider';
+      divider.setAttribute('aria-hidden', 'true');
+
+      var input = document.createElement('input');
+      input.type = 'tel';
+      input.inputMode = 'numeric';
+      input.name = 'phone';
+      input.required = true;
+      input.placeholder = 'Phone Number *';
+      input.setAttribute('aria-label', 'Phone number');
+      input.setAttribute('autocomplete', 'tel-national');
+      input.setAttribute('aria-describedby', 'advisor-widget-error-phone');
+
+      function updateCountry() {
+        var country = getPhoneCountry(countrySelect.value);
+        countrySelect.value = country.iso;
+        countryDisplay.textContent = phoneFlag(country.iso) + ' ' + country.dial;
+        input.maxLength = Math.max(4, 15 - countDigits(country.dial));
+        input.value = input.value.replace(/\D/g, '').slice(0, input.maxLength);
+      }
+
+      addModalListener(countrySelect, 'change', updateCountry);
+      addModalListener(input, 'input', function () {
+        input.value = input.value.replace(/\D/g, '').slice(0, input.maxLength);
+      });
+      updateCountry();
+
+      wrap.appendChild(countryWrap);
+      wrap.appendChild(divider);
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+
+      var err = document.createElement('p');
+      err.id = 'advisor-widget-error-phone';
+      err.className = 'advisor-widget-error cv3-field-err';
+      err.setAttribute('data-field', 'phone');
+      err.hidden = true;
+      form.appendChild(err);
+    }
+
     addField('name', 'Your name', 'text', {
       required: true,
       placeholder: 'Your Name',
@@ -415,13 +521,7 @@
         { tag: 'path', attrs: { d: 'm3 7 9 6 9-6' } },
       ],
     });
-    addField('phone', 'Phone number', 'tel', {
-      required: true,
-      placeholder: 'Phone Number *',
-      icon: [
-        { tag: 'path', attrs: { d: 'M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z' } },
-      ],
-    });
+    addPhoneField();
     addField('occupation', 'Occupation', null, {
       tag: 'select',
       icon: [
@@ -500,10 +600,14 @@
 
   function readFormValues() {
     if (!state.formEl) return {};
+    var phoneInput = state.formEl.querySelector('[name="phone"]');
+    var countrySelect = state.formEl.querySelector('[name="phoneCountry"]');
+    var nationalNumber = phoneInput ? phoneInput.value.replace(/\D/g, '') : '';
+    var selectedCountry = getPhoneCountry(countrySelect ? countrySelect.value : 'IN');
     return {
       name: state.formEl.querySelector('[name="name"]').value,
       email: state.formEl.querySelector('[name="email"]').value,
-      phone: state.formEl.querySelector('[name="phone"]').value,
+      phone: nationalNumber ? selectedCountry.dial + nationalNumber : '',
       occupation: state.formEl.querySelector('[name="occupation"]').value,
       message: state.formEl.querySelector('[name="message"]').value,
     };

@@ -8,6 +8,7 @@ import puppeteer from 'puppeteer';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WIDGET_PATH = path.join(ROOT, 'advisor-widget.js');
+const COUNTRIES_PATH = path.join(ROOT, 'phone-countries.js');
 const STYLES_PATH = path.join(ROOT, 'styles.css');
 
 let browser;
@@ -51,6 +52,16 @@ async function loadWidgetPage(page, options = {}) {
   }
 
   await page.addStyleTag({ path: STYLES_PATH });
+  await page.evaluate((languages) => {
+    Object.defineProperty(window.navigator, 'languages', {
+      configurable: true,
+      get: () => languages,
+    });
+    Object.defineProperty(window.navigator, 'language', {
+      configurable: true,
+      get: () => languages[0] || '',
+    });
+  }, options.languages ?? ['hi-IN']);
   await page.evaluate((siteConfig) => {
     window.SITE_CONFIG = siteConfig;
     window.grecaptcha = {
@@ -78,6 +89,7 @@ async function loadWidgetPage(page, options = {}) {
     contact: { recaptchaSiteKey: options.recaptchaSiteKey ?? 'test-site-key' },
   });
 
+  await page.addScriptTag({ path: COUNTRIES_PATH });
   await page.addScriptTag({ path: WIDGET_PATH });
   await page.waitForFunction(() => window.AdvisorWidget);
 }
@@ -236,6 +248,45 @@ test('modal restores the previous icon-led course guidance design', async () => 
   await page.close();
 });
 
+test('phone selector detects the browser country and exposes the full country list', async () => {
+  const page = await browser.newPage();
+  await loadWidgetPage(page, { languages: ['en-GB'] });
+  await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
+  const phoneUi = await page.evaluate(() => {
+    const select = document.querySelector('[name="phoneCountry"]');
+    return {
+      selectedIso: select?.value,
+      optionCount: select?.options.length,
+      selectedDisplay: document.querySelector('.advisor-widget-phone-country-display')?.textContent.trim(),
+      countryAutocomplete: select?.autocomplete,
+      nationalAutocomplete: document.querySelector('[name="phone"]')?.autocomplete,
+    };
+  });
+  assert.equal(phoneUi.selectedIso, 'GB');
+  assert.ok(phoneUi.optionCount >= 200);
+  assert.equal(phoneUi.selectedDisplay, '🇬🇧 +44');
+  assert.equal(phoneUi.countryAutocomplete, 'tel-country-code');
+  assert.equal(phoneUi.nationalAutocomplete, 'tel-national');
+  await page.close();
+});
+
+test('phone selector falls back to India and updates its compact display', async () => {
+  const page = await browser.newPage();
+  await loadWidgetPage(page, { languages: ['fr'] });
+  await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
+  assert.equal(await page.$eval('[name="phoneCountry"]', (el) => el.value), 'IN');
+  assert.equal(
+    await page.$eval('.advisor-widget-phone-country-display', (el) => el.textContent.trim()),
+    '🇮🇳 +91',
+  );
+  await page.select('[name="phoneCountry"]', 'US');
+  assert.equal(
+    await page.$eval('.advisor-widget-phone-country-display', (el) => el.textContent.trim()),
+    '🇺🇸 +1',
+  );
+  await page.close();
+});
+
 test('empty submission shows name email phone errors without fetch', async () => {
   const page = await newPage();
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
@@ -323,11 +374,12 @@ test('repeated open close cycles do not grow modal listener bookkeeping', async 
 });
 
 test('valid submission executes recaptcha and posts normalized payload', async () => {
-  const page = await newPage();
+  const page = await newPage({ languages: ['en-US'] });
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '415 555-0132');
+  assert.equal(await page.$eval('[name="phone"]', (el) => el.value), '4155550132');
   await page.type('[name="message"]', '  Please call after 6 PM.  ');
   await page.select('[name="occupation"]', 'Student');
   await page.click('.advisor-widget-dialog button[type="submit"]');
@@ -344,7 +396,7 @@ test('valid submission executes recaptcha and posts normalized payload', async (
   assert.deepEqual(body, {
     name: 'Asha Rao',
     email: 'asha@example.com',
-    phone: '+919876543210',
+    phone: '+14155550132',
     occupation: 'Student',
     message: 'Please call after 6 PM.',
     recaptchaToken: 'test-token',
@@ -357,7 +409,7 @@ test('success shows approved callback confirmation copy', async () => {
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '9876543210');
   await page.click('.advisor-widget-dialog button[type="submit"]');
   await page.waitForSelector('.advisor-widget-success');
   const successText = await page.$eval('.advisor-widget-success', (el) => el.textContent.trim());
@@ -389,7 +441,7 @@ test('failed request retains values and keeps WhatsApp available', async () => {
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '9876543210');
   await page.click('.advisor-widget-dialog button[type="submit"]');
   await page.waitForFunction(() =>
     [...document.querySelectorAll('.advisor-widget-dialog .advisor-widget-error')]
@@ -400,7 +452,7 @@ test('failed request retains values and keeps WhatsApp available', async () => {
   const phoneVal = await page.$eval('[name="phone"]', (el) => el.value);
   assert.equal(nameVal, 'Asha Rao');
   assert.equal(emailVal, 'asha@example.com');
-  assert.equal(phoneVal, '+919876543210');
+  assert.equal(phoneVal, '9876543210');
   const whatsapp = await page.$('.advisor-widget-whatsapp');
   assert.ok(whatsapp);
   await page.close();
@@ -422,7 +474,7 @@ test('repeated submit clicks while pending make one request', async () => {
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '9876543210');
   const submitBtn = '.advisor-widget-dialog button[type="submit"]';
   await page.click(submitBtn);
   await page.click(submitBtn);
@@ -448,7 +500,7 @@ test('a closed pending submission cannot mutate a newly reopened dialog', async 
   });
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '9876543210');
   await page.click('.advisor-widget-dialog button[type="submit"]');
   await page.waitForFunction(() => window.__fetchCalls.length === 1);
 
@@ -476,7 +528,7 @@ test('missing recaptcha key fails closed before fetch', async () => {
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   await page.type('[name="name"]', 'Asha Rao');
   await page.type('[name="email"]', 'asha@example.com');
-  await page.type('[name="phone"]', '+919876543210');
+  await page.type('[name="phone"]', '9876543210');
   await page.click('.advisor-widget-dialog button[type="submit"]');
   await page.waitForFunction(() =>
     [...document.querySelectorAll('.advisor-widget-dialog .advisor-widget-error')]

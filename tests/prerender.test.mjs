@@ -70,10 +70,11 @@ const PUBLIC_PAGES = [
 ];
 
 const APPROVED_VERSIONS = {
-  'styles.css': '143',
+  'styles.css': '144',
   'site.config.js': '19',
-  'advisor-widget.js': '2',
-  'v2.build.js': '37',
+  'phone-countries.js': '1',
+  'advisor-widget.js': '3',
+  'v2.build.js': '38',
   'app.build.js': '120',
 };
 
@@ -81,8 +82,13 @@ for (const page of PUBLIC_PAGES) {
   test(`public page assets — ${page} loads widget scripts once`, () => {
     const html = read(page);
     assert.equal((html.match(/site\.config\.js\?v=19/g) || []).length, 1, 'one site.config.js?v=19');
-    assert.equal((html.match(/advisor-widget\.js\?v=2/g) || []).length, 1, 'one advisor-widget.js?v=2');
-    assert.match(html, /styles\.css\?v=143/, 'styles.css?v=143');
+    assert.equal((html.match(/phone-countries\.js\?v=1/g) || []).length, 1, 'one phone-countries.js?v=1');
+    assert.equal((html.match(/advisor-widget\.js\?v=3/g) || []).length, 1, 'one advisor-widget.js?v=3');
+    assert.match(html, /styles\.css\?v=144/, 'styles.css?v=144');
+    assert.ok(
+      html.indexOf('phone-countries.js?v=1') < html.indexOf('advisor-widget.js?v=3'),
+      'country data loads before advisor widget',
+    );
   });
 }
 

@@ -35,6 +35,8 @@ test('normalizePayload — returns the exact stored lead shape', () => {
     message: 'Please call after 6 PM.',
     source: 'course_enquiry',
   });
+  assert.equal('country' in result.value.lead, false);
+  assert.equal('countryCode' in result.value.lead, false);
   assert.equal(result.value.recaptchaToken, 'token');
 });
 

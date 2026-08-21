@@ -1,5 +1,5 @@
-// Loads the REAL shipped browser bundles (site.config.js, data.js, videos.js,
-// v2.build.js) into a Node vm sandbox with minimal browser stubs, then returns
+// Loads the REAL shipped browser bundles (site.config.js, phone-countries.js,
+// data.js, videos.js, v2.build.js) into a Node vm sandbox with minimal browser stubs, then returns
 // the sandbox so tests can call the actual production functions (V2_VALIDATE,
 // getMcPrice, formatMc*, ROADMAP, ROADMAP_VIDEOS, …).
 //
@@ -50,7 +50,7 @@ export function loadSiteGlobals() {
   sandbox.firebase = noop;
 
   vm.createContext(sandbox);
-  for (const f of ['site.config.js', 'data.js', 'videos.js', 'v2.build.js']) {
+  for (const f of ['site.config.js', 'phone-countries.js', 'data.js', 'videos.js', 'v2.build.js']) {
     const code = fs.readFileSync(path.join(ROOT, f), 'utf8');
     vm.runInContext(code, sandbox, { filename: f });
   }

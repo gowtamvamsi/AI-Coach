@@ -51,6 +51,32 @@ test('phone — v2SplitE164 splits dial + local (longest-prefix match)', () => {
   assert.deepEqual(split('+971501234567'), { dial: '+971', local: '501234567' });
 });
 
+test('phone countries — shared list covers international and shared calling codes', () => {
+  const countries = g.PHONE_COUNTRIES;
+  assert.ok(Array.isArray(countries));
+  assert.ok(countries.length >= 200);
+  assert.equal(new Set(countries.map((country) => country.iso)).size, countries.length);
+  for (const iso of ['IN', 'US', 'CA', 'GB', 'AE', 'SG', 'AU', 'ZA', 'BR', 'JP']) {
+    assert.ok(countries.some((country) => country.iso === iso), `${iso} is present`);
+  }
+  assert.equal(countries.find((country) => country.iso === 'US').dial, '+1');
+  assert.equal(countries.find((country) => country.iso === 'CA').dial, '+1');
+  assert.equal(countries.find((country) => country.iso === 'RU').dial, '+7');
+  assert.equal(countries.find((country) => country.iso === 'KZ').dial, '+7');
+});
+
+test('phone countries — browser locale inference uses a supported region and falls back to India', () => {
+  const { inferIso, flag } = g.PHONE_COUNTRY_UTILS;
+  assert.equal(inferIso(['en-GB']), 'GB');
+  assert.equal(inferIso(['en-US']), 'US');
+  assert.equal(inferIso(['hi-IN']), 'IN');
+  assert.equal(inferIso(['en', 'de-DE']), 'DE');
+  assert.equal(inferIso(['fr']), 'IN');
+  assert.equal(inferIso(['xx-ZZ']), 'IN');
+  assert.equal(inferIso([]), 'IN');
+  assert.equal(flag('IN'), '🇮🇳');
+});
+
 // ── Email: format + disposable + placeholder + typo detection ────────────────
 test('email — accepts real addresses', () => {
   const V = g.V2_VALIDATE;
