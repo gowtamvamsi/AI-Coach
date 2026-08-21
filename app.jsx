@@ -4808,140 +4808,6 @@ function CoursesSectionHead({ eyebrow, title, sub }) {
   );
 }
 
-function CoursesEnquiryCard({ onClose }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-  // Inline validation — errors surface as fields blur, not only on submit
-  const [fieldErr, setFieldErr] = useState({});
-  const closeRef = useRef(null);
-  const validators = {
-    name: (v) => V2_VALIDATE.nameError(v),
-    email: (v) => V2_VALIDATE.emailError(v),
-    phone: (v) => V2_VALIDATE.phoneError(v, true),
-  };
-  const blurCheck = (field, value) => {
-    if (!value.trim()) return; // empty untouched fields stay quiet until submit
-    setFieldErr((prev) => ({ ...prev, [field]: validators[field](value) || '' }));
-  };
-  const clearErr = (field) => setFieldErr((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
-
-  useEffect(() => {
-    const previousFocus = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    closeRef.current?.focus();
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus?.();
-    };
-  }, [onClose]);
-
-  const submit = async () => {
-    const err = V2_VALIDATE.nameError(name) || V2_VALIDATE.emailError(email) || V2_VALIDATE.phoneError(phone, true);
-    if (err) { setError(err); return; }
-    setLoading(true); setError('');
-    try {
-      const db = window.firebase.firestore();
-      await db.collection('leads').add({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        occupation: role,
-        message: message.trim(),
-        source: 'course_enquiry',
-        createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
-      });
-      setSent(true);
-    } catch (e) {
-      console.error('[COURSE ENQUIRY] persistence failed', e);
-      setError('Something went wrong — please try again or reach us on WhatsApp.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="cv3-advisor-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="cv3-advisor-dialog" role="dialog" aria-modal="true" aria-labelledby="cv3-advisor-title">
-        <button ref={closeRef} type="button" className="cv3-advisor-close" onClick={onClose} aria-label="Close advisor form">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-        </button>
-        <div className="cv3-enquiry-card">
-          <div className="cv3-eyebrow">Course guidance</div>
-          <h3 className="cv3-enquiry-title" id="cv3-advisor-title">Talk to a Course Advisor</h3>
-          {sent ? (
-            <div className="cv3-advisor-success">
-              <span className="cv3-advisor-success-icon" aria-hidden="true">✓</span>
-              <p className="cv3-enquiry-success">Thanks—your request is in. A course advisor will call you within 24 hours.</p>
-              <button type="button" className="cv3-enquiry-send" onClick={onClose}>Close</button>
-            </div>
-          ) : (
-            <>
-              <p className="cv3-advisor-intro">Share your details and we’ll help you decide whether this course is the right fit.</p>
-              <div className="cv3-enquiry-fields">
-                <label className={`cv3-field ${fieldErr.name ? 'cv3-field--invalid' : ''}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
-                  <input type="text" placeholder="Your Name" aria-label="Your name" value={name} aria-invalid={!!fieldErr.name} onChange={(e) => { setName(e.target.value); clearErr('name'); }} onBlur={(e) => blurCheck('name', e.target.value)} />
-                </label>
-                {fieldErr.name && <p className="cv3-field-err">{fieldErr.name}</p>}
-                <label className={`cv3-field ${fieldErr.email ? 'cv3-field--invalid' : ''}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-                  <input type="email" placeholder="Email Address" aria-label="Email address" value={email} aria-invalid={!!fieldErr.email} onChange={(e) => { setEmail(e.target.value); clearErr('email'); }} onBlur={(e) => blurCheck('email', e.target.value)} />
-                </label>
-                {fieldErr.email && <p className="cv3-field-err">{fieldErr.email}</p>}
-                <label className={`cv3-field ${fieldErr.phone ? 'cv3-field--invalid' : ''}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" /></svg>
-                  <input type="tel" placeholder="Phone Number *" aria-label="Phone number" required value={phone} aria-invalid={!!fieldErr.phone} onChange={(e) => { setPhone(e.target.value); clearErr('phone'); }} onBlur={(e) => blurCheck('phone', e.target.value)} />
-                </label>
-                {fieldErr.phone && <p className="cv3-field-err">{fieldErr.phone}</p>}
-                <label className="cv3-field cv3-field--select">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M9 3h6" /></svg>
-                  <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Your occupation">
-                    <option value="">I am a…</option>
-                    <option>Working professional</option>
-                    <option>Student</option>
-                    <option>Homemaker</option>
-                    <option>Founder / entrepreneur</option>
-                    <option>Other</option>
-                  </select>
-                  <svg className="cv3-field-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-                </label>
-                <label className="cv3-field cv3-field--textarea">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-4 3v-3H4z" /></svg>
-                  <textarea placeholder="Anything you’d like us to know? (optional)" aria-label="Message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
-                </label>
-                <button type="button" className="cv3-enquiry-send" onClick={submit} disabled={loading}>
-                  {loading ? 'SENDING…' : 'REQUEST A CALLBACK'}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
-                </button>
-                {error && <p className="cv3-enquiry-error">{error}</p>}
-                <div className="cv3-enquiry-note">Your information is secure with us</div>
-              </div>
-            </>
-          )}
-        </div>
-        {!sent && (
-          <a href={V2_BRAND.whatsappCommunity} target="_blank" rel="noopener noreferrer" className="cv3-whatsapp-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.004c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.94 1.35-.5.05-1.13.24-3.66-.77-3.08-1.24-5.06-4.4-5.22-4.6-.15-.2-1.25-1.66-1.25-3.17s.79-2.25 1.07-2.56c.28-.3.61-.38.82-.38.2 0 .41 0 .59.01.19.01.44-.07.69.53.24.6.83 2.06.9 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.28.1 1.76.83 2.06.98.3.15.5.22.57.35.07.13.07.73-.17 1.4z" /></svg>
-            Talk to us on WhatsApp
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Small inline icons for the curriculum section (no icon dependency on this site).
 const CV3_ICON = {
   clock: <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
@@ -5286,7 +5152,6 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
   const instr = window.COURSE_INSTRUCTOR || {};
-  const [advisorOpen, setAdvisorOpen] = useState(false);
   const [showAllProjects, setShowAllProjects] = useState(false);
 
   // Runtime-only motion: scroll reveal + hero stat count-up. Gated on
@@ -5382,7 +5247,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </a>
-            <button type="button" className="cv3-btn cv3-btn--advisor" onClick={() => setAdvisorOpen(true)}>
+            <button type="button" className="cv3-btn cv3-btn--advisor" onClick={(event) => window.AdvisorWidget?.open(event.currentTarget)}>
               <svg className="cv3-advisor-cta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 5c0 9 6 15 15 15l2-3-4-2-2 2c-3-1.5-5.5-4-7-7l2-2-2-4z" />
               </svg>
@@ -5419,7 +5284,6 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           </div>
         </div>
       </header>
-      {advisorOpen && <CoursesEnquiryCard onClose={() => setAdvisorOpen(false)} />}
 
       {/* TRUST BAR */}
       <section className="cv3-trust">
@@ -7186,6 +7050,21 @@ function App() {
     document.body.classList.toggle('nav-menu-open', navMenuOpen);
     return () => document.body.classList.remove('nav-menu-open');
   }, [navMenuOpen]);
+
+  // Shared sticky advisor widget — public tabs only, never on private account paths.
+  useEffect(() => {
+    const publicTabs = new Set(['home', 'roadmap', 'masterclass']);
+    const privatePaths = new Set(['/account', '/dashboard', '/email-tasks', '/courses']);
+    const syncWidget = () => {
+      const path = window.location.pathname.replace(/\/+$/, '') || '/';
+      const onPublicTab = publicTabs.has(activeMainTab);
+      const onPrivatePath = privatePaths.has(path);
+      window.AdvisorWidget?.setEnabled(onPublicTab && !onPrivatePath);
+    };
+    syncWidget();
+    window.addEventListener('popstate', syncWidget);
+    return () => window.removeEventListener('popstate', syncWidget);
+  }, [activeMainTab]);
 
   // Hide floating CTAs + lock background scroll while any dialog is open.
   const anyModalOpen = !!(
@@ -9082,7 +8961,6 @@ function App() {
       )}
 
       <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
-      <V2WhatsAppButton />
       <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
     </React.Fragment>

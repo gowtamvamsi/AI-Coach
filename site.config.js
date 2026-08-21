@@ -236,6 +236,16 @@ We will dive into the architectural patterns required to build autonomous, produ
   ],
 
   // ─────────────────────────────────────────────────────────────────
+  // Contact / integrations — used by the shared advisor widget
+  // ─────────────────────────────────────────────────────────────────
+  contact: {
+    // Public reCAPTCHA v3 site key (safe to commit). Leave empty until a key is
+    // registered for balajichippada.com, www.balajichippada.com, and localhost.
+    // RECAPTCHA_SECRET_KEY lives only in Cloud Function env vars.
+    recaptchaSiteKey: '',
+  },
+
+  // ─────────────────────────────────────────────────────────────────
   // Feature flags — global on/off switches for homepage sections
   // ─────────────────────────────────────────────────────────────────
   featureFlags: {

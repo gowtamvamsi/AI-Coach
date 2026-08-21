@@ -79,6 +79,10 @@
         "function": "getYouTubePlaylist"
       },
       {
+        "source": "/api/course-enquiry",
+        "function": "courseEnquiry"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

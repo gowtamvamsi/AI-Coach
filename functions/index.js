@@ -11,6 +11,7 @@ const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const otpLib = require("./lib/otp");
+const courseEnquiryLib = require("./lib/course-enquiry");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -2522,3 +2523,128 @@ exports.generateEnquiryReply = functions
       body: String(draft.body),
     };
   });
+
+async function verifyCourseEnquiryRecaptcha({ token, remoteIp, expectedAction, minScore }) {
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) return { ok: false };
+
+  const params = new URLSearchParams({
+    secret,
+    response: token,
+    remoteip: remoteIp || "",
+  });
+
+  let data;
+  try {
+    const resp = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    if (!resp.ok) return { ok: false };
+    data = await resp.json();
+  } catch (_e) {
+    return { ok: false };
+  }
+
+  if (!data || data.success !== true) return { ok: false };
+  if (data.action !== expectedAction) return { ok: false };
+  if (typeof data.score !== "number" || data.score < minScore) return { ok: false };
+  return { ok: true };
+}
+
+async function submitCourseEnquiryLead({ lead, ip, nowMs }) {
+  const hashSecret = process.env.COURSE_ENQUIRY_HASH_SECRET;
+  if (!hashSecret) return { ok: false, reason: "config" };
+
+  const ipHash = courseEnquiryLib.hashLimitKey("ip", ip, hashSecret);
+  const emailHash = courseEnquiryLib.hashLimitKey("email", lead.email, hashSecret);
+  const duplicateHash = courseEnquiryLib.hashLimitKey(
+    "duplicate",
+    `${lead.email}|${lead.phone}`,
+    hashSecret,
+  );
+
+  const limitsCol = db.collection("courseEnquiryLimits");
+  const ipRef = limitsCol.doc(`ip_${ipHash}`);
+  const emailRef = limitsCol.doc(`email_${emailHash}`);
+  const duplicateRef = limitsCol.doc(`duplicate_${duplicateHash}`);
+  const leadRef = db.collection("leads").doc();
+
+  const rateExpiresAt = admin.firestore.Timestamp.fromMillis(
+    nowMs + courseEnquiryLib.RATE_WINDOW_MS,
+  );
+  const duplicateExpiresAt = admin.firestore.Timestamp.fromMillis(
+    nowMs + courseEnquiryLib.DUPLICATE_WINDOW_MS,
+  );
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const [ipSnap, emailSnap, duplicateSnap] = await Promise.all([
+        tx.get(ipRef),
+        tx.get(emailRef),
+        tx.get(duplicateRef),
+      ]);
+
+      const ipDecision = courseEnquiryLib.rateDecision(
+        ipSnap.exists ? ipSnap.data() : null,
+        nowMs,
+      );
+      const emailDecision = courseEnquiryLib.rateDecision(
+        emailSnap.exists ? emailSnap.data() : null,
+        nowMs,
+      );
+
+      if (!ipDecision.allow || !emailDecision.allow) {
+        throw new Error("RATE_LIMIT");
+      }
+      if (courseEnquiryLib.isDuplicate(
+        duplicateSnap.exists ? duplicateSnap.data() : null,
+        nowMs,
+      )) {
+        throw new Error("DUPLICATE");
+      }
+
+      tx.set(ipRef, {
+        ...ipDecision.next,
+        expiresAt: rateExpiresAt,
+      }, { merge: true });
+      tx.set(emailRef, {
+        ...emailDecision.next,
+        expiresAt: rateExpiresAt,
+      }, { merge: true });
+      tx.set(duplicateRef, {
+        lastSubmittedAt: nowMs,
+        expiresAt: duplicateExpiresAt,
+      }, { merge: true });
+      tx.set(leadRef, {
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        occupation: lead.occupation,
+        message: lead.message,
+        source: lead.source,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err && err.message === "RATE_LIMIT") return { ok: false, reason: "rate" };
+    if (err && err.message === "DUPLICATE") return { ok: false, reason: "duplicate" };
+    return { ok: false, reason: "firestore-down" };
+  }
+}
+
+const courseEnquiryCoreHandler = courseEnquiryLib.createHandler({
+  verifyRecaptcha: verifyCourseEnquiryRecaptcha,
+  submitLead: submitCourseEnquiryLead,
+  hashSecret: process.env.COURSE_ENQUIRY_HASH_SECRET || "",
+  now: () => Date.now(),
+});
+
+exports.courseEnquiry = functions.https.onRequest(async (req, res) => {
+  if (!process.env.RECAPTCHA_SECRET_KEY || !process.env.COURSE_ENQUIRY_HASH_SECRET) {
+    return res.status(503).json({ ok: false });
+  }
+  return courseEnquiryCoreHandler(req, res);
+});

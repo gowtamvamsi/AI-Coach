@@ -53,10 +53,47 @@ test('prerender — llms.txt exists and is non-trivial', () => {
 
 test('prerender — cache-bust versions are present on bundles', () => {
   const html = read('index.html');
-  for (const asset of ['v2.build.js', 'app.build.js', 'styles.css']) {
+  for (const asset of ['v2.build.js', 'app.build.js', 'styles.css', 'site.config.js', 'advisor-widget.js']) {
     assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=\\d+`), `${asset} has a ?v= cache-bust`);
   }
 });
+
+const PUBLIC_PAGES = [
+  'index.html',
+  'roadmap.html',
+  'about.html',
+  'privacy.html',
+  'terms.html',
+  'glossary.html',
+  'masterclasses.html',
+  'guides/how-to-become-an-agentic-ai-engineer.html',
+];
+
+const APPROVED_VERSIONS = {
+  'styles.css': '143',
+  'site.config.js': '19',
+  'advisor-widget.js': '2',
+  'v2.build.js': '37',
+  'app.build.js': '120',
+};
+
+for (const page of PUBLIC_PAGES) {
+  test(`public page assets — ${page} loads widget scripts once`, () => {
+    const html = read(page);
+    assert.equal((html.match(/site\.config\.js\?v=19/g) || []).length, 1, 'one site.config.js?v=19');
+    assert.equal((html.match(/advisor-widget\.js\?v=2/g) || []).length, 1, 'one advisor-widget.js?v=2');
+    assert.match(html, /styles\.css\?v=143/, 'styles.css?v=143');
+  });
+}
+
+for (const page of ['index.html', 'roadmap.html']) {
+  test(`react shell assets — ${page} has matching approved cache-bust versions`, () => {
+    const html = read(page);
+    for (const [asset, version] of Object.entries(APPROVED_VERSIONS)) {
+      assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=${version}`), `${asset}?v=${version}`);
+    }
+  });
+}
 
 test('app bundle — courses tab includes creator-led landing sections (v3 design)', () => {
   const js = read('app.build.js');
@@ -67,27 +104,38 @@ test('app bundle — courses tab includes creator-led landing sections (v3 desig
   assert.doesNotMatch(js, /hero_Section_bacground(?:_dark_mode)?\.png/, 'old hero background artwork is removed');
   assert.match(js, /Enroll Now/, 'hero enrollment CTA uses approved capitalization');
   assert.match(js, /Talk to an Advisor/, 'hero includes the advisor CTA');
-  assert.match(js, /cv3-advisor-modal/, 'advisor form opens in a modal');
+  assert.match(js, /AdvisorWidget[^;]{0,80}\.open\(event\.currentTarget\)/, 'hero advisor CTA opens the shared widget');
+  assert.doesNotMatch(js, /cv3-advisor-modal/, 'duplicate React advisor modal is removed');
   assert.match(js, /cv3-hero-cta-chevrons/, 'hero enrollment CTA includes double chevrons');
   assert.match(js, /cv3-curriculum-detail/, 'courses page has master-detail curriculum');
   assert.match(js, /cv3-pricing-card/, 'courses page has pricing card');
 });
 
-test('course advisor — lead persistence keeps the existing Firestore schema', () => {
-  const source = read('app.jsx');
-  const start = source.indexOf('function CoursesEnquiryCard');
-  const end = source.indexOf('// Small inline icons for the curriculum section', start);
-  assert.ok(start >= 0 && end > start, 'enquiry component source block exists');
-  const block = source.slice(start, end);
+test('shared advisor widget — browser contract and React integration', () => {
+  const widget = read('advisor-widget.js');
+  const appSource = read('app.jsx');
+  const v2Source = read('v2.jsx');
+  const appJs = read('app.build.js');
+  const v2Js = read('v2.build.js');
 
-  assert.match(block, /db\.collection\('leads'\)\.add\(\{/, 'writes to the existing leads collection');
-  for (const field of ['name', 'email', 'phone', 'occupation', 'message', 'createdAt']) {
-    assert.match(block, new RegExp(`\\b${field}:`), `preserves ${field} field`);
+  assert.match(widget, /fetch\('\/api\/course-enquiry'/, 'widget posts to /api/course-enquiry');
+  for (const field of ['name', 'email', 'phone', 'occupation', 'message', 'recaptchaToken']) {
+    assert.match(widget, new RegExp(field), `widget payload includes ${field}`);
   }
-  assert.match(block, /source:\s*'course_enquiry'/, 'preserves course_enquiry source value');
-  assert.match(block, /FieldValue\.serverTimestamp\(\)/, 'preserves server timestamp');
-  assert.match(block, /phoneError\(phone,\s*true\)/, 'phone is required for the promised callback');
-  assert.match(block, /course advisor will call you within 24 hours/, 'shows the callback confirmation');
+  assert.match(widget, /Please enter your phone number\./, 'phone is required in client validation');
+  assert.match(widget, /Thanks—your request is in\. A course advisor will call you within 24 hours\./, 'approved success copy');
+  assert.match(widget, /Talk to us on WhatsApp/, 'WhatsApp fallback remains in the modal');
+  assert.match(widget, /aria-describedby/, 'invalid fields link to stable error nodes');
+  assert.match(widget, /isPrivatePath\(window\.location\.pathname\)/, 'setEnabled blocks private paths including /courses');
+
+  assert.match(appSource, /AdvisorWidget\?\.open\(event\.currentTarget\)/, 'hero CTA opens shared widget');
+  assert.match(appSource, /AdvisorWidget\?\.setEnabled\(onPublicTab && !onPrivatePath\)/, 'App excludes private paths including /courses');
+  assert.match(appSource, /['"]\/courses['"]/, 'App private-path gate includes /courses');
+  assert.doesNotMatch(appSource, /function CoursesEnquiryCard/, 'duplicate React enquiry modal removed');
+  assert.doesNotMatch(appSource, /<V2WhatsAppButton\s*\/>/, 'root WhatsApp float removed from App');
+  assert.doesNotMatch(v2Source, /function V2WhatsAppButton/, 'V2WhatsAppButton definition removed');
+  assert.doesNotMatch(v2Js, /v2-whatsapp-float/, 'built v2 bundle no longer ships WhatsApp float markup');
+  assert.doesNotMatch(appJs, /cv3-advisor-modal/, 'built app bundle no longer ships duplicate advisor modal');
 });
 
 test('course hero — primary and advisor CTAs share identical dimensions and typography', () => {
