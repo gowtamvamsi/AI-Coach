@@ -115,6 +115,26 @@ test('course hero — advisor CTA is visibly actionable and the old kicker is re
   assert.match(css, /@media \(max-width: 620px\) \{[\s\S]*?\.cv3-advisor-cta-icon \{ display: none; \}/, 'phone icon hides when mobile width is constrained');
 });
 
+test('course hero — desktop content starts closer to navigation without changing mobile spacing', () => {
+  const css = read('styles.css');
+
+  assert.match(
+    css,
+    /@media \(min-width: 1041px\)\s*\{[\s\S]*?\.cv3\s*\{\s*padding-top:\s*calc\(var\(--layout-top\) - 48px\);/,
+    'desktop course page shifts the complete hero another 64px upward',
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 1041px\)\s*\{[\s\S]*?\.cv3-hero\s*\{\s*padding-top:\s*0;/,
+    'desktop hero removes the 64px top gap',
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 620px\)\s*\{[\s\S]*?\.cv3-hero\s*\{\s*padding:\s*42px 18px 10px;/,
+    'mobile hero spacing remains unchanged',
+  );
+});
+
 test('course hero — the three-item skills checklist is removed completely', () => {
   const source = read('app.jsx');
   const data = read('data.js');
@@ -144,6 +164,29 @@ test('course page — sections follow the prospective buyer decision journey', (
   const positions = markers.map((marker) => page.indexOf(marker));
   assert.ok(positions.every((position) => position >= 0), 'all buyer-journey sections exist');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'sections appear in the approved buyer journey order');
+});
+
+test('course pricing — one shared launch offer renders in both pricing surfaces', () => {
+  const source = read('app.jsx');
+  const data = read('data.js');
+  const css = read('styles.css');
+  const info = data.slice(
+    data.indexOf('window.COURSE_INFO'),
+    data.indexOf('window.COURSE_PROJECTS'),
+  );
+
+  assert.match(info, /price:\s*29999/, 'launch price is ₹29,999');
+  assert.match(info, /listPrice:\s*34999/, 'standard price is ₹34,999');
+  assert.match(info, /priceOfferLabel:\s*"Launch offer · First 45 days"/, 'launch label is centralized');
+  assert.match(info, /priceTaxCaption:\s*"18% GST is already included and paid to the Government\."/, 'GST caption is centralized');
+  assert.doesNotMatch(info, /Will reveal soon/, 'placeholder price is removed');
+  assert.doesNotMatch(info, /offerEnd|offerExpiry|countdown|deadline/i, 'offer has no automatic expiry');
+  assert.match(source, /function CoursesPriceDisplay\(\{\s*info,\s*full\s*=\s*false\s*\}\)/, 'shared price component exists');
+  assert.equal((source.match(/<CoursesPriceDisplay\b/g) || []).length, 2, 'both public price surfaces use the shared component');
+  assert.match(css, /\.cv3-price-list\s*\{[^}]*text-decoration:\s*line-through/, 'standard price is struck through');
+  assert.match(css, /\.cv3-price-offer-badge\s*\{[^}]*background:\s*var\(--cv3-accent-soft\)/, 'launch offer uses the existing accent treatment');
+  assert.match(css, /\.cv3-price-tax-caption\s*\{[^}]*font-size:\s*11px/, 'GST explanation stays visually secondary');
+  assert.match(css, /\.cv3-price-display--full\s*\{[^}]*align-items:\s*center/, 'full pricing card remains centered');
 });
 
 test('course instructor — shared section uses the unified editorial card', () => {

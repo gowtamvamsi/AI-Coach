@@ -18,7 +18,7 @@ So: free content is genuinely valuable and stays free, but it is **not a substit
 ## Course identity
 
 - **Name:** Agentic AI at Production Level (flagship; the only program)
-- **Fee:** **INR 29,999**, one-time, inclusive of GST, no subscription. *(The public site still shows "Will reveal soon" — the price is confirmed internally at 29,999. Quote 29,999 when a student asks directly.)*
+- **Fee:** **INR 29,999** launch offer (standard price **INR 34,999**), one-time, inclusive of 18% GST, no subscription. The public offer is manually controlled and currently active.
 - **Format:** Self-paced, with live sessions layered on
 - **Access:** 2 years, including every update released in that window; session recordings also available for 2 years
 - **Level:** Starter → advanced. **No prerequisites at all** — Python is taught inside the course (Module 00). "I don't know coding" is not a reason to wait.

@@ -9168,6 +9168,10 @@ body.nav-menu-open .v2-mobile-sticky {
   align-items: center;
   isolation: isolate;
 }
+@media (min-width: 1041px) {
+  .cv3 { padding-top: calc(var(--layout-top) - 48px); }
+  .cv3-hero { padding-top: 0; }
+}
 .cv3-hero::before {
   content: "";
   position: absolute;
@@ -9640,8 +9644,42 @@ body.nav-menu-open .v2-mobile-sticky {
   gap: 18px;
 }
 .cv3-price-label { font-size: 14px; color: var(--cv3-ink3); }
-.cv3-price { font-family: var(--cv3-serif); font-weight: 600; font-size: 44px; letter-spacing: -0.01em; line-height: 1.15; }
+.cv3-price-display { display: flex; flex-direction: column; align-items: flex-start; }
+.cv3-price-display--full { align-items: center; }
+.cv3-price-offer-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.cv3-price-list {
+  color: var(--cv3-ink3);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.cv3-price-offer-badge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--cv3-accent-soft);
+  color: var(--cv3-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+.cv3-price { font-family: var(--cv3-serif); font-weight: 600; font-size: 44px; letter-spacing: -0.01em; line-height: 1.15; color: var(--cv3-accent); }
 .cv3-price-note { font-size: 13px; color: var(--cv3-ink3); margin-top: 2px; }
+.cv3-price-tax-caption {
+  max-width: 360px;
+  margin-top: 6px;
+  color: var(--cv3-ink3);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .cv3-flagship-includes { display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--cv3-ink2); }
 .cv3-check-row { display: flex; align-items: flex-start; gap: 10px; }
 .cv3-check { color: var(--cv3-accent); font-weight: 700; flex: none; }
@@ -10276,7 +10314,7 @@ body.nav-menu-open .v2-mobile-sticky {
   margin-bottom: 22px;
 }
 .cv3-pricing-name { font-size: 17px; font-weight: 600; margin-bottom: 20px; }
-.cv3-pricing-price { font-family: var(--cv3-serif); font-weight: 600; font-size: 64px; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
+.cv3-pricing-price { font-family: var(--cv3-serif); font-weight: 600; font-size: 64px; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; color: var(--cv3-accent); }
 .cv3-pricing-cta { margin: 30px 0; }
 .cv3-pricing-features { display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: var(--cv3-ink2); text-align: left; }
 

@@ -744,7 +744,10 @@ window.COURSE_INFO = {
   moduleCount: window.COURSE_CURRICULUM.length,
   submoduleCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.length, 0),
   lessonCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.reduce((b, s) => b + (s.lessons || []).length, 0), 0),
-  price: "Will reveal soon", // ponytail: string passes through priceFmt as-is; restore a number to show ₹ again
+  price: 29999,
+  listPrice: 34999,
+  priceOfferLabel: "Launch offer · First 45 days",
+  priceTaxCaption: "18% GST is already included and paid to the Government.",
   // Curriculum header CTA — put the PDF's URL here and the "Download Syllabus"
   // button appears. Empty string = button hidden.
   syllabusUrl: "",

@@ -5260,6 +5260,28 @@ function CoursesFAQ() {
   );
 }
 
+function CoursesPriceDisplay({ info, full = false }) {
+  const formatPrice = (value) => (
+    typeof value === 'number' ? '₹' + value.toLocaleString('en-IN') : value
+  );
+  const currentPriceClass = full ? 'cv3-pricing-price' : 'cv3-price';
+  const note = full
+    ? 'One-time payment · Inclusive of GST · No subscription'
+    : 'Inclusive of GST · No subscription';
+
+  return (
+    <div className={`cv3-price-display ${full ? 'cv3-price-display--full' : 'cv3-price-display--compact'}`}>
+      <div className="cv3-price-offer-line">
+        <span className="cv3-price-list">{formatPrice(info.listPrice)}</span>
+        <span className="cv3-price-offer-badge">{info.priceOfferLabel}</span>
+      </div>
+      <div className={currentPriceClass}>{formatPrice(info.price)}</div>
+      <div className="cv3-price-note">{note}</div>
+      <div className="cv3-price-tax-caption">{info.priceTaxCaption}</div>
+    </div>
+  );
+}
+
 function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
@@ -5320,7 +5342,6 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
       document.querySelectorAll('.cv3-armed').forEach((el) => el.classList.remove('cv3-armed', 'cv3-in'));
     };
   }, []);
-  const priceFmt = (n) => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN') : n);
   const scrollToId = (id) => (e) => {
     e.preventDefault();
     const el = document.getElementById(id);
@@ -5438,8 +5459,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           <div className="cv3-flagship-side">
             <div>
               <div className="cv3-price-label">One-time payment</div>
-              <div className="cv3-price">{priceFmt(info.price)}</div>
-              <div className="cv3-price-note">Inclusive of GST · No subscription</div>
+              <CoursesPriceDisplay info={info} />
             </div>
             <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
             <div className="cv3-flagship-includes">
@@ -5532,8 +5552,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
         <div className="cv3-pricing-card">
           <span className="cv3-pricing-pill">Full access for 2 years</span>
           <div className="cv3-pricing-name">{info.flagshipName}</div>
-          <div className="cv3-pricing-price">{priceFmt(info.price)}</div>
-          <div className="cv3-price-note">One-time payment · Inclusive of GST · No subscription</div>
+          <CoursesPriceDisplay info={info} full />
           <button type="button" className="cv3-btn cv3-btn--accent cv3-pricing-cta" disabled style={{ cursor: "default", opacity: 0.7 }}>Enrollment opening soon</button>
           <div className="cv3-pricing-features">
             {(info.pricingIncludes || []).map((feat) => (
