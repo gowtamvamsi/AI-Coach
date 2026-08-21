@@ -318,7 +318,7 @@ function PhaseTabBox({ phase, videoLinks, completedModules, tracking, onVideoPro
           )}
 
           <div className="tabbox__topics">
-            <div className="tabbox__topics-label">Topics</div>
+            <div className="tabbox__topics-label">Topics Covered in this Video</div>
             <table className="tabbox__topics-table">
               <tbody>
                 {section.items.map((item, ii) => (
@@ -1456,8 +1456,11 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
       label: 'Company',
       links: [
         { title: 'About Balaji', href: '/about' },
-        { title: 'Privacy Policy', href: '#', legal: 'privacy' },
-        { title: 'Terms of Service', href: '#', legal: 'terms' },
+        // Real pages, not modals: Google's OAuth branding review requires a
+        // crawlable privacy-policy link on the homepage, and a `#` + modal
+        // gives a reviewer (or crawler) nothing to follow.
+        { title: 'Privacy Policy', href: '/privacy' },
+        { title: 'Terms of Service', href: '/terms' },
         { title: 'Refund Policy', href: '#', legal: 'refund' },
         { title: 'Contact', href: '#', legal: 'contact' },
       ]
@@ -1481,16 +1484,17 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
           <RevealOnScroll className="site-footer__brand-col">
             <div className="site-footer__brand">
               <div className="site-footer__logo-wrapper">
-                <svg className="site-footer__logo" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="footer-logo-grad" x1="0" x2="1" y1="0" y2="1">
-                      <stop offset="0" stopColor="#c2533c"/>
-                      <stop offset="0.5" stopColor="#d18a2a"/>
-                      <stop offset="1" stopColor="#6b4d80"/>
-                    </linearGradient>
-                  </defs>
-                  <rect width="32" height="32" rx="8" fill="url(#footer-logo-grad)"/>
-                  <text x="16" y="22" textAnchor="middle" fontFamily="-apple-system,system-ui,sans-serif" fontSize="18" fontWeight="700" fill="white">A</text>
+                {/* FLA wordmark. Letterforms inherit currentColor so the mark
+                    works on the footer's light and dark backgrounds; the
+                    paper-plane accent keeps its brand colours. */}
+                <svg className="site-footer__logo" viewBox="99 318 802 364" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FLA">
+                  <path fill="currentColor" d="M115.4,681.25c-3.24,0-6.92-1.36-9.86-3.64-3.58-2.78-5.55-6.46-5.54-10.38l.14-199.83c.02-22.81,4.37-42.49,12.93-58.48,9.94-18.55,25.13-31.2,45.15-37.59,14.12-4.51,28.13-6.7,42.83-6.71l118.81-.08c2.6,0,5.08,1.09,7.01,3.06,1.94,1.99,3.02,4.61,2.96,7.17l-.43,17.59c-.38,15.75-14.96,25.16-28.84,25.17l-93.39.02c-25.17,0-39.76,7.78-44.59,23.75-2.75,9.08-4.18,18.85-4.24,29.03l-.18,28.18c3.87-1.36,8.37-2.41,13.38-2.41,0,0,104.01-.01,104.01-.01,4.53,0,9.17,4.61,9.2,9.14l.1,15.41c.05,7.75-2.82,14.94-8.08,20.24-5.08,5.12-11.95,7.94-19.36,7.95l-84.84.11c-8.01.01-14.3,6.52-14.32,14.82l-.23,87.17c-.04,16.1-13.63,29.91-29.67,30.14l-12.95.19Z"/>
+                  <path fill="currentColor" d="M493.85,638.59c2.84-4.59-.47-10.52-5.86-10.52l-36.32-.03c-23.17-.01-36.14-6.41-39.64-19.57-1.97-7.42-2.9-14.18-2.9-21.28l-.09-213.03c0-5.58-5.16-9.47-9.8-9.47l-43.11.04c-4.76,0-9.09,4.48-9.08,9.38l.13,214.23c0,16.3,3.19,31.45,9.71,46.32,8.07,18.4,22.64,31.83,42.13,38.84,14.66,5.28,27.81,7.74,41.38,7.74h21.65c3.4.01,6.56-1.75,8.35-4.64l23.47-38.01Z"/>
+                  <path fill="currentColor" d="M873.14,614.9l-50.59-82.61c-2.71-4.43-9.12-4.49-11.92-.12l-23.57,36.75c-1.48,2.31-1.48,5.27,0,7.58l28.89,45.2c.58.9.65,3.11.12,3.84-.54.73-2.21,1.34-3.56,1.34l-89.85-.03c-.98,0-2.66-1.17-2.91-1.92-.25-.75.12-2.1.81-3.17l64.23-100.09,28.1-43.86,28.86-44.9c2.74-4.27,1.6-9.94-2.58-12.82l-21.74-14.95-5.65-3.84c-4.36-2.97-10.32-1.76-13.18,2.67l-56.51,87.58-63.68,97.57-39.44,60.16c-3.62,5.52-6,10.32-4.05,17.44,1.38,5.03,5.09,9.91,10.91,12.42,4.36,1.88,8.73,1.98,13.74,1.98h98.88s116.52-.06,116.52-.06c7.54,0,14.28-4.82,17.56-10.14,4.14-6.72,5.07-15.08,1.13-21.68l-20.5-34.34Z"/>
+                  <path fill="currentColor" d="M562.19,665.28c-6.57,10.67-13.77,16.09-26.31,15.97l-22.65-.22-17.4-.16c-1.34-.01-3.4-1.77-3.92-2.83-.62-1.26-.81-3.82.23-5.5l60.57-98.11,121.46-196.78c.23-.38.5-.74.8-1.06,5.11-5.5,10.55-9.35,17.81-11.29,12.35-2.65,25.96,1.62,32.88,12.83l27.35,44.29c1.37,2.21,1.34,5.01-.06,7.2l-24.42,38.03c-2.67,4.16-8.77,4.14-11.41-.05l-13.29-21.13c-.63-1.46-2.25-2.6-3.74-2.5s-2.3,1.57-3.24,3.07l-25.12,40.47-109.54,177.78Z"/>
+                  <polygon fill="#aa241a" points="850.09 394.53 833.7 405.94 833.48 402.32 843.92 387.48 850.09 394.53"/>
+                  <path fill="#f9472b" d="M831.31,381.51l45.96,31.72c2.16,1.49,5.14.27,5.64-2.3l17.01-87.84c.56-2.87-2.32-5.19-5.01-4.04l-89,38.16c-2.63,1.13-2.99,4.71-.63,6.34l26.03,17.96"/>
+                  <path fill="#db3a2a" d="M888.57,332.09l-44.32,58.34-10.32,15.26c-.79,1.07-2.49.51-2.49-.83l.13-23.19,57-49.59Z"/>
                 </svg>
               </div>
               <p className="site-footer__copyright">
@@ -1572,6 +1576,7 @@ function SiteFooter({ setActiveMainTab, setLegalPage }) {
             ))}
           </div>
         </div>
+
       </div>
     </footer>
   );
@@ -3022,6 +3027,78 @@ const SavedContactsTable = React.memo(function SavedContactsTable({ savedContact
 
 
 // ===============================================================
+// DASHBOARD — workspace tab rail. The dashboard used to be one
+// ~5,300px scroll of stacked panels with an anchor-link nav; each
+// job (classes, video content, audience, enquiries) now gets its
+// own workspace and the rail doubles as a live status readout —
+// every tab carries its own count, so the state of the business is
+// legible without entering a single section.
+// ===============================================================
+const DASH_SECTIONS = [
+  { id: 'overview',  label: 'Overview',      adminOnly: false },
+  { id: 'classes',   label: 'Masterclasses', adminOnly: false },
+  { id: 'videos',    label: 'Videos',        adminOnly: true  },
+  { id: 'audience',  label: 'Audience',      adminOnly: true  },
+  { id: 'enquiries', label: 'Enquiries',     adminOnly: true  },
+];
+
+// Live doc count for a collection, rendered as a mono chip in the
+// tab rail. Own component so the count updating never re-renders
+// DashboardView (see the re-render warning in CLAUDE.md).
+function DashCount({ collection, where }) {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    if (!db) return;
+    let q = db.collection(collection);
+    if (where) q = q.where(where[0], where[1], where[2]);
+    const unsub = q.onSnapshot((snap) => setCount(snap.size), () => {});
+    return () => unsub();
+  }, [collection]);
+  if (count == null || count === 0) return null;
+  return <span className="dash-tab__count">{count}</span>;
+}
+DashCount = React.memo(DashCount);
+
+function DashboardTabs({ active, onChange, isAdmin, classCount, leadCount }) {
+  const tabs = DASH_SECTIONS.filter((t) => isAdmin || !t.adminOnly);
+  return (
+    <nav className="dashboard__nav" aria-label="Dashboard sections">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className={`dash-tab${active === t.id ? ' is-active' : ''}`}
+          aria-current={active === t.id ? 'page' : undefined}
+          onClick={() => onChange(t.id)}
+        >
+          {t.label}
+          {t.id === 'classes' && classCount > 0 && <span className="dash-tab__count">{classCount}</span>}
+          {t.id === 'videos' && <DashCount collection="roadmapVideos" />}
+          {t.id === 'audience' && leadCount > 0 && <span className="dash-tab__count">{leadCount}</span>}
+          {t.id === 'enquiries' && <DashCount collection="leads" where={['source', '==', 'course_enquiry']} />}
+        </button>
+      ))}
+    </nav>
+  );
+}
+DashboardTabs = React.memo(DashboardTabs);
+
+// Every business number in one readout. These used to be split
+// across two panels 1,200px apart (seats/revenue inside the
+// schedule grid, leads/conversion inside Marketing) — which is why
+// the dashboard never answered "how are we doing?" at a glance.
+function DashStat({ label, value, sub, accent }) {
+  return (
+    <div className="dash-stat" style={accent ? { '--stat-accent': accent } : undefined}>
+      <div className="dash-stat__label">{label}</div>
+      <div className="dash-stat__value">{value}</div>
+      {sub && <div className="dash-stat__sub">{sub}</div>}
+    </div>
+  );
+}
+
+
+// ===============================================================
 // STAFF / ADMIN DASHBOARD TAB VIEW
 // ===============================================================
 
@@ -3031,6 +3108,15 @@ function DashboardView({ user, role, onLogout }) {
   // Schedule/Edit form fields + zoom-link manager live in
   // ScheduleMasterclassPanel (local state) so typing there never
   // re-renders this whole component.
+  // Which workspace is showing. The dashboard is five focused
+  // screens, not one long scroll — see DashboardTabs above.
+  const [dashSection, setDashSection] = useState('overview');
+  const switchDashSection = React.useCallback((id) => {
+    setDashSection(id);
+    // JS smooth-scroll ignores the CSS reduced-motion reset, so gate it here
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+  }, []);
   const [editSessionId, setEditSessionId] = useState("");
   const [editSessionIsMc, setEditSessionIsMc] = useState(false);
   const [selectedRosterClassId, setSelectedRosterClassId] = useState("all");
@@ -3043,30 +3129,6 @@ function DashboardView({ user, role, onLogout }) {
   const [expandedTestLead, setExpandedTestLead] = useState(null);
 
   const [status, setStatus] = useState({ type: "", message: "" });
-
-  // Nav scroll-spy — highlights the section pill you're scrolled into.
-  // DOM-only class toggles (no state): this component must never re-render
-  // on scroll (see CLAUDE.md DashboardView warning). Sections mount late
-  // (Firestore snapshots), so links/sections are re-queried per frame.
-  useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const links = document.querySelectorAll('.dashboard__nav a');
-        let activeId = '';
-        links.forEach((a) => {
-          const sec = document.getElementById((a.getAttribute('href') || '').slice(1));
-          if (sec && sec.getBoundingClientRect().top <= window.innerHeight * 0.35) activeId = sec.id;
-        });
-        links.forEach((a) => a.classList.toggle('is-active', (a.getAttribute('href') || '') === '#' + activeId));
-      });
-    };
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
-  }, []);
 
   // ── AI Masterclass Creation State ──
   const [masterclasses, setMasterclasses] = useState([]);
@@ -3490,7 +3552,7 @@ function DashboardView({ user, role, onLogout }) {
               `https://balajichippada.com/\n\n` +
               `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
               `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
-              `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
+              `https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6\n\n` +
               `Let's build some amazing agentic systems together!\n\n` +
               `Best,\n` +
               `Balaji Chippada\n` +
@@ -3811,25 +3873,6 @@ ${mcRawSyllabus}`;
     }
   };
 
-  const handleDeleteMasterclass = async (mcId, mcTitle) => {
-    const count = completedRegCount(mcId);
-    if (!window.confirm(`Cancel & delete "${mcTitle}"?${count ? ` This will email ${count} registered student(s) that it's cancelled.` : ''} This cannot be undone.`)) return;
-    try {
-      await db.collection('masterclasses').doc(mcId).set({
-        deleted: true,
-        status: "deleted",
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      // If we were editing this session, reset form
-      if (editSessionId === mcId) handleSelectSessionToEdit("", false);
-      const stats = await notifyCancellation(mcId);
-      setStatus({ type: 'success', message: cancellationResultMsg(mcTitle, stats) });
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Failed to delete masterclass.' });
-    }
-  };
-
   // Save a Zoom link for a masterclass and email it to everyone already
   // registered (via the sendZoomLinkToRegistrants Cloud Function). Future
   // registrants get it automatically in their confirmation email.
@@ -3902,130 +3945,149 @@ ${mcRawSyllabus}`;
   }, [masterclasses, sessions]);
 
   // Compute active registrations (excluding those for soft-deleted sessions/masterclasses)
-  const activeRegistrations = registrations.filter(r => {
-    // Find if this registration is for a deleted session/masterclass
-    const isDeletedMc = masterclasses.some(m => m.id === r.sessionId && (m.deleted || m.status === 'deleted'));
-    const isDeletedSession = sessions.some(s => s.id === r.sessionId && (s.deleted || s.status === 'deleted'));
-    // Also check if it's the featured ID and it's marked as deleted
-    const isFeaturedDeleted = r.sessionId === (V2_CONFIG_MASTERCLASS?.id) && [...masterclasses, ...sessions].some(x => x.id === r.sessionId && (x.deleted || x.status === 'deleted'));
-    
-    return !isDeletedMc && !isDeletedSession && !isFeaturedDeleted;
-  });
+  // ── Derived audience/registration data ────────────────────────────
+  // All of this is memoized and index-based. It used to be recomputed
+  // inline on EVERY render — including every dashboard tab switch —
+  // and three of the segments were quadratic (users × registrations),
+  // with activeRegistrations allocating a fresh [...masterclasses,
+  // ...sessions] array per registration. On production-sized data that
+  // was seconds of blocked main thread per click.
 
-  // Filter registrations by the selected roster class dropdown selection
-  const filteredRegistrations = activeRegistrations.filter(r => {
-    if (selectedRosterClassId === "all") return true;
-    return r.sessionId === selectedRosterClassId;
-  });
+  // Ids of soft-deleted classes, from both collections. Subsumes the old
+  // per-row isDeletedMc / isDeletedSession / isFeaturedDeleted checks —
+  // the featured-id case was already covered by the other two.
+  const deletedClassIds = React.useMemo(() => {
+    const out = new Set();
+    masterclasses.forEach(m => { if (m && (m.deleted || m.status === 'deleted')) out.add(m.id); });
+    sessions.forEach(x => { if (x && (x.deleted || x.status === 'deleted')) out.add(x.id); });
+    return out;
+  }, [masterclasses, sessions]);
 
-  // Compute metrics and segments using filtered registrations only
-  const totalRevenue = filteredRegistrations
-    .filter(r => r.status === 'completed')
-    .reduce((sum, r) => sum + (r.amount / 100), 0);
+  const activeRegistrations = React.useMemo(
+    () => registrations.filter(r => !deletedClassIds.has(r.sessionId)),
+    [registrations, deletedClassIds]
+  );
 
-  const totalSeats = filteredRegistrations
-    .filter(r => r.status === 'completed').length;
+  const filteredRegistrations = React.useMemo(
+    () => (selectedRosterClassId === "all"
+      ? activeRegistrations
+      : activeRegistrations.filter(r => r.sessionId === selectedRosterClassId)),
+    [activeRegistrations, selectedRosterClassId]
+  );
+
+  const { totalRevenue, totalSeats } = React.useMemo(() => {
+    let revenue = 0, seats = 0;
+    filteredRegistrations.forEach(r => {
+      if (r.status === 'completed') { revenue += (r.amount / 100); seats += 1; }
+    });
+    return { totalRevenue: revenue, totalSeats: seats };
+  }, [filteredRegistrations]);
 
   const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase());
 
   // ── Marketing Segmentation & Deduplication Computations ──
-  
-  // 1. Leads Metrics
-  const uniquePaidEmails = Array.from(new Set(
-    activeRegistrations
-      .filter(r => r.status === 'completed')
-      .map(r => (r.studentEmail || '').toLowerCase().trim())
-      .filter(Boolean)
-  ));
+  const norm = (v) => (v || '').toLowerCase().trim();
+
+  // Emails with at least one completed booking — the lookup that turns
+  // the three quadratic segment scans into linear passes.
+  const paidEmails = React.useMemo(() => {
+    const out = new Set();
+    activeRegistrations.forEach(r => {
+      if (r.status === 'completed') { const e = norm(r.studentEmail); if (e) out.add(e); }
+    });
+    return out;
+  }, [activeRegistrations]);
+
+  // First user per email (matches the old users.find(...) semantics)
+  const userByEmail = React.useMemo(() => {
+    const out = new Map();
+    users.forEach(u => { const e = norm(u.email); if (e && !out.has(e)) out.set(e, u); });
+    return out;
+  }, [users]);
+
+  const uniquePaidEmails = React.useMemo(() => Array.from(paidEmails), [paidEmails]);
   const totalPayingStudents = uniquePaidEmails.length;
   const totalLeads = users.length;
-  const conversionRate = totalLeads > 0 
-    ? ((totalPayingStudents / totalLeads) * 100).toFixed(1) 
+  const conversionRate = totalLeads > 0
+    ? ((totalPayingStudents / totalLeads) * 100).toFixed(1)
     : "0.0";
 
-  const totalProfessionals = users.filter(u => u.userType === 'Working Professional').length;
-  const totalAcademicStudents = users.filter(u => u.userType === 'Student').length;
+  const { professionalsList, academicStudentsList } = React.useMemo(() => ({
+    professionalsList: users.filter(u => u.userType === 'Working Professional'),
+    academicStudentsList: users.filter(u => u.userType === 'Student'),
+  }), [users]);
+  const totalProfessionals = professionalsList.length;
+  const totalAcademicStudents = academicStudentsList.length;
 
-  // 2. Audience Lists
-  // Cold Leads: Signed up in Auth but no completed booking
-  const coldLeadsList = users.filter(u => {
-    const emailLower = (u.email || '').toLowerCase().trim();
-    return !activeRegistrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower);
-  });
+  // Cold Leads: signed up but never completed a booking
+  const coldLeadsList = React.useMemo(
+    () => users.filter(u => !paidEmails.has(norm(u.email))),
+    [users, paidEmails]
+  );
 
-  // Paid Customers (Warm Segment): Deduction merged registrations & users
-  const paidCustomersList = (() => {
+  // Paid Customers: signed-up payers first, then direct registrations
+  // not already covered by a user account (order preserved).
+  const paidCustomersList = React.useMemo(() => {
     const list = [];
     const seen = new Set();
-    
-    // Add signed up users who paid
     users.forEach(u => {
-      const emailLower = (u.email || '').toLowerCase().trim();
-      if (activeRegistrations.some(r => r.status === 'completed' && (r.studentEmail || '').toLowerCase().trim() === emailLower)) {
+      const e = norm(u.email);
+      if (paidEmails.has(e)) {
         list.push({
           name: u.name || u.displayName || "Signed Up Student",
           email: u.email,
           phone: u.phone || "",
           userType: u.userType || "Not Specified"
         });
-        seen.add(emailLower);
+        seen.add(e);
       }
     });
-    
-    // Add direct registrations we haven't seen yet
     activeRegistrations.forEach(r => {
-      if (r.status === 'completed') {
-        const emailLower = (r.studentEmail || '').toLowerCase().trim();
-        if (emailLower && !seen.has(emailLower)) {
-          list.push({
-            name: r.studentName || "Paid Student",
-            email: r.studentEmail,
-            phone: r.studentPhone || "",
-            userType: "Not Specified"
-          });
-          seen.add(emailLower);
-        }
+      if (r.status !== 'completed') return;
+      const e = norm(r.studentEmail);
+      if (e && !seen.has(e)) {
+        list.push({
+          name: r.studentName || "Paid Student",
+          email: r.studentEmail,
+          phone: r.studentPhone || "",
+          userType: "Not Specified"
+        });
+        seen.add(e);
       }
     });
     return list;
-  })();
+  }, [users, activeRegistrations, paidEmails]);
 
-  // Working Professionals list
-  const professionalsList = users.filter(u => u.userType === 'Working Professional');
-
-  // Academic Students list
-  const academicStudentsList = users.filter(u => u.userType === 'Student');
-
-  // Abandoned Checkouts: unique pending registrations with no successful registration
-  const abandonedCheckoutsList = (() => {
+  // Abandoned Checkouts: pending with no completed booking for that email
+  const abandonedCheckoutsList = React.useMemo(() => {
     const list = [];
     const seen = new Set();
-    
     activeRegistrations.forEach(r => {
-      if (r.status === 'pending') {
-        const emailLower = (r.studentEmail || '').toLowerCase().trim();
-        if (emailLower && !seen.has(emailLower)) {
-          const hasCompleted = activeRegistrations.some(rc => rc.status === 'completed' && (rc.studentEmail || '').toLowerCase().trim() === emailLower);
-          if (!hasCompleted) {
-            const matchingUser = users.find(u => (u.email || '').toLowerCase().trim() === emailLower);
-            list.push({
-              name: r.studentName || (matchingUser ? (matchingUser.name || matchingUser.displayName) : "Abandoned Checkout"),
-              email: r.studentEmail,
-              phone: r.studentPhone || (matchingUser ? matchingUser.phone : ""),
-              userType: matchingUser ? (matchingUser.userType || "Not Specified") : "Not Specified"
-            });
-            seen.add(emailLower);
-          }
-        }
-      }
+      if (r.status !== 'pending') return;
+      const e = norm(r.studentEmail);
+      if (!e || seen.has(e) || paidEmails.has(e)) return;
+      const matchingUser = userByEmail.get(e);
+      list.push({
+        name: r.studentName || (matchingUser ? (matchingUser.name || matchingUser.displayName) : "Abandoned Checkout"),
+        email: r.studentEmail,
+        phone: r.studentPhone || (matchingUser ? matchingUser.phone : ""),
+        userType: matchingUser ? (matchingUser.userType || "Not Specified") : "Not Specified"
+      });
+      seen.add(e);
     });
     return list;
-  })();
+  }, [activeRegistrations, paidEmails, userByEmail]);
 
   // Session Campaign Filter Roster
-  const activeMcCampaignSession = sessions.find(s => s.id === selectedMcCampaignId) || masterclasses.find(m => m.id === selectedMcCampaignId);
-  const sessionCampaignRoster = registrations.filter(r => r.sessionId === selectedMcCampaignId);
+  const activeMcCampaignSession = React.useMemo(
+    () => sessions.find(s => s.id === selectedMcCampaignId) || masterclasses.find(m => m.id === selectedMcCampaignId),
+    [sessions, masterclasses, selectedMcCampaignId]
+  );
+  const sessionCampaignRoster = React.useMemo(
+    () => registrations.filter(r => r.sessionId === selectedMcCampaignId),
+    [registrations, selectedMcCampaignId]
+  );
 
   // 3. Robust client-side HTML5 CSV downloader
   const handleExportCSV = (list, segmentName) => {
@@ -4075,24 +4137,140 @@ ${mcRawSyllabus}`;
         </div>
       )}
 
-      <nav className="dashboard__nav" aria-label="Dashboard sections">
-        {isAdmin && <a href="#dash-videos">Roadmap Videos</a>}
-        {isAdmin && <a href="#dash-code-links">Code Links</a>}
-        <a href="#dash-classes">Masterclasses</a>
-        <a href="#mc-schedule-form">{isAdmin ? 'Schedule' : 'Overview'}</a>
-        {isAdmin && <a href="#dash-marketing">Marketing</a>}
-        {isAdmin && <a href="#dash-enquiries">Enquiries<EnquiryCountBadge /></a>}
-      </nav>
+      <DashboardTabs
+        active={dashSection}
+        onChange={switchDashSection}
+        isAdmin={isAdmin}
+        classCount={combinedClasses.length}
+        leadCount={totalLeads}
+      />
 
-{/* ── Roadmap Video Linker (Admin) — own component so typing doesn't re-render DashboardView ── */}
-      {isAdmin && <RoadmapVideosAdminPanel user={user} />}
+      <div className="dash-workspace" key={dashSection}>
 
-{/* ── Per-video "Link to code" manager (Admins only) ── */}
-      {isAdmin && <VideoCodeLinksAdminPanel user={user} />}
+      {/* ═══════════════ WORKSPACE — Overview ═══════════════ */}
+      {dashSection === 'overview' && (
+      <React.Fragment>
+        <div className="dash-statrail">
+          <DashStat
+            label="Reserved seats"
+            value={totalSeats}
+            sub={selectedRosterClassId === 'all' ? 'Across all classes' : 'Selected class'}
+            accent="var(--c-rust)"
+          />
+          <DashStat
+            label="Gross revenue"
+            value={`₹${totalRevenue.toLocaleString()}`}
+            sub={selectedRosterClassId === 'all' ? 'Across all classes' : 'Selected class'}
+            accent="var(--c-amber)"
+          />
+          {isAdmin && (
+            <DashStat label="Total leads" value={totalLeads} sub="Unique email profiles" />
+          )}
+          {isAdmin && (
+            <DashStat label="Paid customers" value={totalPayingStudents} sub="Completed bookings" accent="var(--c-emerald)" />
+          )}
+          {isAdmin && (
+            <DashStat label="Conversion" value={`${conversionRate}%`} sub="Leads who paid" accent="var(--c-emerald)" />
+          )}
+          {isAdmin && (
+            <DashStat
+              label="Professionals"
+              value={totalLeads > 0 ? `${((totalProfessionals / totalLeads) * 100).toFixed(0)}%` : '0%'}
+              sub={`${totalProfessionals} pros · ${totalAcademicStudents} students`}
+            />
+          )}
+        </div>
 
-      {/* ── Sessions Management Section (Admins only) ── */}
+      <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)", paddingBottom: "12px", gap: "12px", flexWrap: "wrap" }}>
+          <h2 className="dashboard__panel-title" style={{ margin: 0, borderBottom: "none", paddingBottom: 0 }}>Registrations</h2>
+          <select
+            value={selectedRosterClassId}
+            onChange={(e) => setSelectedRosterClassId(e.target.value)}
+            style={{
+              background: "var(--bg-elev)",
+              color: "var(--fg)",
+              border: "1px solid var(--line)",
+              borderRadius: "8px",
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: "500",
+              outline: "none",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              maxWidth: "240px",
+              fontFamily: "inherit"
+            }}
+            className="roster-select"
+          >
+            <option value="all">All Scheduled Classes</option>
+            {combinedClasses.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div style={{ marginTop: "12px" }}>
+          <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({filteredRegistrations.length})</h3>
+          <div style={{ overflowX: "auto", maxHeight: "340px", border: "1px solid var(--line)", borderRadius: "8px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
+              <thead>
+                <tr style={{ background: "var(--bg-elev)", borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ padding: "10px 14px", fontWeight: "600" }}>Student</th>
+                  <th style={{ padding: "10px 14px", fontWeight: "600" }}>Class</th>
+                  <th style={{ padding: "10px 14px", fontWeight: "600" }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRegistrations.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" style={{ padding: "20px", textAlign: "center", color: "var(--fg-faint)" }}>No bookings registered yet.</td>
+                  </tr>
+                ) : (
+                  filteredRegistrations.map(r => (
+                    <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                      <td style={{ padding: "10px 14px" }}>
+                        <b>{r.studentName}</b>
+                        <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>{r.studentEmail}</div>
+                      </td>
+                      <td style={{ padding: "10px 14px" }}>{r.sessionTitle || "Masterclass"}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <span className={`dashboard__role-badge`} style={{ 
+                          background: r.status === 'completed' ? 'rgba(90,141,118,0.12)' : 'rgba(194,83,60,0.12)',
+                          color: r.status === 'completed' ? 'var(--c-emerald)' : 'var(--c-rust)',
+                          borderColor: r.status === 'completed' ? 'var(--c-emerald)' : 'var(--c-rust)',
+                          padding: "2px 6px",
+                          fontSize: "9px"
+                        }}>
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </React.Fragment>
+      )}
+
+      {/* ═══════════════ WORKSPACE — Videos ═══════════════ */}
+      {dashSection === 'videos' && isAdmin && (
+      <React.Fragment>
+        <RoadmapVideosAdminPanel user={user} />
+        <VideoCodeLinksAdminPanel user={user} />
+      </React.Fragment>
+      )}
+
+      {/* ═══════════════ WORKSPACE — Masterclasses ═══════════════ */}
+      {dashSection === 'classes' && (
+      <React.Fragment>
       {isAdmin && (
-        <div id="dash-classes" className="dashboard__panel" style={{ marginBottom: "28px" }}>
+        <div id="dash-classes" className="dashboard__panel">
           <h2 className="dashboard__panel-title" style={{ marginBottom: "18px" }}>Scheduled Masterclasses ({combinedClasses.length})</h2>
           {(() => {
             if (combinedClasses.length === 0) {
@@ -4196,47 +4374,7 @@ ${mcRawSyllabus}`;
           })()}
         </div>
       )}
-      {/* ── Published Masterclasses Management ── */}
-      {(() => {
-        const activeMcs = masterclasses.filter(m => !m.deleted && m.status !== 'deleted');
-        if (!isAdmin || activeMcs.length === 0) return null;
-        return (
-          <div className="dashboard__panel" style={{ marginBottom: "28px" }}>
-            <h2 className="dashboard__panel-title" style={{ marginBottom: "16px" }}>
-              Published Masterclasses ({activeMcs.length})
-            </h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {activeMcs.map(mc => (
-                <div key={mc.id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 16px", background: "var(--bg-elev)",
-                  border: "1px solid var(--line)", borderRadius: "10px", gap: "12px", flexWrap: "wrap"
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--fg)" }}>{mc.title}</div>
-                    <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "3px" }}>
-                      {mc.syllabus?.length || 0} topics · {mc.instructor} · ₹{(mc.price || 0).toLocaleString()}
-                      {mc.dateTime && ` · ${new Date(mc.dateTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteMasterclass(mc.id, mc.title)}
-                    style={{
-                      padding: "6px 14px", fontSize: "12px", fontWeight: 600,
-                      border: "1px solid var(--c-rust)", background: "transparent",
-                      color: "var(--c-rust)", borderRadius: "8px", cursor: "pointer"
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      <div className="dashboard__grid" id="mc-schedule-form">
+      <div id="mc-schedule-form">
         {/* Left Panel: Form (Only visible to Administrators) */}
         {isAdmin ? (
           <ScheduleMasterclassPanel
@@ -4251,139 +4389,26 @@ ${mcRawSyllabus}`;
           />
         ) : (
           <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "50px 30px" }}>
-            <div style={{ fontSize: "56px", marginBottom: "20px" }}>🔒</div>
-            <h2 className="dashboard__panel-title" style={{ justifyContent: "center", margin: 0, borderBottom: "none" }}>Creation Locked</h2>
+            <h2 className="dashboard__panel-title" style={{ justifyContent: "center", margin: 0, borderBottom: "none" }}>Scheduling is admin-only</h2>
             <p className="hero__sub" style={{ fontSize: "14px", marginTop: "14px", maxWidth: "34ch" }}>
-              Only authorized administrator accounts have permission to publish or edit masterclasses. Sign in with an admin account to continue.
+              Sign in with an admin account to publish or edit masterclasses.
             </p>
           </div>
         )}
 
-        {/* Right Panel: Analytics & Registrations */}
-        <div className="dashboard__panel" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)", paddingBottom: "12px", gap: "12px", flexWrap: "wrap" }}>
-            <h2 className="dashboard__panel-title" style={{ margin: 0, borderBottom: "none", paddingBottom: 0 }}>Overview & Bookings</h2>
-            <select
-              value={selectedRosterClassId}
-              onChange={(e) => setSelectedRosterClassId(e.target.value)}
-              style={{
-                background: "var(--bg-elev)",
-                color: "var(--fg)",
-                border: "1px solid var(--line)",
-                borderRadius: "8px",
-                padding: "6px 12px",
-                fontSize: "13px",
-                fontWeight: "500",
-                outline: "none",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                maxWidth: "240px",
-                fontFamily: "inherit"
-              }}
-              className="roster-select"
-            >
-              <option value="all">All Scheduled Classes</option>
-              {combinedClasses.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div className="phase__weeks-block" style={{ marginTop: 0, padding: "16px" }}>
-              <div className="phase__weeks-label">Reserved Seats</div>
-              <div className="phase__weeks">{totalSeats}</div>
-            </div>
-            <div className="phase__weeks-block" style={{ marginTop: 0, padding: "16px", borderLeftColor: "var(--c-amber)" }}>
-              <div className="phase__weeks-label">Gross Revenue</div>
-              <div className="phase__weeks" style={{ color: "var(--c-amber)" }}>₹{totalRevenue.toLocaleString()}</div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: "12px" }}>
-            <h3 className="form-label" style={{ marginBottom: "12px" }}>Roster List ({filteredRegistrations.length})</h3>
-            <div style={{ overflowX: "auto", maxHeight: "340px", border: "1px solid var(--line)", borderRadius: "8px" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", color: "var(--fg-dim)", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ background: "var(--bg-elev)", borderBottom: "1px solid var(--line)" }}>
-                    <th style={{ padding: "10px 14px", fontWeight: "600" }}>Student</th>
-                    <th style={{ padding: "10px 14px", fontWeight: "600" }}>Class</th>
-                    <th style={{ padding: "10px 14px", fontWeight: "600" }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRegistrations.length === 0 ? (
-                    <tr>
-                      <td colSpan="3" style={{ padding: "20px", textAlign: "center", color: "var(--fg-faint)" }}>No bookings registered yet.</td>
-                    </tr>
-                  ) : (
-                    filteredRegistrations.map(r => (
-                      <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
-                        <td style={{ padding: "10px 14px" }}>
-                          <b>{r.studentName}</b>
-                          <div style={{ fontSize: "11px", color: "var(--fg-faint)" }}>{r.studentEmail}</div>
-                        </td>
-                        <td style={{ padding: "10px 14px" }}>{r.sessionTitle || "Masterclass"}</td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <span className={`dashboard__role-badge`} style={{ 
-                            background: r.status === 'completed' ? 'rgba(90,141,118,0.12)' : 'rgba(194,83,60,0.12)',
-                            color: r.status === 'completed' ? 'var(--c-emerald)' : 'var(--c-rust)',
-                            borderColor: r.status === 'completed' ? 'var(--c-emerald)' : 'var(--c-rust)',
-                            padding: "2px 6px",
-                            fontSize: "9px"
-                          }}>
-                            {r.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </div>
+      </React.Fragment>
+      )}
 
-      {/* ── Marketing & Audience Management Panel (Full Width) — admin only ── */}
-      {isAdmin && (
-      <div id="dash-marketing" className="dashboard__panel" style={{ marginTop: "28px" }}>
+      {/* ═══════════════ WORKSPACE — Audience ═══════════════ */}
+      {dashSection === 'audience' && isAdmin && (
+      <div id="dash-marketing" className="dashboard__panel">
         <h2 className="dashboard__panel-title" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           Marketing & Audience Management
         </h2>
         <p className="hero__sub" style={{ marginTop: "4px", fontSize: "14px", color: "var(--fg-dim)", maxWidth: "100%" }}>
           Deduplicate, filter, and organize student accounts, registrants, and failed checkouts. Export segmented contacts into HubSpot, Klaviyo, or custom audiences.
         </p>
-
-        {/* KPI Cards Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "24px", marginBottom: "28px" }}>
-          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px" }}>
-            <div className="phase__weeks-label">Total Leads (Sign-ups)</div>
-            <div className="phase__weeks" style={{ fontSize: "28px", marginTop: "4px" }}>{totalLeads}</div>
-            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Unique email profiles</div>
-          </div>
-          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-rust)" }}>
-            <div className="phase__weeks-label">Paid Customers</div>
-            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-rust)", marginTop: "4px" }}>{totalPayingStudents}</div>
-            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Completed bookings</div>
-          </div>
-          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-emerald)" }}>
-            <div className="phase__weeks-label">Conversion Rate</div>
-            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-emerald)", marginTop: "4px" }}>{conversionRate}%</div>
-            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>Leads to paid ratio</div>
-          </div>
-          <div className="phase__weeks-block" style={{ marginTop: 0, padding: "20px", borderLeftColor: "var(--c-amber)" }}>
-            <div className="phase__weeks-label">Professional Ratio</div>
-            <div className="phase__weeks" style={{ fontSize: "28px", color: "var(--c-amber)", marginTop: "4px" }}>
-              {totalLeads > 0 ? ((totalProfessionals / totalLeads) * 100).toFixed(0) : 0}%
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--fg-faint)", marginTop: "4px", fontFamily: "JetBrains Mono" }}>
-              {totalProfessionals} Pros / {totalAcademicStudents} Students
-            </div>
-          </div>
-        </div>
 
         {/* 5 Targeted Audience Segments Grid */}
         <h3 className="form-label" style={{ marginBottom: "16px", fontSize: "11px", color: "var(--fg-faint)" }}>Standard Marketing Segments</h3>
@@ -4744,8 +4769,10 @@ ${mcRawSyllabus}`;
       </div>
       )}
 
-      {/* ── Course Enquiries Panel (Full Width) — admin only ── */}
-      {isAdmin && <AdminEnquiriesPanel />}
+      {/* ═══════════════ WORKSPACE — Enquiries ═══════════════ */}
+      {dashSection === 'enquiries' && isAdmin && <AdminEnquiriesPanel />}
+
+      </div>{/* /.dash-workspace */}
 
       {/* 5. Marketing Email Broadcast Modal — admin only */}
       {isAdmin && showBroadcastModal && (
@@ -4883,45 +4910,155 @@ function CoursesEnquiryCard() {
   );
 }
 
-function CoursesCurriculumV3() {
-  const modules = window.COURSE_CURRICULUM || [];
-  const [sel, setSel] = useState(0);
-  const m = modules[sel] || { submodules: [] };
-  const lockIcon = (
-    <svg className="cv3-lesson-lock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+// Small inline icons for the curriculum section (no icon dependency on this site).
+const CV3_ICON = {
+  clock: <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
+  play: <path d="M5 3.5v17l14-8.5-14-8.5Z" />,
+  book: <path d="M12 6.5s-2.5-2-8-1.5v13c5.5-.5 8 1.5 8 1.5s2.5-2 8-1.5v-13c-5.5-.5-8 1.5-8 1.5Zm0 0v13" />,
+  search: <path d="m21 21-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />,
+  lock: <path d="M7 11V7a5 5 0 0 1 10 0v4M5 11h14v11H5V11Z" />,
+  eye: <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm10 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />,
+  target: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0-3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />,
+  file: <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5" />,
+  arrow: <path d="M5 12h14m-6-6 6 6-6 6" />,
+};
+
+function Cv3Icon({ name, size = 16, fill }) {
+  return (
+    <svg className="cv3-i" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"
+      fill={fill ? 'currentColor' : 'none'} stroke={fill ? 'none' : 'currentColor'}
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {CV3_ICON[name]}
+    </svg>
   );
+}
+
+function CoursesCurriculumV3() {
+  const allModules = window.COURSE_CURRICULUM || [];
+  const D = window.COURSE_DURATION;
+  const info = window.COURSE_INFO || {};
+  const [sel, setSel] = useState(0);
+  const [q, setQ] = useState('');
+
+  // Decorate once — runtime is derived, not stored.
+  const modules = React.useMemo(() => allModules.map((mod, i) => ({
+    ...mod,
+    idx: i,
+    secs: D.moduleSecs(mod),
+  })), [allModules]);
+
+  const shown = React.useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return modules.filter((mod) => {
+      if (!needle) return true;
+      const hay = `${mod.n} ${mod.title} ${mod.tagline || ''} ${(mod.submodules || []).map((s) => s.title).join(' ')}`;
+      return hay.toLowerCase().includes(needle);
+    });
+  }, [modules, q]);
+
+  // Keep the detail panel on a module that's still visible after filtering.
+  const m = modules[sel] || modules[0] || { submodules: [] };
+  const active = shown.some((x) => x.idx === sel) ? m : (shown[0] || m);
+
+  // Below the master/detail breakpoint the panel is rendered inline, right under
+  // the module you tapped, instead of in a second column far below the list.
+  // Same single panel either way — only its parent changes.
+  const [stacked, setStacked] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 960px)');
+    const sync = () => setStacked(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const detail = (
+    <div className={`cv3-curriculum-detail ${stacked ? 'is-inline' : ''}`} key={active.n}>
+      <div className="cv3-eyebrow">Module {active.n}</div>
+      <h3 className="cv3-detail-title">{active.title}</h3>
+      {active.tagline && <p className="cv3-detail-summary">{active.tagline}</p>}
+      {active.project && (
+        <p className="cv3-detail-project">
+          <Cv3Icon name="target" size={16} />
+          <span><b>You'll Build:</b> {active.project}</span>
+        </p>
+      )}
+      <div className="cv3-detail-meta">
+        <div><Cv3Icon name="play" size={16} fill /><div><b>{D.long(active.secs)}</b><span>Total Duration</span></div></div>
+        <div><Cv3Icon name="book" size={16} /><div><b>{active.submodules.length}</b><span>{active.submodules.length === 1 ? 'Lesson' : 'Lessons'}</span></div></div>
+      </div>
+      <div className="cv3-detail-lessonhead">
+        <span>Lessons in this module</span>
+        <span>Duration</span>
+      </div>
+      <div className="cv3-detail-lessons">
+        {(active.submodules || []).map((sm, i) => (
+          <div key={sm.n} className="cv3-lesson">
+            <span className="cv3-lesson-num">{i + 1}</span>
+            <Cv3Icon name="play" size={13} fill />
+            <span className="cv3-lesson-text">{sm.title}</span>
+            <span className="cv3-lesson-dur">{D.clock(D.lessonSecs(sm))}</span>
+            {sm.preview
+              ? <><span className="cv3-lesson-badge">Preview</span><span className="cv3-lesson-lock"><Cv3Icon name="eye" size={15} /></span></>
+              : <span className="cv3-lesson-lock"><Cv3Icon name="lock" size={15} /></span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <section className="cv3-section" id="cv3-curriculum">
-      <CoursesSectionHead
-        eyebrow="Full curriculum"
-        title="Course Curriculum"
-        sub={`${modules.length} modules, each paired with a shippable build. Click a module to see what's inside.`}
-      />
-      <div className="cv3-curriculum">
-        <div className="cv3-curriculum-list">
-          {modules.map((mod, i) => (
-            <button key={mod.n} type="button" className={`cv3-mod ${i === sel ? 'is-active' : ''}`} onClick={() => setSel(i)}>
-              <span className="cv3-mod-num">{mod.n}</span>
-              <span className="cv3-mod-title">{mod.title}</span>
-            </button>
-          ))}
+      <div className="cv3-curriculum-head">
+        <div>
+          <div className="cv3-eyebrow">Curriculum</div>
+          <h2 className="cv3-h2">Learn step-by-step. Build real AI skills.</h2>
+          <p className="cv3-section-sub">From Python fundamentals to advanced AI systems — master the concepts, tools, and projects used in the real world.</p>
         </div>
-        <div className="cv3-curriculum-detail" key={m.n}>
-          <div className="cv3-eyebrow">Module {m.n}</div>
-          <div className="cv3-detail-rule" />
-          <h3 className="cv3-detail-title">{m.title}</h3>
-          {m.tagline && <p className="cv3-detail-summary">{m.tagline}</p>}
-          {m.project && <p className="cv3-detail-project"><b>You build:</b> {m.project}</p>}
-          <div className="cv3-detail-lessons">
-            {(m.submodules || []).map((sm, i) => (
-              <div key={sm.n} className="cv3-lesson">
-                <span className="cv3-lesson-num">{i + 1}</span>
-                <span className="cv3-lesson-text">{sm.title}</span>
-                {lockIcon}
-              </div>
+        <div className="cv3-curriculum-actions">
+          {info.syllabusUrl && (
+            <a className="cv3-btn cv3-btn--ghost" href={info.syllabusUrl} target="_blank" rel="noopener noreferrer">
+              <Cv3Icon name="file" /> Download Syllabus
+            </a>
+          )}
+          <a className="cv3-btn cv3-btn--accent" href="#cv3-pricing"
+            onClick={(e) => { e.preventDefault(); const el = document.getElementById('cv3-pricing'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>
+            Start Learning Now <Cv3Icon name="arrow" />
+          </a>
+        </div>
+      </div>
+
+      <div className="cv3-curriculum">
+        <div className="cv3-curriculum-pane">
+          <div className="cv3-curriculum-filters">
+            <div className="cv3-search">
+              <Cv3Icon name="search" size={15} />
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Search modules…" aria-label="Search modules" />
+            </div>
+          </div>
+          <div className="cv3-curriculum-list">
+            {shown.map((mod) => (
+              <React.Fragment key={mod.n}>
+                <button type="button"
+                  className={`cv3-mod ${mod.idx === active.idx ? 'is-active' : ''}`}
+                  aria-expanded={stacked ? mod.idx === active.idx : undefined}
+                  onClick={() => setSel(mod.idx)}>
+                  <span className="cv3-mod-num">{mod.n}</span>
+                  <span className="cv3-mod-title">{mod.title}</span>
+                  <span className="cv3-mod-meta">
+                    <span><Cv3Icon name="book" size={14} /> {mod.submodules.length} lesson{mod.submodules.length === 1 ? '' : 's'}</span>
+                    <span><Cv3Icon name="clock" size={14} /> {D.long(mod.secs)}</span>
+                  </span>
+                </button>
+                {stacked && mod.idx === active.idx && detail}
+              </React.Fragment>
             ))}
+            {!shown.length && <p className="cv3-curriculum-empty">No modules match “{q}”.</p>}
           </div>
         </div>
+
+        {!stacked && detail}
       </div>
     </section>
   );
@@ -5042,12 +5179,12 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   };
 
   const highlights = [
-    ['Full course access', 'Lifetime access to all modules and updates.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0z" /><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0z" /></svg>],
+    ['Full course access', '2 years of access to all modules and updates.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0z" /><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0z" /></svg>],
     ['Live & office hours', 'Regular live sessions to clear doubts.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>],
     ['Code & projects', 'Hands-on projects with production-ready code.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>],
     ['Assignments', 'Practical assignments to reinforce learning.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><path d="m9 14 2 2 4-4" /></svg>],
     ['Certificate', 'Shareable certificate upon course completion.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5" /></svg>],
-    ['Lifetime access', 'Learn at your own pace, forever.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8c-2.5 0-4 2-4 4s1.5 4 4 4c3 0 5-8 10-8 2.5 0 4 2 4 4s-1.5 4-4 4c-5 0-7-8-10-8z" /></svg>],
+    ['2 years of access', 'Learn at your own pace, no rush.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8c-2.5 0-4 2-4 4s1.5 4 4 4c3 0 5-8 10-8 2.5 0 4 2 4 4s-1.5 4-4 4c-5 0-7-8-10-8z" /></svg>],
     ['Community & network', 'Connect with learners and AI builders.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>],
     ['More & freebies', 'Templates, cheat sheets and exclusive resources.', <svg key="i" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13M20 12v9H4v-9" /><path d="M12 8C12 5 10 3 8 3a2.5 2.5 0 0 0 0 5zM12 8c0-3 2-5 4-5a2.5 2.5 0 0 1 0 5z" /></svg>],
   ];
@@ -5210,7 +5347,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
       <section className="cv3-section" id="cv3-pricing">
         <CoursesSectionHead eyebrow="Pricing" title="One price. Everything included." />
         <div className="cv3-pricing-card">
-          <span className="cv3-pricing-pill">Full lifetime access</span>
+          <span className="cv3-pricing-pill">Full access for 2 years</span>
           <div className="cv3-pricing-name">{info.flagshipName}</div>
           <div className="cv3-pricing-price">{priceFmt(info.price)}</div>
           <div className="cv3-price-note">One-time payment · Inclusive of GST · No subscription</div>
@@ -5350,7 +5487,7 @@ function RoadmapVideosAdminPanel({ user }) {
   };
 
   return (
-    <div id="dash-videos" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+    <div id="dash-videos" className="dashboard__panel roadmap-admin-panel">
       <h2 className="dashboard__panel-title">Roadmap Videos</h2>
       <p className="hero__sub" style={{ marginTop: '4px', fontSize: '14px', color: 'var(--fg-dim)' }}>
         Link YouTube videos to phases and modules. Changes appear on the Full Roadmap tab immediately.
@@ -5502,7 +5639,7 @@ function VideoCodeLinksAdminPanel({ user }) {
   };
 
   return (
-    <div id="dash-code-links" className="dashboard__panel roadmap-admin-panel" style={{ marginBottom: '28px' }}>
+    <div id="dash-code-links" className="dashboard__panel roadmap-admin-panel">
       <h2 className="dashboard__panel-title" style={{ marginBottom: '6px' }}>Per-video code links</h2>
       <p style={{ fontSize: '13px', color: 'var(--fg-dim)', margin: '0 0 16px' }}>
         Add a “Link to code” button to any individual video by its URL — including each video inside a playlist. Paste the single video’s YouTube link (not the playlist link).
@@ -5551,29 +5688,6 @@ function VideoCodeLinksAdminPanel({ user }) {
 RoadmapVideosAdminPanel = React.memo(RoadmapVideosAdminPanel);
 VideoCodeLinksAdminPanel = React.memo(VideoCodeLinksAdminPanel);
 
-// Live enquiry count for the dashboard nav. Same query as
-// AdminEnquiriesPanel — Firestore shares the listener, so this
-// costs no extra reads. Own component so DashboardView never
-// re-renders on new enquiries (see CLAUDE.md re-render warning).
-function EnquiryCountBadge() {
-  const [count, setCount] = useState(null);
-  useEffect(() => {
-    if (!db) return;
-    const unsub = db.collection('leads')
-      .where('source', '==', 'course_enquiry')
-      .onSnapshot((snap) => setCount(snap.size), () => {});
-    return () => unsub();
-  }, []);
-  if (count == null) return null;
-  return (
-    <span style={{ marginLeft: '6px', padding: '1px 8px', borderRadius: '999px', background: 'var(--c-rust)', color: '#fff', fontSize: '11px', fontFamily: 'JetBrains Mono', fontWeight: 600 }}>
-      {count}
-    </span>
-  );
-}
-
-EnquiryCountBadge = React.memo(EnquiryCountBadge);
-
 // Per-enquiry reply composer. Reuses the sendBulkEmail callable with a
 // single recipient — same Resend pipeline, admin-gated server-side, and
 // the send shows up in Email Tasks like any other job. Owns its own
@@ -5584,6 +5698,27 @@ function EnquiryReplyBox({ enquiry }) {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState(null); // { ok, msg }
+  const [drafting, setDrafting] = useState(false);
+
+  // AI draft — the generateEnquiryReply callable applies the student-mentor-reply
+  // skill and returns { subject, body }. It only fills the composer; the admin
+  // still reads it and presses Send.
+  const generate = async () => {
+    setDrafting(true);
+    setStatus(null);
+    try {
+      // gpt-5 reasoning takes ~40s on a full enquiry; the callable's 70s
+      // client default is too tight, so raise it well clear of the server's 300s.
+      const res = await functions.httpsCallable('generateEnquiryReply', { timeout: 240000 })({ enquiryId: enquiry.id });
+      setSubject(res.data.subject || subject);
+      setBody(res.data.body || '');
+      setOpen(true);
+    } catch (e) {
+      console.error('[ENQUIRY REPLY] draft failed:', e);
+      setStatus({ ok: false, msg: e.message || 'Could not generate a draft.' });
+    }
+    setDrafting(false);
+  };
 
   const send = async () => {
     if (!subject.trim() || !body.trim()) {
@@ -5627,13 +5762,24 @@ function EnquiryReplyBox({ enquiry }) {
   return (
     <div style={{ marginTop: '12px' }}>
       {!open && (
-        <button
-          className="form-btn"
-          onClick={() => { setOpen(true); setStatus(null); }}
-          style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg)', margin: 0, padding: '7px 14px', fontSize: '13px', width: 'auto' }}
-        >
-          Reply
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className="form-btn"
+            onClick={() => { setOpen(true); setStatus(null); }}
+            style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg)', margin: 0, padding: '7px 14px', fontSize: '13px', width: 'auto' }}
+          >
+            Reply
+          </button>
+          <button
+            className="form-btn"
+            onClick={generate}
+            disabled={drafting}
+            style={{ background: 'transparent', border: '1px solid var(--c-rust)', color: 'var(--c-rust)', margin: 0, padding: '7px 14px', fontSize: '13px', width: 'auto' }}
+            title="Draft a reply with AI — you review and send it yourself"
+          >
+            {drafting ? 'Generating…' : '✦ Generate'}
+          </button>
+        </div>
       )}
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
@@ -5663,6 +5809,15 @@ function EnquiryReplyBox({ enquiry }) {
             </button>
             <button
               className="form-btn"
+              onClick={generate}
+              disabled={sending || drafting}
+              style={{ background: 'transparent', border: '1px solid var(--c-rust)', color: 'var(--c-rust)', margin: 0, padding: '8px 14px', fontSize: '13px', width: 'auto' }}
+              title="Replace the draft with a freshly generated one"
+            >
+              {drafting ? 'Generating…' : '✦ Generate'}
+            </button>
+            <button
+              className="form-btn"
               onClick={() => setOpen(false)}
               disabled={sending}
               style={{ background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--fg-dim)', margin: 0, padding: '8px 14px', fontSize: '13px', width: 'auto' }}
@@ -5681,11 +5836,126 @@ function EnquiryReplyBox({ enquiry }) {
   );
 }
 
+// One-click blast to every enquiry that arrived with an empty message — there's
+// nothing to tailor a reply to, so they all get the same course-details email.
+// Owns its own subject/body state so typing never re-renders the enquiry list.
+function EnquiryBulkEmailBox({ enquiries }) {
+  const [subject, setSubject] = useState('Course details — Agentic AI at Production Level');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState(null); // { ok, msg }
+
+  // Same address twice = one email, but the reply is logged on every matching doc
+  // so none of them stay stuck in "Yet to be replied".
+  const unique = [];
+  const seen = new Set();
+  for (const q of enquiries) {
+    const email = (q.email || '').trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    unique.push({ name: q.name || '', email });
+  }
+
+  const send = async () => {
+    if (!subject.trim() || !body.trim()) {
+      setStatus({ ok: false, msg: 'Subject and message are both required.' });
+      return;
+    }
+    if (unique.length === 0) {
+      setStatus({ ok: false, msg: 'None of these enquiries has an email address.' });
+      return;
+    }
+    if (!window.confirm(`Send this email to ${unique.length} ${unique.length === 1 ? 'person' : 'people'}? This cannot be undone.`)) return;
+    setSending(true);
+    setStatus(null);
+    try {
+      await functions.httpsCallable('sendBulkEmail')({
+        subject: subject.trim(),
+        body,
+        label: `Empty-message enquiries — ${unique.length} recipients`,
+        recipients: unique,
+      });
+      // Log on every lead doc so the thread survives and the tab counts update.
+      // Firestore caps a batch at 500 writes; chunk well under it.
+      const entry = {
+        direction: 'out',
+        subject: subject.trim(),
+        body,
+        sentAt: Date.now(),
+        by: (auth && auth.currentUser && auth.currentUser.email) || 'admin',
+      };
+      const withEmail = enquiries.filter((q) => (q.email || '').trim());
+      try {
+        for (let i = 0; i < withEmail.length; i += 400) {
+          const batch = db.batch();
+          for (const q of withEmail.slice(i, i + 400)) {
+            batch.update(db.collection('leads').doc(q.id), {
+              replies: firebase.firestore.FieldValue.arrayUnion(entry),
+            });
+          }
+          await batch.commit();
+        }
+      } catch (logErr) {
+        console.error('[BULK ENQUIRY] sent but could not log to threads:', logErr);
+      }
+      setStatus({ ok: true, msg: `Sent to ${unique.length} ${unique.length === 1 ? 'recipient' : 'recipients'}. Track delivery in Email Tasks.` });
+      setBody('');
+    } catch (e) {
+      console.error('[BULK ENQUIRY] send failed:', e);
+      setStatus({ ok: false, msg: e.message || 'Could not send the bulk email.' });
+    }
+    setSending(false);
+  };
+
+  return (
+    <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: '12px', padding: '18px 20px', marginTop: '18px' }}>
+      <div style={{ fontSize: '15px', fontWeight: 600 }}>Email all {unique.length} of them at once</div>
+      <p style={{ margin: '4px 0 12px', fontSize: '13px', color: 'var(--fg-dim)', lineHeight: 1.6 }}>
+        These enquiries left no message, so there's nothing to tailor. Write one email and it goes to every unique
+        address below in a single send.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <input
+          className="form-input"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Subject"
+          style={{ fontSize: '13px' }}
+        />
+        <textarea
+          className="form-input"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={"Hi there,\n\nThanks for your interest in the course…"}
+          rows={8}
+          style={{ fontSize: '13px', resize: 'vertical', fontFamily: 'inherit' }}
+        />
+        <div>
+          <button
+            className="form-btn"
+            onClick={send}
+            disabled={sending || unique.length === 0}
+            style={{ margin: 0, padding: '8px 18px', fontSize: '13px', width: 'auto' }}
+          >
+            {sending ? 'Sending…' : `Send to all ${unique.length}`}
+          </button>
+        </div>
+      </div>
+      {status && (
+        <p style={{ margin: '10px 0 0', fontSize: '13px', color: status.ok ? 'var(--c-green, #3a9d5d)' : 'var(--c-rust)' }}>
+          {status.ok ? '✔' : '⚠'} {status.msg}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AdminEnquiriesPanel() {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [filter, setFilter] = useState('all'); // all | replied | pending
 
   useEffect(() => {
     if (!db) return;
@@ -5710,6 +5980,22 @@ function AdminEnquiriesPanel() {
     return d ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
   };
 
+  // Replied = at least one outbound reply logged on the lead doc.
+  const isReplied = (q) => Array.isArray(q.replies) && q.replies.some((r) => r.direction !== 'in');
+  const repliedCount = enquiries.filter(isReplied).length;
+  const pendingCount = enquiries.length - repliedCount;
+  // Empty-message enquiries can't be answered individually — they get their own
+  // tab and a single bulk send instead. It's a queue, not a content filter: once
+  // one is replied to it leaves this tab for "Replied", so the count is the
+  // outstanding work and a bulk send never re-hits someone already handled.
+  const hasNoMessage = (q) => !String(q.message || '').trim();
+  const noMessage = enquiries.filter((q) => hasNoMessage(q) && !isReplied(q));
+  const shown = filter === 'all'
+    ? enquiries
+    : filter === 'nomessage'
+      ? noMessage
+      : enquiries.filter((q) => isReplied(q) === (filter === 'replied'));
+
   const exportCsv = () => {
     const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     const rows = enquiries.map((q) =>
@@ -5725,7 +6011,7 @@ function AdminEnquiriesPanel() {
   };
 
   return (
-    <div id="dash-enquiries" className="dashboard__panel" style={{ marginTop: '28px' }}>
+    <div id="dash-enquiries" className="dashboard__panel">
       <h2 className="dashboard__panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
         Course Enquiries
         <span style={{ fontSize: '13px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono', fontWeight: 400 }}>
@@ -5748,8 +6034,37 @@ function AdminEnquiriesPanel() {
       {!loading && !error && enquiries.length === 0 && (
         <p style={{ fontSize: '14px', color: 'var(--fg-faint)', marginTop: '16px' }}>No enquiries yet.</p>
       )}
+      {enquiries.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '16px' }}>
+          {[
+            { id: 'all', label: 'All', count: enquiries.length },
+            { id: 'replied', label: 'Replied', count: repliedCount },
+            { id: 'pending', label: 'Yet to be replied', count: pendingCount },
+            { id: 'nomessage', label: 'No message', count: noMessage.length },
+          ].map((f) => (
+            <button
+              key={f.id}
+              className={`dash-tab${filter === f.id ? ' is-active' : ''}`}
+              onClick={() => setFilter(f.id)}
+            >
+              {f.label}
+              <span className="dash-tab__count">{f.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!loading && !error && enquiries.length > 0 && shown.length === 0 && (
+        <p style={{ fontSize: '14px', color: 'var(--fg-faint)', marginTop: '16px' }}>
+          {filter === 'replied'
+            ? 'No replied enquiries yet.'
+            : filter === 'nomessage'
+              ? 'Nothing waiting — every empty-message enquiry has been replied to.'
+              : 'All enquiries have been replied to.'}
+        </p>
+      )}
+      {filter === 'nomessage' && noMessage.length > 0 && <EnquiryBulkEmailBox enquiries={noMessage} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '18px', maxHeight: '560px', overflowY: 'auto', paddingRight: '6px' }}>
-        {enquiries.map((q) => {
+        {shown.map((q) => {
           const expanded = expandedId === q.id;
           const replies = Array.isArray(q.replies) ? q.replies : [];
           return (
@@ -6025,96 +6340,6 @@ function AdminEmailTasks() {
 }
 
 // ===============================================================
-// Public support chatbot widget — floating bubble + chat panel.
-// Sends messages to the `chatbot` Cloud Function (Gemini, key server-side)
-// and renders the conversation. Falls back to email/WhatsApp on any error.
-// ===============================================================
-function V2Chatbot({ nextMc }) {
-  const GREETING = "Hi! 👋 Ask me anything about the roadmap or the masterclasses — pricing, schedule, what you'll learn, or how to join.";
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{ role: 'bot', text: GREETING }]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const scrollRef = React.useRef(null);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, open, loading]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-    const history = messages.slice(-8).map((m) => ({ role: m.role, text: m.text }));
-    setMessages((prev) => [...prev, { role: 'user', text }]);
-    setInput('');
-    setLoading(true);
-    try {
-      if (!functions) throw new Error('offline');
-      const mc = nextMc || (window.SITE_CONFIG && window.SITE_CONFIG.nextMasterclass) || {};
-      const ctx = { title: mc.title || mc.shortTitle, dateTime: mc.dateTime, price: mc.price, originalPrice: mc.originalPrice };
-      const res = await functions.httpsCallable('chatbot')({ message: text, history, context: ctx });
-      const reply = (res && res.data && res.data.reply) || "Sorry, I couldn't answer that. Please email team@balajichippada.com.";
-      setMessages((prev) => [...prev, { role: 'bot', text: reply }]);
-    } catch (e) {
-      setMessages((prev) => [...prev, { role: 'bot', text: "I'm having trouble right now. Please email team@balajichippada.com or ask in the WhatsApp community." }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const waUrl = (typeof V2_BRAND !== 'undefined' && V2_BRAND.whatsappCommunity) || '#';
-
-  return (
-    <React.Fragment>
-      <button
-        type="button"
-        className={`v2-chat-fab ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? 'Close chat assistant' : 'Open chat assistant'}
-      >
-        <span aria-hidden="true">{open ? '✕' : '💬'}</span>
-      </button>
-
-      {open && (
-        <div className="v2-chat-panel" role="dialog" aria-label="Chat assistant">
-          <div className="v2-chat-head">
-            <div className="v2-chat-head-text">
-              <div className="v2-chat-title">Ask a question</div>
-              <div className="v2-chat-sub">Roadmap &amp; masterclasses · AI assistant</div>
-            </div>
-            <button type="button" className="v2-chat-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
-          </div>
-
-          <div className="v2-chat-msgs" ref={scrollRef}>
-            {messages.map((m, i) => (
-              <div key={i} className={`v2-chat-msg v2-chat-msg--${m.role}`}>{m.text}</div>
-            ))}
-            {loading && (
-              <div className="v2-chat-msg v2-chat-msg--bot v2-chat-typing"><span></span><span></span><span></span></div>
-            )}
-          </div>
-
-          <form className="v2-chat-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question…"
-              maxLength={600}
-              aria-label="Your question"
-            />
-            <button type="submit" disabled={loading || !input.trim()} aria-label="Send">↑</button>
-          </form>
-
-          <div className="v2-chat-foot">
-            AI answers can be imperfect · <a href={waUrl} target="_blank" rel="noopener noreferrer">WhatsApp</a> · <a href="mailto:team@balajichippada.com">Email</a>
-          </div>
-        </div>
-      )}
-    </React.Fragment>
-  );
-}
-
-// ===============================================================
 // MAIN APPLICATION ROOT COMPONENT
 // ===============================================================
 
@@ -6153,7 +6378,11 @@ function App() {
       const meta = window.SEO_CONFIG && window.SEO_CONFIG.getRouteMeta
         ? window.SEO_CONFIG.getRouteMeta(window.location.pathname)
         : null;
-      return (meta && meta.tab) || 'home';
+      const tab = (meta && meta.tab) || 'home';
+      // The masterclass tab has no nav entry when the flag is off — don't let a
+      // stale link land on a tab the user can't navigate back to.
+      if (tab === 'masterclass' && !V2_CONFIG.showMasterclassTab) return 'home';
+      return tab;
     } catch (e) { return 'home'; }
   });
 
@@ -7547,16 +7776,18 @@ function App() {
         className={`nav__tab-btn ${activeMainTab === 'home' ? 'active' : ''}`}
         onClick={() => switchMainTab('home')}
       >
-        Home
+        Course
       </button>
-      <button
-        role="tab"
-        aria-selected={activeMainTab === 'masterclass'}
-        className={`nav__tab-btn ${activeMainTab === 'masterclass' ? 'active' : ''}`}
-        onClick={() => switchMainTab('masterclass')}
-      >
-        Masterclass
-      </button>
+      {V2_CONFIG.showMasterclassTab && (
+        <button
+          role="tab"
+          aria-selected={activeMainTab === 'masterclass'}
+          className={`nav__tab-btn ${activeMainTab === 'masterclass' ? 'active' : ''}`}
+          onClick={() => switchMainTab('masterclass')}
+        >
+          Masterclass
+        </button>
+      )}
       <button
         role="tab"
         aria-selected={activeMainTab === 'roadmap'}
@@ -7700,7 +7931,28 @@ function App() {
     </div>
   ) : null;
 
-  // Signed-out CTA — sits on the left next to the menu button (mirrors where
+  // FLA wordmark in the nav's left slot — clicking it returns to the home tab.
+  // Letterforms use currentColor so the mark follows the theme.
+  const navBrand = (
+    <button
+      type="button"
+      className="nav__brand"
+      aria-label="FLA — go to home"
+      onClick={() => switchMainTab('home')}
+    >
+      <svg className="nav__brand-logo" viewBox="99 318 802 364" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path fill="currentColor" d="M115.4,681.25c-3.24,0-6.92-1.36-9.86-3.64-3.58-2.78-5.55-6.46-5.54-10.38l.14-199.83c.02-22.81,4.37-42.49,12.93-58.48,9.94-18.55,25.13-31.2,45.15-37.59,14.12-4.51,28.13-6.7,42.83-6.71l118.81-.08c2.6,0,5.08,1.09,7.01,3.06,1.94,1.99,3.02,4.61,2.96,7.17l-.43,17.59c-.38,15.75-14.96,25.16-28.84,25.17l-93.39.02c-25.17,0-39.76,7.78-44.59,23.75-2.75,9.08-4.18,18.85-4.24,29.03l-.18,28.18c3.87-1.36,8.37-2.41,13.38-2.41,0,0,104.01-.01,104.01-.01,4.53,0,9.17,4.61,9.2,9.14l.1,15.41c.05,7.75-2.82,14.94-8.08,20.24-5.08,5.12-11.95,7.94-19.36,7.95l-84.84.11c-8.01.01-14.3,6.52-14.32,14.82l-.23,87.17c-.04,16.1-13.63,29.91-29.67,30.14l-12.95.19Z"/>
+        <path fill="currentColor" d="M493.85,638.59c2.84-4.59-.47-10.52-5.86-10.52l-36.32-.03c-23.17-.01-36.14-6.41-39.64-19.57-1.97-7.42-2.9-14.18-2.9-21.28l-.09-213.03c0-5.58-5.16-9.47-9.8-9.47l-43.11.04c-4.76,0-9.09,4.48-9.08,9.38l.13,214.23c0,16.3,3.19,31.45,9.71,46.32,8.07,18.4,22.64,31.83,42.13,38.84,14.66,5.28,27.81,7.74,41.38,7.74h21.65c3.4.01,6.56-1.75,8.35-4.64l23.47-38.01Z"/>
+        <path fill="currentColor" d="M873.14,614.9l-50.59-82.61c-2.71-4.43-9.12-4.49-11.92-.12l-23.57,36.75c-1.48,2.31-1.48,5.27,0,7.58l28.89,45.2c.58.9.65,3.11.12,3.84-.54.73-2.21,1.34-3.56,1.34l-89.85-.03c-.98,0-2.66-1.17-2.91-1.92-.25-.75.12-2.1.81-3.17l64.23-100.09,28.1-43.86,28.86-44.9c2.74-4.27,1.6-9.94-2.58-12.82l-21.74-14.95-5.65-3.84c-4.36-2.97-10.32-1.76-13.18,2.67l-56.51,87.58-63.68,97.57-39.44,60.16c-3.62,5.52-6,10.32-4.05,17.44,1.38,5.03,5.09,9.91,10.91,12.42,4.36,1.88,8.73,1.98,13.74,1.98h98.88s116.52-.06,116.52-.06c7.54,0,14.28-4.82,17.56-10.14,4.14-6.72,5.07-15.08,1.13-21.68l-20.5-34.34Z"/>
+        <path fill="currentColor" d="M562.19,665.28c-6.57,10.67-13.77,16.09-26.31,15.97l-22.65-.22-17.4-.16c-1.34-.01-3.4-1.77-3.92-2.83-.62-1.26-.81-3.82.23-5.5l60.57-98.11,121.46-196.78c.23-.38.5-.74.8-1.06,5.11-5.5,10.55-9.35,17.81-11.29,12.35-2.65,25.96,1.62,32.88,12.83l27.35,44.29c1.37,2.21,1.34,5.01-.06,7.2l-24.42,38.03c-2.67,4.16-8.77,4.14-11.41-.05l-13.29-21.13c-.63-1.46-2.25-2.6-3.74-2.5s-2.3,1.57-3.24,3.07l-25.12,40.47-109.54,177.78Z"/>
+        <polygon fill="#aa241a" points="850.09 394.53 833.7 405.94 833.48 402.32 843.92 387.48 850.09 394.53"/>
+        <path fill="#f9472b" d="M831.31,381.51l45.96,31.72c2.16,1.49,5.14.27,5.64-2.3l17.01-87.84c.56-2.87-2.32-5.19-5.01-4.04l-89,38.16c-2.63,1.13-2.99,4.71-.63,6.34l26.03,17.96"/>
+        <path fill="#db3a2a" d="M888.57,332.09l-44.32,58.34-10.32,15.26c-.79,1.07-2.49.51-2.49-.83l.13-23.19,57-49.59Z"/>
+      </svg>
+    </button>
+  );
+
+  // Signed-out CTA — sits on the right, next to the theme toggle (mirrors where
   // the signed-in user chip appears).
   const navSignInButton = (!user || user.isAnonymous) ? (
     <button
@@ -7754,8 +8006,7 @@ function App() {
         >
         <div className="nav__start">
           {navMenuButton}
-          {navUserMenu}
-          {navSignInButton}
+          {navBrand}
         </div>
 
         <div className="nav__tabs" role="tablist">
@@ -7763,22 +8014,8 @@ function App() {
         </div>
 
         <div className="nav__right">
-          <button
-            className="nav__book-seat-btn"
-            onClick={() => {
-              if (nextMcReserved) {
-                goToAccount();
-              } else if (nextMasterclass) {
-                openBooking(nextMasterclass);
-              } else {
-                const el = document.getElementById('masterclasses');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
-          >
-            {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve · <V2McPrice mc={nextMasterclass} /></> : 'Book a seat') : 'See classes')}
-          </button>
-
+          {navUserMenu}
+          {navSignInButton}
           <button
             type="button"
             className="theme-toggle"
@@ -7797,28 +8034,14 @@ function App() {
         <nav className="nav" aria-label="Primary">
           <div className="nav__start">
             {navMenuButton}
-            {navUserMenu}
-            {navSignInButton}
+            {navBrand}
           </div>
           <div className="nav__tabs" role="tablist">
             {mainNavTabs}
           </div>
           <div className="nav__right">
-            <button
-              className="nav__book-seat-btn"
-              onClick={() => {
-                if (nextMcReserved) {
-                  goToAccount();
-                } else if (nextMasterclass) {
-                  openBooking(nextMasterclass);
-                } else {
-                  const el = document.getElementById('masterclasses');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-            >
-              {nextMcReserved ? 'Seat booked ✓' : (nextMasterclass ? (isMcFree(nextMasterclass) ? <>Reserve · <V2McPrice mc={nextMasterclass} /></> : 'Book a seat') : 'See classes')}
-            </button>
+            {navUserMenu}
+            {navSignInButton}
             <button
               type="button"
               className="theme-toggle"
@@ -8349,6 +8572,17 @@ function App() {
                 {isRegistering ? "Sign Up with Google" : "Sign In with Google"}
               </button>
 
+              {/* Point-of-request disclosure. Google's OAuth review checks that the
+                  app is transparent about what it asks for at the moment it asks,
+                  not only in the privacy policy. Links open in a new tab so the
+                  half-filled sign-in form isn't lost. */}
+              <p style={{ marginTop: "12px", marginBottom: 0, fontSize: "12.5px", lineHeight: 1.6, color: "var(--fg-faint)", textAlign: "center" }}>
+                Google sign-in shares your name, email address and profile picture — nothing else.{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "var(--c-rust)" }}>Privacy Policy</a>
+                {" · "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "var(--c-rust)" }}>Terms</a>
+              </p>
+
               <div style={{ textAlign: "center", marginTop: "24px", fontSize: "14px", color: "var(--fg-dim)" }}>
                 {isRegistering ? "Already have an account?" : "Need an account?"}{" "}
                 <button 
@@ -8630,7 +8864,6 @@ function App() {
 
       <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
       <V2WhatsAppButton />
-      <V2Chatbot nextMc={nextMasterclass} />
       <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
     </React.Fragment>

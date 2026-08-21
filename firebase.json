@@ -50,6 +50,10 @@
         ]
       },
       {
+        "source": "/vendor/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
         "source": "/llms.txt",
         "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
       },
@@ -65,6 +69,9 @@
         "source": "/sitemap.xml",
         "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
       }
+    ],
+    "redirects": [
+      { "source": "/masterclasses", "destination": "/", "type": 301 }
     ],
     "rewrites": [
       {

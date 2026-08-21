@@ -660,6 +660,15 @@ window.ROADMAP_VIDEOS = [
     ],
   },
   {
+    id: 'phase4-rag-pipeline',
+    youtubeId: 'Lw8QSNKpu7Y',
+    title: 'Build a RAG Pipeline from Scratch',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 4, modules: ['4.3'], startSec: 0 },
+    ],
+  },
+  {
     id: 'phase2-evals-benchmarks',
     youtubeId: 'm9wvHClG8vo',
     title: 'Reading model evals & benchmarks',

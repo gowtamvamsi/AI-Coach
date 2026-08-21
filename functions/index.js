@@ -722,7 +722,7 @@ exports.onLeadCreated = functions.firestore
       `https://balajichippada.com/\n\n` +
       `Over the next few days, I'll send you a couple of study guides to help you set up your Python environment, configure Claude Code, and get access to the APIs we use in the cohorts.\n\n` +
       `If you have any questions or get stuck on any phase, feel free to reply directly to this email or join our WhatsApp community:\n` +
-      `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
+      `https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6\n\n` +
       `Let's build some amazing agentic systems together!\n\n` +
       `Best,\n` +
       `Balaji Chippada\n` +
@@ -1276,7 +1276,7 @@ exports.onUserSignupWelcome = functions.firestore
         `• Reserve your seat for the next live masterclass — the first one is free:\n` +
         `  https://balajichippada.com/\n\n` +
         `Have a question or just want to say hi? Reply directly to this email, or join our WhatsApp community:\n` +
-        `https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa\n\n` +
+        `https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6\n\n` +
         `Let's build some amazing agentic systems together!\n\n` +
         `Best,\n` +
         `Balaji Chippada\n` +
@@ -2391,3 +2391,134 @@ exports.onSessionHardDeleted = functions.firestore.document("sessions/{id}").onD
   await cascadeClassDeletion(context.params.id);
   return null;
 });
+
+// ===============================================================
+// AI ENQUIRY REPLY DRAFTER
+// ---------------------------------------------------------------
+// Drafts a mentor-voice reply to a course enquiry using the
+// `student-mentor-reply` skill (SKILL.md + its references, copied
+// verbatim into skill-mentor-reply/) as the system prompt. Admin
+// only; the draft is returned to the dashboard for review and is
+// never sent automatically — sending stays the human's job via the
+// existing sendBulkEmail path.
+// ponytail: the whole skill (~30KB ≈ 8k tokens) goes in every call.
+// Selective reference loading only if token cost ever matters.
+// ===============================================================
+const OPENAI_MODEL = "gpt-5";
+
+// Read once at cold start — these files ship with the deploy and never change at runtime.
+const MENTOR_SKILL_PROMPT = (() => {
+  const fs = require("fs");
+  const path = require("path");
+  const dir = path.join(__dirname, "skill-mentor-reply");
+  const files = [
+    "SKILL.md",
+    "references/example-reply-and-topics.md",
+    "references/course.md",
+    "references/roadmap.md",
+    "references/course-details-template.md",
+  ];
+  try {
+    return files
+      .map((f) => `\n\n===== FILE: ${f} =====\n\n` + fs.readFileSync(path.join(dir, f), "utf8"))
+      .join("");
+  } catch (e) {
+    console.error("[MENTOR REPLY] skill files missing:", e.message);
+    return "";
+  }
+})();
+
+exports.generateEnquiryReply = functions
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+    if (!isEmulator) {
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
+      }
+      const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+      const role = callerDoc.exists ? callerDoc.data().role : "";
+      if (role !== "admin") {
+        throw new functions.https.HttpsError("permission-denied", "Access denied. Only admins can draft replies.");
+      }
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new functions.https.HttpsError("failed-precondition", "OPENAI_API_KEY is not configured on the server.");
+    }
+    if (!MENTOR_SKILL_PROMPT) {
+      throw new functions.https.HttpsError("internal", "The mentor-reply skill files are missing from the deploy.");
+    }
+
+    const enquiryId = ((data && data.enquiryId) || "").trim();
+    if (!enquiryId) throw new functions.https.HttpsError("invalid-argument", "An enquiryId is required.");
+
+    // Read the enquiry server-side — never trust a client-supplied message body.
+    const snap = await db.collection("leads").doc(enquiryId).get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "That enquiry no longer exists.");
+    const q = snap.data();
+
+    const replies = Array.isArray(q.replies) ? q.replies.slice().sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0)) : [];
+    const thread = replies.length
+      ? "\n\nPrior messages in this thread (oldest first):\n" +
+        replies
+          .map((r) => `[${r.direction === "in" ? "STUDENT" : "BALAJI"}] ${r.subject ? `Subject: ${r.subject}\n` : ""}${r.body || ""}`)
+          .join("\n---\n")
+      : "";
+
+    const userPrompt =
+      "Draft Balaji's email reply to this course enquiry, following the skill above.\n\n" +
+      `Name: ${q.name || "(not given)"}\n` +
+      `Stage/occupation: ${q.occupation || "(not given)"}\n` +
+      `Their message: ${q.message ? q.message : "(they left the message field empty)"}` +
+      thread +
+      "\n\nReturn JSON only, shape: {\"subject\": \"...\", \"body\": \"...\"}. " +
+      "The body is the full email text ready to send, signed off as Balaji (or Team Balaji if you used the canned course-details template). " +
+      "PLAIN TEXT ONLY — no markdown of any kind. No asterisks, no underscores, no backticks, no ### headers, no [label](url) links, no bullet characters like • or —. " +
+      "Write URLs bare (balajichippada.com/roadmap). Use blank lines between paragraphs and plain numbers (1. 2. 3.) or hyphens for lists. " +
+      "If something needs emphasis, put it on its own line instead of formatting it.";
+
+    let res;
+    try {
+      res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are drafting on behalf of Balaji Chippada. Follow this skill exactly:" + MENTOR_SKILL_PROMPT },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      });
+    } catch (e) {
+      console.error("[MENTOR REPLY] network error:", e);
+      throw new functions.https.HttpsError("unavailable", "Could not reach the drafting service.");
+    }
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("[MENTOR REPLY] OpenAI error", res.status, detail.slice(0, 500));
+      throw new functions.https.HttpsError("internal", `Drafting failed (${res.status}). Check the API key and its credit balance.`);
+    }
+
+    const json = await res.json();
+    const raw = ((json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || "").trim();
+    let draft;
+    try {
+      draft = JSON.parse(raw);
+    } catch (e) {
+      console.error("[MENTOR REPLY] unparseable model output:", raw.slice(0, 500));
+      throw new functions.https.HttpsError("internal", "The draft came back malformed — try generating again.");
+    }
+    if (!draft || !draft.body) {
+      throw new functions.https.HttpsError("internal", "The draft came back empty — try generating again.");
+    }
+
+    return {
+      subject: String(draft.subject || "Re: Your course enquiry").trim(),
+      body: String(draft.body),
+    };
+  });

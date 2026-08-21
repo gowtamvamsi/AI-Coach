@@ -35,7 +35,7 @@ window.SITE_CONFIG = {
     youtubeChannel: 'https://www.youtube.com/@balajichippada',
     roadmapVideoId: 'q0doXVA18-A', // homepage hero embed
     roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
-    whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
+    whatsappCommunity: 'https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6',
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
     instagram: 'https://www.instagram.com/balajichippada',
     github: 'https://github.com/ch-balaji',
@@ -247,5 +247,6 @@ We will dive into the architectural patterns required to build autonomous, produ
     showCurriculumSection: true,   // on-page curriculum that "Explore curriculum" scrolls to
     showQuoteBand: false,          // ★★★★★ rotating testimonial — off until real reviews
     showSuccessStories: false,     // 3-card testimonial grid — off until real reviews
+    showMasterclassTab: false,     // Masterclass nav tab — /masterclasses still resolves if linked directly
   },
 };

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Privacy Policy · Balaji Chippada</title>
+  <meta name="description" content="How balajichippada.com collects, uses, and protects your personal data — account details, masterclass registrations, payments, and analytics." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#14131a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)" />
+  <link rel="canonical" href="https://balajichippada.com/privacy" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://balajichippada.com/privacy" />
+  <meta property="og:site_name" content="The Agent Engineer" />
+  <meta property="og:title" content="Privacy Policy · Balaji Chippada" />
+  <meta property="og:description" content="How balajichippada.com collects, uses, and protects your personal data." />
+
+  <!-- favicon.ico must be a real file: Googlebot falls back to /favicon.ico and the SPA rewrite would otherwise hand it index.html -->
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/svg+xml" href="/logos/fla-badge.svg" />
+  <link rel="apple-touch-icon" href="/logos/fla-badge-180.png" />
+
+  <script>
+    (() => {
+      // Fold the bare Firebase host into the canonical domain for humans.
+      if (location.hostname.endsWith('.web.app') || location.hostname.endsWith('.firebaseapp.com')) {
+        location.replace('https://balajichippada.com' + location.pathname + location.search + location.hash);
+        return;
+      }
+      // Storage can throw SecurityError when site data is blocked — see index.html.
+      try { window.localStorage.getItem('__probe'); } catch (e) {
+        const shim = Object.create({
+          getItem(k) { return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : null; },
+          setItem(k, v) { this[k] = String(v); },
+          removeItem(k) { delete this[k]; },
+          clear() { Object.keys(this).forEach((k) => delete this[k]); },
+          key(i) { const k = Object.keys(this)[i]; return k === undefined ? null : k; },
+          get length() { return Object.keys(this).length; },
+        });
+        try { Object.defineProperty(window, 'localStorage', { value: shim, configurable: true }); } catch (e2) {}
+      }
+      let t = localStorage.getItem('roadmap-theme');
+      if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=122" />
+  <style>
+    .doc { max-width: 820px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+    .doc-nav { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: space-between;
+      max-width: 820px; margin: 0 auto; padding: 1.25rem; }
+    .doc-nav a { color: var(--fg-dim); text-decoration: none; font-size: 0.92rem; }
+    .doc-nav a:hover { color: var(--c-rust); }
+    .doc-brand { font-family: 'Instrument Serif', serif; font-size: 1.3rem; color: var(--fg); }
+    .doc-nav-links { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+    .doc h1 { font-family: 'Instrument Serif', serif; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 1.5rem 0 0.75rem; }
+    .doc h2 { font-size: 1.3rem; margin: 2.25rem 0 0.6rem; color: var(--fg); }
+    .doc .lede { color: var(--fg-dim); font-size: 1.12rem; line-height: 1.6; margin-bottom: 0.5rem; }
+    .doc p, .doc li { color: var(--fg-dim); line-height: 1.7; }
+    .doc p { margin: 0.6rem 0; }
+    .doc ul { margin: 0.6rem 0; padding-left: 1.25rem; }
+    .doc li { margin: 0.35rem 0; }
+    .doc a { color: var(--c-rust); }
+    .doc .crumb { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--fg-faint); letter-spacing: 0.04em; }
+    .doc .crumb a { color: var(--fg-faint); }
+    .doc .updated { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--fg-faint); margin-bottom: 1.5rem; }
+    .doc-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+    .doc-table th, .doc-table td { border: 1px solid var(--line); padding: 0.6rem 0.75rem; text-align: left; vertical-align: top; color: var(--fg-dim); }
+    .doc-table th { color: var(--fg); font-weight: 600; }
+    .doc-scroll { overflow-x: auto; }
+    .doc-foot { border-top: 1px solid var(--line); margin-top: 3rem; padding-top: 1.5rem; color: var(--fg-faint); font-size: 0.88rem; }
+    .doc-foot a { color: var(--fg-dim); }
+  </style>
+</head>
+<body>
+  <nav class="doc-nav">
+    <a class="doc-brand" href="/">Balaji Chippada</a>
+    <span class="doc-nav-links">
+      <a href="/roadmap">Roadmap</a>
+      <a href="/about">About</a>
+      <a href="/terms">Terms</a>
+    </span>
+  </nav>
+
+  <main class="doc">
+    <div class="crumb"><a href="/">Home</a> / Privacy Policy</div>
+    <h1>Privacy Policy</h1>
+    <div class="updated">Last updated: 5 August 2026</div>
+
+    <p class="lede">This policy explains what personal data <a href="/">balajichippada.com</a> collects, why it is collected, who it is shared with, and how you can have it deleted. The site is operated by Balaji Chippada ("we", "us"), based in India.</p>
+
+    <h2>1. Data we collect</h2>
+    <div class="doc-scroll">
+      <table class="doc-table">
+        <thead>
+          <tr><th>What</th><th>When</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Name, email address, phone number</td>
+            <td>When you register for a masterclass, join a waitlist, or submit an enquiry form</td>
+            <td>To confirm your seat, send the joining link, calendar invite, reminders, and the session recording</td>
+          </tr>
+          <tr>
+            <td>Email address and password</td>
+            <td>When you create an account with email sign-up</td>
+            <td>To authenticate you. Passwords are handled by Firebase Authentication and are never visible to us</td>
+          </tr>
+          <tr>
+            <td>Google account name, email address, and profile picture</td>
+            <td>When you choose "Sign in with Google"</td>
+            <td>To create and identify your account. See section 3</td>
+          </tr>
+          <tr>
+            <td>Learning progress (which roadmap videos you have marked watched)</td>
+            <td>As you use the roadmap while signed in</td>
+            <td>To sync your progress markers across your devices</td>
+          </tr>
+          <tr>
+            <td>Payment details</td>
+            <td>When you pay for a paid masterclass</td>
+            <td>Collected and processed entirely by Razorpay. We receive only the payment status and order reference — we never see or store your card, UPI, or bank details</td>
+          </tr>
+          <tr>
+            <td>Usage analytics and referral (UTM) parameters</td>
+            <td>As you browse the site</td>
+            <td>To understand which content and channels are useful. See section 5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>We do not ask for, and do not want, any sensitive personal data — government IDs, financial account numbers, health information, or biometric data. Please do not send these to us.</p>
+
+    <h2>2. How we use your data</h2>
+    <ul>
+      <li>To deliver what you signed up for: masterclass access links, calendar invites, reminders, and recordings.</li>
+      <li>To operate your account and keep your roadmap progress in sync.</li>
+      <li>To send occasional updates about new masterclasses and content. Every such email carries an unsubscribe option, and you can opt out at any time.</li>
+      <li>To process payments and issue refunds.</li>
+      <li>To understand aggregate site usage and improve the content.</li>
+    </ul>
+    <p><strong>We do not sell your personal data, and we do not share it with advertisers or data brokers.</strong> When we email a group of registrants, recipients are hidden from one another.</p>
+
+    <h2>3. Google user data</h2>
+    <p>If you use "Sign in with Google", we request only your basic profile and email address. We use them solely to create your account, identify you when you return, and send you the masterclass emails you signed up for.</p>
+    <p>We do not request access to your Gmail, Drive, Calendar, Contacts, or any other Google service. Our use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. We do not transfer this data to third parties except as needed to provide the service (see section 4), and we do not use it for advertising.</p>
+    <p>You can disconnect this site's access at any time from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Google Account permissions page</a>.</p>
+
+    <h2>4. Service providers</h2>
+    <p>We use the following processors. Each receives only the data needed for its function:</p>
+    <ul>
+      <li><strong>Google Firebase</strong> (Authentication, Firestore, Cloud Functions, Hosting) — account, registration, and progress data storage.</li>
+      <li><strong>Google Analytics</strong> — aggregate usage measurement.</li>
+      <li><strong>Razorpay</strong> — payment processing for paid masterclasses.</li>
+      <li><strong>Resend</strong> — delivery of transactional and update emails.</li>
+      <li><strong>Zoom</strong> — hosting of live masterclass sessions.</li>
+      <li><strong>YouTube</strong> — embedded videos on the roadmap. YouTube may set its own cookies when you play a video.</li>
+    </ul>
+    <p>Some of these providers store data on servers outside India, including in the United States and the European Union.</p>
+
+    <h2>5. Cookies and browser storage</h2>
+    <p>We do not use advertising or cross-site tracking cookies. The site stores a small amount of data in your browser for functional reasons: your light/dark theme choice, which videos you have marked watched, which banners you have dismissed, and referral (UTM) parameters from the link you arrived by.</p>
+    <p>Firebase Authentication stores a session token so you stay signed in. Google Analytics sets its own cookies to measure usage; you can opt out with the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Google Analytics opt-out add-on</a>. Blocking site data in your browser will disable these features but the site will still work.</p>
+
+    <h2>6. Retention</h2>
+    <p>We keep registration and account data for as long as your account exists, so that you retain access to sessions you have paid for and to your progress. Payment records are retained for as long as Indian tax and accounting rules require. If you ask us to delete your data, we remove it within 30 days except where we are legally required to retain a record of a transaction.</p>
+
+    <h2>7. Your rights</h2>
+    <p>You can ask us to:</p>
+    <ul>
+      <li>Show you a copy of the personal data we hold about you.</li>
+      <li>Correct anything that is wrong.</li>
+      <li>Delete your account and associated data.</li>
+      <li>Stop sending you update emails.</li>
+    </ul>
+    <p>Email <a href="mailto:team@balajichippada.com">team@balajichippada.com</a> and we will respond within 30 days. There is no charge for any of these requests.</p>
+
+    <h2>8. Security</h2>
+    <p>Data is stored in Google Firebase with access rules that restrict each account to its own records. Administrative access is limited to the site operator. All traffic to the site is encrypted over HTTPS. No system is perfectly secure, but we will notify affected users without undue delay if a breach affects their personal data.</p>
+
+    <h2>9. Children</h2>
+    <p>This site is intended for working software engineers and students aged 16 and over. We do not knowingly collect personal data from children under 16. If you believe a child has provided us data, email us and we will delete it.</p>
+
+    <h2>10. Changes to this policy</h2>
+    <p>If we change this policy materially, we will update the date at the top of this page and, where the change affects how we use data you have already given us, notify registered users by email.</p>
+
+    <h2>11. Contact</h2>
+    <p>Questions, requests, or complaints about privacy: <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>. We respond within 24 hours on working days.</p>
+
+    <div class="doc-foot">
+      Balaji Chippada — The Agent Engineer ·
+      <a href="/">balajichippada.com</a> ·
+      <a href="/terms">Terms of Service</a> ·
+      <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>
+    </div>
+  </main>
+</body>
+</html>

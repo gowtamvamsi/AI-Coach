@@ -536,6 +536,7 @@ const V2_CONFIG = {
   showWhereToStart: _FF.showWhereToStart !== false,
   showHeroSecondaryCta: _FF.showHeroSecondaryCta !== false,
   showCurriculumSection: _FF.showCurriculumSection !== false,
+  showMasterclassTab: _FF.showMasterclassTab !== false,
 };
 
 // Brand identity & socials sourced from site.config.js (window.SITE_CONFIG.brand).
@@ -546,7 +547,7 @@ const V2_BRAND = Object.assign({
   youtubeChannel: 'https://www.youtube.com/@balajichippada',
   roadmapVideoId: 'Mf_J_PVGTdA',
   roadmapVideoUrl: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
-  whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
+  whatsappCommunity: 'https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6',
   linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
   instagram: 'https://www.instagram.com/balajichippada',
   github: 'https://github.com/ch-balaji',
@@ -3195,9 +3196,11 @@ function V2WhatsAppButton() {
 function V2LegalModal({ page, onClose }) {
   if (!page) return null;
   const content = {
+    // Only `refund` and `contact` belong here. Privacy and Terms are real pages
+    // (/privacy, /terms) — the footer and FAQ link straight to them. Do NOT add
+    // summarised privacy/terms entries back: Google's OAuth review needs a
+    // crawlable policy page, and a modal stub would drift out of sync with it.
     refund: { title: 'Refund Policy', body: '100% refund within 24 hours of purchase, no questions asked. Email team@balajichippada.com with your order ID.' },
-    privacy: { title: 'Privacy Policy', body: 'We collect name, email, and phone to deliver masterclass access and updates. We do not sell your data. Contact us to delete your account.' },
-    terms: { title: 'Terms of Service', body: 'Masterclass content is for personal learning. Recording redistribution is prohibited. Sessions may be rescheduled with 48h notice.' },
     contact: {
       title: 'Contact',
       body: (

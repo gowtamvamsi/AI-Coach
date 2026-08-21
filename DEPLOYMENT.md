@@ -162,8 +162,13 @@ changed — **skip it for pure frontend deploys.**
 
 Procedure:
 1. `generateUploadUrl` → upload a zip of `index.js`, `package.json`,
-   `package-lock.json`, and `lib/` (gen1, nodejs20).
-2. Create or `PATCH` the function with the new source.
+   `package-lock.json`, `lib/`, and `skill-mentor-reply/` (gen1, nodejs20).
+   Omitting `skill-mentor-reply/` doesn't crash the deploy, but
+   `generateEnquiryReply` then refuses every request — its prompt lives in
+   those markdown files.
+2. Create or `PATCH` the function with the new source. `_deploy_fns.js`
+   PATCHes the existing `TARGETS`; `_deploy_new_fn.js` creates a brand-new
+   function (clones runtime + env vars from `sendBulkEmail`, sets IAM).
 3. For `onCall`/HTTPS functions, `setIamPolicy` granting `allUsers` the
    `roles/cloudfunctions.invoker` role.
 4. Clone env vars from the existing function so config isn't lost.

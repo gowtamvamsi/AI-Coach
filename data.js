@@ -72,8 +72,8 @@ window.ROADMAP = [
     sections: [
       { n: "4.1", title: "Why RAG exists", items: ["LLMs can't see your private data", "The brain-in-a-windowless-room reaches its limit", "Use cases: internal docs, company policies, recent data"] },
       { n: "4.2", title: "Chunking strategies", items: ["Fixed-width chunking and why it breaks", "Semantic chunking by structure", "Overlap windows", "Parent-child chunking", "Late chunking — embed first, chunk later — preserves context across boundaries", "Chunk size vs retrieval quality tradeoff"] },
-      { n: "4.3", title: "Document ingestion pipeline", items: ["Layout identification with Docling (headers, paragraphs, tables, code blocks, formulas)", "Serialization to structured objects", "Why PyMuPDF alone fails on complex PDFs"] },
-      { n: "4.4", title: "Embeddings", items: ["What an embedding actually is (vector in N-dim space)", "Cosine similarity, dot product, Euclidean distance", "Embedding models — Titan Multimodal, SentenceTransformer, OpenAI ada/text-embedding-3, Cohere", "Choosing dimensions vs cost"] },
+      { n: "4.3", title: "RAG pipeline — ingestion, retrieval, embeddings", items: ["The two halves: indexing (parse → chunk → embed → store) and retrieval (embed query → similarity search → generate)", "Parsing and loading documents, then chunking from scratch — no LangChain, so you see what the one-liner hides", "Embedding models — all-MiniLM-L6-v2 (384-dim, free) vs OpenAI text-embedding-3 (1536-dim, paid); dimensions vs quality vs storage cost", "Storing chunks + vectors + metadata (source file) in ChromaDB, and why metadata is what makes answers citable", "Cosine similarity and top-k retrieval — scoring the query against every chunk, and how k=3 vs k=10 changes the answer", "Grounded generation — stuffing retrieved chunks into the prompt, a system prompt that forces \"I don't have enough context\", temperature ~0.2"] },
+      { n: "4.4", title: "Agentic RAG", items: ["Why naive RAG breaks — one-shot retrieval, no query rewriting, wrong-k failures, no idea when it's wrong", "Retrieval as a tool — the `finish_reason: tool_calls` branch, letting the model decide *whether* and *what* to search", "Query planning and rewriting — decomposing multi-part questions, multi-hop retrieval across documents", "Self-correcting retrieval — grade the retrieved chunks, re-query when relevance is low (Corrective RAG, Self-RAG)", "Routing — choosing the right collection, index, or tool per query instead of one global vector store", "Loop control — max retrieval steps, latency and token budgets, and falling back to \"I don't know\" instead of looping forever"] },
       { n: "4.5", title: "Chunk enrichment", items: ["PII detection and redaction", "NER for entities", "Key-phrase extraction", "Metadata for hybrid search"] },
       { n: "4.6", title: "Vector databases", items: ["Pinecone, Weaviate, pgvector", "Chroma for local dev", "S3 Vector Buckets, OpenSearch", "HNSW vs IVF indexes", "Decision matrix: managed (Pinecone) vs self-hosted (Weaviate, Qdrant) vs in-process (Chroma, FAISS) vs already-in-your-stack (pgvector)"] },
       { n: "4.7", title: "Hybrid retrieval & next-gen retrievers", items: ["Vector search + BM25 keyword", "Reranking with cross-encoders (Cohere Rerank, BGE)", "Metadata filtering", "Query expansion", "Late-interaction retrievers — ColBERT (text), ColPali (multimodal/PDF pages as images) — when they beat dense retrieval and what they cost"] },
@@ -297,96 +297,141 @@ window.NEXT_STEPS = [
 // Module order swapped vs the source PDF: RAG before MCP, Evaluation before Multi-Agent Orchestration.
 window.COURSE_CURRICULUM = [
   {
-    n: "00",
+    n: "01",
     title: "Python Fundamentals",
     tagline: "The Python you actually need before touching an LLM — from Colab setup to file handling.",
     project: "Command your Python basics: data structures, control flow, functions & file I/O",
     tools: ["Python", "Google Colab"],
     submodules: [
-      { n: "0.1", title: "Google Colab Tutorial: Step-by-Step Guide for Beginners", lessons: ["Google Colab Tutorial: Step-by-Step Guide for Beginners"] },
-      { n: "0.2", title: "Keywords, Identifiers & Comments", lessons: ["Keywords, Identifiers & Comments"] },
-      { n: "0.3", title: "Indentation, Statements & Variables", lessons: ["Indentation, Statements & Variables"] },
-      { n: "0.4", title: "Data Types vs Data Structures Explained", lessons: ["Data Types vs Data Structures Explained"] },
-      { n: "0.5", title: "Numeric Data Types & Strings", lessons: ["Numeric Data Types & Strings"] },
-      { n: "0.6", title: "Lists in Python: Methods & Manipulation", lessons: ["Lists in Python: Methods & Manipulation"] },
-      { n: "0.7", title: "Tuples in Python: Mastering Immutable Data Structures", lessons: ["Tuples in Python: Mastering Immutable Data Structures"] },
-      { n: "0.8", title: "Sets in Python: Methods & Manipulations", lessons: ["Sets in Python: Methods & Manipulations"] },
-      { n: "0.9", title: "Dictionaries in Python: Methods & Manipulation", lessons: ["Dictionaries in Python: Methods & Manipulation"] },
-      { n: "0.10", title: "Type Casting in Python (Very Easy)", lessons: ["Type Casting in Python (Very Easy)"] },
-      { n: "0.11", title: "Operators in Python — Part 1", lessons: ["Operators in Python — Part 1"] },
-      { n: "0.12", title: "Bitwise Operators in Python & 2's Complement", lessons: ["Bitwise Operators in Python & 2's Complement"] },
-      { n: "0.13", title: "If-Else Statement Tutorial in Python", lessons: ["If-Else Statement Tutorial in Python"] },
-      { n: "0.14", title: "While Loops in Python: How to Avoid Infinite Loops", lessons: ["While Loops in Python: How to Avoid Infinite Loops"] },
-      { n: "0.15", title: "Python For Loop Tutorial: Real-Life Examples", lessons: ["Python For Loop Tutorial: Real-Life Examples"] },
-      { n: "0.16", title: "Break vs Continue vs Pass Statement in Python", lessons: ["Break vs Continue vs Pass Statement in Python"] },
-      { n: "0.17", title: "Functions in Python", lessons: ["Functions in Python"] },
-      { n: "0.18", title: "Arguments vs Parameters in Functions (args vs kwargs)", lessons: ["Arguments vs Parameters in Functions (args vs kwargs)"] },
-      { n: "0.19", title: "Map, Reduce & Filter in Python: Inbuilt vs User-Defined", lessons: ["Map, Reduce & Filter in Python: Inbuilt vs User-Defined"] },
-      { n: "0.20", title: "Recursive Functions & Lambda Functions in Python", lessons: ["Recursive Functions & Lambda Functions in Python"] },
-      { n: "0.21", title: "Exception Handling in Python: try / except / finally", lessons: ["Exception Handling in Python: try / except / finally"] },
-      { n: "0.22", title: "File Handling in Python: Reading & Writing to Files", lessons: ["File Handling in Python: Reading & Writing to Files"] }
-    ]
-  },
-  {
-    n: "01",
-    title: "Build a Full Working Agent",
-    tagline: "Ship a working agent on day one — before the fundamentals grind.",
-    project: "Atlas v0 — a working agent in 40 lines, no frameworks",
-    tools: ["Python", "LLM APIs"],
-    submodules: [
-      { n: "0.1", title: "What You'll Build: Meet Atlas, the Course's Running Agent", lessons: ["Meet Atlas: The AI Assistant You'll Build, Deploy & Monitor"] },
-      { n: "0.2", title: "Build Your First Working Agent in 40 Lines (No Frameworks)", lessons: ["Build a Working AI Agent in 40 Lines (No Frameworks, No Magic)"] }
+      { n: "1.1", secs: 790, title: "Google Colab Tutorial: Step-by-Step Guide for Beginners", lessons: ["Google Colab Tutorial: Step-by-Step Guide for Beginners"] },
+      { n: "1.2", secs: 552, title: "Keywords, Identifiers & Comments", lessons: ["Keywords, Identifiers & Comments"] },
+      { n: "1.3", secs: 750, title: "Indentation, Statements & Variables", lessons: ["Indentation, Statements & Variables"] },
+      { n: "1.4", secs: 489, title: "Data Types vs Data Structures Explained", lessons: ["Data Types vs Data Structures Explained"] },
+      { n: "1.5", secs: 1014, title: "Numeric Data Types & Strings", lessons: ["Numeric Data Types & Strings"] },
+      { n: "1.6", secs: 984, title: "Lists in Python: Methods & Manipulation", lessons: ["Lists in Python: Methods & Manipulation"] },
+      { n: "1.7", secs: 629, title: "Tuples in Python: Mastering Immutable Data Structures", lessons: ["Tuples in Python: Mastering Immutable Data Structures"] },
+      { n: "1.8", secs: 702, title: "Sets in Python: Methods & Manipulations", lessons: ["Sets in Python: Methods & Manipulations"] },
+      { n: "1.9", secs: 670, title: "Dictionaries in Python: Methods & Manipulation", lessons: ["Dictionaries in Python: Methods & Manipulation"] },
+      { n: "1.10", secs: 429, title: "Type Casting in Python (Very Easy)", lessons: ["Type Casting in Python (Very Easy)"] },
+      { n: "1.11", secs: 564, title: "Operators in Python — Part 1", lessons: ["Operators in Python — Part 1"] },
+      { n: "1.12", secs: 671, title: "Bitwise Operators in Python & 2's Complement", lessons: ["Bitwise Operators in Python & 2's Complement"] },
+      { n: "1.13", secs: 618, title: "If-Else Statement Tutorial in Python", lessons: ["If-Else Statement Tutorial in Python"] },
+      { n: "1.14", secs: 659, title: "While Loops in Python: How to Avoid Infinite Loops", lessons: ["While Loops in Python: How to Avoid Infinite Loops"] },
+      { n: "1.15", secs: 1103, title: "Python For Loop Tutorial: Real-Life Examples", lessons: ["Python For Loop Tutorial: Real-Life Examples"] },
+      { n: "1.16", secs: 492, title: "Break vs Continue vs Pass Statement in Python", lessons: ["Break vs Continue vs Pass Statement in Python"] },
+      { n: "1.17", secs: 1539, title: "Functions in Python", lessons: ["Functions in Python"] },
+      { n: "1.18", secs: 1241, title: "Arguments vs Parameters in Functions (args vs kwargs)", lessons: ["Arguments vs Parameters in Functions (args vs kwargs)"] },
+      { n: "1.19", secs: 1590, title: "Map, Reduce & Filter in Python: Inbuilt vs User-Defined", lessons: ["Map, Reduce & Filter in Python: Inbuilt vs User-Defined"] },
+      { n: "1.20", secs: 1292, title: "Recursive Functions & Lambda Functions in Python", lessons: ["Recursive Functions & Lambda Functions in Python"] },
+      { n: "1.21", secs: 1466, title: "Exception Handling in Python: try / except / finally", lessons: ["Exception Handling in Python: try / except / finally"] },
+      { n: "1.22", secs: 1210, title: "File Handling in Python: Reading & Writing to Files", lessons: ["File Handling in Python: Reading & Writing to Files"] },
+      { n: "1.23", secs: 1458, title: "NumPy Arrays Part 1", lessons: ["NumPy Arrays Part 1"] },
+      { n: "1.24", secs: 1250, title: "NumPy Arrays Part 2", lessons: ["NumPy Arrays Part 2"] },
+      { n: "1.25", secs: 1794, title: "NumPy Arrays Part 3", lessons: ["NumPy Arrays Part 3"] },
+      { n: "1.26", secs: 1504, title: "Pandas Part 1", lessons: ["Pandas Part 1"] },
+      { n: "1.27", secs: 1322, title: "Pandas Part 2", lessons: ["Pandas Part 2"] },
+      { n: "1.28", secs: 890, title: "Pandas Part 3", lessons: ["Pandas Part 3"] },
+      { n: "1.29", secs: 957, title: "Pandas Part 4", lessons: ["Pandas Part 4"] },
+      { n: "1.30", secs: 1113, title: "Pandas Part 5", lessons: ["Pandas Part 5"] },
+      { n: "1.31", secs: 1394, title: "Pandas Part 6", lessons: ["Pandas Part 6"] },
+      { n: "1.32", secs: 1190, title: "Pandas Part 7", lessons: ["Pandas Part 7"] }
     ]
   },
   {
     n: "02",
+    title: "Advanced Python",
+    tagline: "The Python that agent frameworks are actually written in — OOP, APIs, and your first LangChain build.",
+    project: "Your own mini LangChain, built from scratch and installable as a package",
+    tools: ["Python OOP", "Dataclasses", "requests", "OpenAI & Groq APIs", "LangChain"],
+    submodules: [
+      { n: "2.1", secs: 253, title: "Module Overview & Capstone Project", lessons: ["Module Overview & Capstone Project"] },
+      { n: "2.2", secs: 614, title: "Python OOP - Why OOP Concepts Matter", lessons: ["Python OOP - Why OOP Concepts Matter"] },
+      { n: "2.3", secs: 1407, title: "Python OOP - Classes and Instances", lessons: ["Python OOP - Classes and Instances"] },
+      { n: "2.4", secs: 412, title: "Python OOP - slots", lessons: ["Python OOP - slots"] },
+      { n: "2.5", secs: 1231, title: "Python OOP - Class Variables and Instance Variables", lessons: ["Python OOP - Class Variables and Instance Variables"] },
+      { n: "2.6", secs: 518, title: "Python OOP - Need for Class Methods and Static Methods", lessons: ["Python OOP - Need for Class Methods and Static Methods"] },
+      { n: "2.7", secs: 987, title: "Python OOP - Class Methods vs Static Methods", lessons: ["Python OOP - Class Methods vs Static Methods"] },
+      { n: "2.8", secs: 1171, title: "Python OOP - Dunder Methods", lessons: ["Python OOP - Dunder Methods"] },
+      { n: "2.9", secs: 184, title: "Python OOP - Why We Need Inheritance", lessons: ["Python OOP - Why We Need Inheritance"] },
+      { n: "2.10", secs: 1045, title: "Python OOP - Class Inheritance in Detail", lessons: ["Python OOP - Class Inheritance in Detail"] },
+      { n: "2.11", secs: 808, title: "Python OOP - Method Overriding and Polymorphism", lessons: ["Python OOP - Method Overriding and Polymorphism"] },
+      { n: "2.12", secs: 840, title: "Python OOP - Property Decorator, Getter, Setter, and Deleter", lessons: ["Python OOP - Property Decorator, Getter, Setter, and Deleter"] },
+      { n: "2.13", secs: 803, title: "Python OOP - Data Classes", lessons: ["Python OOP - Data Classes"] },
+      { n: "2.14", secs: 828, title: "JSON — JavaScript Object Notation", lessons: ["JSON — JavaScript Object Notation"] },
+      { n: "2.15", secs: 1586, title: "JSON in Code", lessons: ["JSON in Code"] },
+      { n: "2.16", secs: 1225, title: "API Theory Explained", lessons: ["API Theory Explained"] },
+      { n: "2.17", secs: 493, title: "How to Create a Groq API Key", lessons: ["How to Create a Groq API Key"] },
+      { n: "2.18", secs: 568, title: "Creating and Saving an OpenAI API Key", lessons: ["Creating and Saving an OpenAI API Key"] },
+      { n: "2.19", secs: 1385, title: "Communicating with APIs via Requests, OpenAI, and Groq", lessons: ["Communicating with APIs via Requests, OpenAI, and Groq"] },
+      { n: "2.20", secs: 860, title: "Power of LangChain Framework", lessons: ["Power of LangChain Framework"] },
+      { n: "2.21", secs: 2373, title: "Capstone - Building Your Own LangChain Project from Scratch", lessons: ["Capstone - Building Your Own LangChain Project from Scratch"] },
+      { n: "2.22", secs: 253, title: "Loading Your Mini LangChain as a Package", lessons: ["Loading Your Mini LangChain as a Package"] }
+    ]
+  },
+  {
+    n: "03",
     title: "NLP Basics, Intuition-First",
     tagline: "Understand what text becomes before an LLM ever sees it.",
     project: "Semantic search over your own notes",
     tools: ["Tokens", "Embeddings", "Vector similarity", "Transformers"],
     submodules: [
-      { n: "1.1", title: "How Machines Learned to Understand Language (Deep Learning, No Math)", lessons: ["Deep Learning Explained Without a Single Equation"] },
-      { n: "1.2", title: "Tokens: How AI Actually Reads Text", lessons: ["Tokens: Why AI Doesn't See Words the Way You Do"] },
-      { n: "1.3", title: "Embeddings: Turning Meaning Into Numbers", lessons: ["Embeddings: How a Computer Learns That “King” and “Queen” Are Close"] },
-      { n: "1.4", title: "Vector Similarity: Measuring How Close Two Meanings Are", lessons: ["Cosine Similarity: How Machines Measure That Two Things Mean the Same"] },
-      { n: "1.5", title: "Neural Networks: What They Are & How They Learn", lessons: ["What Is a Neural Network? The Building Block of Modern AI", "Backpropagation & Gradient Descent: How a Network Actually Learns"] },
-      { n: "1.6", title: "Transformers & Attention: How a Model Decides What Matters", lessons: ["Attention, Explained for Humans: How a Model Decides What Matters", "Self-Attention: How a Sentence Understands Itself"] },
-      { n: "1.7", title: "Positional Encoding, NER & the Classic NLP Tasks You Still Need", lessons: ["Word Order, Names & the Classic NLP Tasks You Still Need in 2026"] },
-      { n: "1.8", title: "Your First Build: Semantic Search Over Your Own Notes", lessons: ["Build It: Semantic Search Over Your Own Notes"] }
-    ]
-  },
-  {
-    n: "03",
-    title: "LLMs: Internals, Parameters, Benchmarking & Cost",
-    tagline: "Pick and control the right model for a job — and predict its cost.",
-    project: "A provider-agnostic LLM client (cloud + local via Ollama)",
-    tools: ["OpenAI SDK", "LangChain", "Ollama"],
-    submodules: [
-      { n: "2.1", title: "What an LLM Is: Training, Next-Token Prediction, Context & Limits", lessons: ["What Is an LLM, Really? A Short History & How They're Trained", "Next-Token Prediction, Explained From Scratch", "How to Communicate With LLMs Using an API Key", "What Is a Context Window? Why a Model Can Only “See” So Much at Once", "The Brain in a Windowless Room: Cutoffs, Hallucination & What LLMs Can't Know"] },
-      { n: "2.2", title: "Controlling Model Output: Decoding Dials & Reasoning vs Base Models", lessons: ["Temperature, Top-p, Max Tokens, Stop Sequences & Frequency/Presence Penalties: The Dials That Change Everything", "Reasoning vs Base Models: When “Thinking” Models Actually Win"] },
-      { n: "2.3", title: "Benchmarking LLMs: What the Numbers Really Mean", lessons: ["MMLU, Benchmarks & Lies: How to Actually Judge an LLM"] },
-      { n: "2.4", title: "Choosing & Pricing an LLM (Incl. Open-Source Models)", lessons: ["Picking the Right LLM: Quality vs Speed vs Cost (The Real Tradeoff)", "Open-Source & Open-Weight Models: The Landscape & Running Them Locally"] },
-      { n: "2.5", title: "Frameworks & a Provider-Agnostic Model Wrapper (LangChain + OpenAI SDK)", lessons: ["LangChain & OpenAI Frameworks: Do You Even Need One?", "LangChain Basics: Chains, Prompts & Models", "Build It: A Provider-Agnostic LLM Client (Cloud + Local via Ollama)", "Curated Resources to Keep Learning (Docs, Courses & Repositories)"] },
-      { n: "2.6", title: "Responsible AI: Bias, Safety & India-Specific Models", lessons: ["Bias, Safety & What “Responsible AI” Means in Practice — incl. Sarvam AI for India-Specific Use-Cases"] }
+      { n: "3.1", secs: 1473, title: "How Machines Understand Language", lessons: ["How Machines Understand Language"] },
+      { n: "3.2", secs: 1315, title: "Tokenization", lessons: ["Tokenization"] },
+      { n: "3.3", secs: 1279, title: "Tokenization Code", lessons: ["Tokenization Code"] },
+      { n: "3.4", secs: 670, title: "Bag Of Words", lessons: ["Bag Of Words"] },
+      { n: "3.5", secs: 956, title: "BOW Code", lessons: ["BOW Code"] },
+      { n: "3.6", secs: 1265, title: "Cosine Similarity", lessons: ["Cosine Similarity"] },
+      { n: "3.7", secs: 762, title: "Cosine Similarity Code", lessons: ["Cosine Similarity Code"] },
+      { n: "3.8", secs: 1307, title: "TF-IDF Theory", lessons: ["TF-IDF Theory"] },
+      { n: "3.9", secs: 846, title: "TF-IDF Code", lessons: ["TF-IDF Code"] },
+      { n: "3.10", secs: 1918, title: "Word2Vec and Avg Word2Vec", lessons: ["Word2Vec and Avg Word2Vec"] },
+      { n: "3.11", secs: 911, title: "Word2Vec Code", lessons: ["Word2Vec Code"] },
+      { n: "3.12", secs: 2553, title: "Transformers Architecture", lessons: ["Transformers Architecture"] },
+      { n: "3.13", secs: 1233, title: "Open Source vs Closed Source Embedding Models", lessons: ["Open Source vs Closed Source Embedding Models"] },
+      { n: "3.14", secs: 568, title: "OpenAI API Key Creation Process", lessons: ["OpenAI API Key Creation Process"] },
+      { n: "3.15", secs: 313, title: "Creating Voyage API Key", lessons: ["Creating Voyage API Key"] },
+      { n: "3.16", secs: 1460, title: "Capstone Project: Semantic Search building", lessons: ["Capstone Project: Semantic Search building"] },
+      { n: "3.17", secs: 758, title: "Cost vs Quality vs Infra Tradeoff", lessons: ["Cost vs Quality vs Infra Tradeoff"] }
     ]
   },
   {
     n: "04",
-    title: "Prompt Engineering",
-    tagline: "Reliably get the behavior you want — the skill every agent call depends on.",
-    project: "A prompt toolkit you'll reuse in every agent call",
-    tools: ["Chain-of-Thought", "Structured output", "Pydantic"],
+    title: "LLM Internals and LangChain",
+    tagline: "Pick and control the right model for a job — and predict its cost.",
+    project: "A cost-aware LLM client: multi-turn chat, controlled output, the right model per job",
+    tools: ["OpenAI API", "Anthropic API", "LangChain"],
     submodules: [
-      { n: "3.1", title: "Anatomy of a Prompt: Instruction, Context, Input & Format", lessons: ["Anatomy of a Prompt: Instruction, Context, Input & Format"] },
-      { n: "3.2", title: "Interview-Style Prompting: Drawing the Best Answer Out of a Model", lessons: ["Interview-Style Prompting: Drawing the Best Answer Out of a Model"] },
-      { n: "3.3", title: "Chain-of-Thought: Making a Model Show Its Work", lessons: ["Chain-of-Thought: Making a Model Show Its Work"] },
-      { n: "3.4", title: "Structured Output: Forcing Clean JSON With Pydantic Schemas", lessons: ["Structured Output: Forcing Clean JSON With Pydantic Schemas"] },
-      { n: "3.5", title: "Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)", lessons: ["Asking an LLM to Write & Improve Its Own Prompts (Meta-Prompting)"] },
-      { n: "3.6", title: "A Look Ahead: Context & Loop Engineering (Coming Later in the Course)", lessons: ["A Look Ahead: Context & Loop Engineering (Coming Later in the Course)"] }
+      { n: "4.1", secs: 439, title: "How LLMs Are Built — The Four-Phase Lifecycle", lessons: ["How LLMs Are Built — The Four-Phase Lifecycle"] },
+      { n: "4.2", secs: 1194, title: "LLM Pre-Training — Data Collection, Tokens, and Base Models", lessons: ["LLM Pre-Training — Data Collection, Tokens, and Base Models"] },
+      { n: "4.3", secs: 219, title: "Supervised Fine-Tuning — Building Instruction-Following Models", lessons: ["Supervised Fine-Tuning — Building Instruction-Following Models"] },
+      { n: "4.4", secs: 249, title: "RLHF — Aligning LLMs with Human Preferences", lessons: ["RLHF — Aligning LLMs with Human Preferences"] },
+      { n: "4.5", secs: 396, title: "LLM Inference — Hallucinations, Knowledge Cutoffs, and Core Terms", lessons: ["LLM Inference — Hallucinations, Knowledge Cutoffs, and Core Terms"] },
+      { n: "4.6", secs: 784, title: "Context Windows — Limits, Long Conversations, and Hallucinations", lessons: ["Context Windows — Limits, Long Conversations, and Hallucinations"] },
+      { n: "4.7", secs: 446, title: "Context Engineering — Managing Context for Better LLM Performance", lessons: ["Context Engineering — Managing Context for Better LLM Performance"] },
+      { n: "4.8", secs: 1011, title: "Reading LLM API Responses — OpenAI, Anthropic, and JSON", lessons: ["Reading LLM API Responses — OpenAI, Anthropic, and JSON"] },
+      { n: "4.9", secs: 1432, title: "Controlling LLM Output — Multi-Turn Chats, Temperature, and Max Tokens", lessons: ["Controlling LLM Output — Multi-Turn Chats, Temperature, and Max Tokens"] },
+      { n: "4.10", secs: 1205, title: "Reasoning vs Instruct Models — Choosing the Right LLM", lessons: ["Reasoning vs Instruct Models — Choosing the Right LLM"] },
+      { n: "4.11", secs: 1251, title: "LLM API Cost Optimization — Reasoning Effort and Model Choice", lessons: ["LLM API Cost Optimization — Reasoning Effort and Model Choice"] },
+      { n: "4.12", secs: 1631, title: "Evaluating LLMs — Benchmarks, Arenas, and Real-World Testing", lessons: ["Evaluating LLMs — Benchmarks, Arenas, and Real-World Testing"] },
+      { n: "4.13", secs: 1655, title: "Choosing an LLM — Cost, Quality, Speed, and Deployment Trade-offs", lessons: ["Choosing an LLM — Cost, Quality, Speed, and Deployment Trade-offs"] },
+      { n: "4.14", secs: 636, title: "The LangChain Ecosystem — Components, Tooling, and Use Cases", lessons: ["The LangChain Ecosystem — Components, Tooling, and Use Cases"] },
+      { n: "4.15", secs: 3723, title: "LangChain — Working with Invoke, Stream, Batch, Reasoning", lessons: ["LangChain — Working with Invoke, Stream, Batch, Reasoning"] },
+      { n: "4.16", secs: 1346, title: "Capstone Project — Building a Multi-Model Chatbot: Problem Overview", lessons: ["Capstone Project — Building a Multi-Model Chatbot: Problem Overview"] },
+      { n: "4.17", secs: 3548, title: "Capstone Project — Building It Live", lessons: ["Capstone Project — Building It Live"] }
     ]
   },
   {
     n: "05",
+    title: "Prompt Engineering",
+    tagline: "Reliably get the behavior you want — the skill every agent call depends on.",
+    project: "A pattern library of prompts you'll reuse in every agent call",
+    tools: ["Prompt patterns", "Structured output"],
+    submodules: [
+      { n: "5.1", secs: 1863, title: "Applied Prompt Patterns", lessons: ["Applied Prompt Patterns"] }
+    ]
+  },
+  {
+    n: "06",
     title: "Foundations of Agentic Systems",
     tagline: "Understand the agent loop deeply — because you built it by hand.",
     project: "Atlas gets a ReAct brain, live tools, and self-correction",
@@ -401,7 +446,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "06",
+    n: "07",
     title: "RAG — Retrieval-Augmented Generation",
     tagline: "Answer from your own documents — grounded and cited, not from memory.",
     project: "Document intelligence for Atlas — grounded, cited answers",
@@ -416,7 +461,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "07",
+    n: "08",
     title: "MCP — Model Context Protocol",
     tagline: "Connect your agent to anything through one universal standard.",
     project: "An MCP server from scratch + a Gmail & Calendar MCP for Atlas",
@@ -431,7 +476,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "08",
+    n: "09",
     title: "Memory & Optimization",
     tagline: "Remember across sessions without blowing the context window.",
     project: "Atlas remembers your preferences across sessions — on a token budget",
@@ -445,7 +490,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "09",
+    n: "10",
     title: "State Machines & DAGs (LangGraph)",
     tagline: "Control an agent's flow deterministically — and pause for a human.",
     project: "Atlas re-architected on LangGraph with approval checkpoints",
@@ -458,7 +503,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "10",
+    n: "11",
     title: "Evaluation",
     tagline: "Prove your agent works and catch regressions before users do.",
     project: "A regression suite that blocks bad Atlas changes",
@@ -471,7 +516,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "11",
+    n: "12",
     title: "Multi-Agent Orchestration",
     tagline: "Make specialized agents collaborate without burning $400 in a loop.",
     project: "Atlas becomes a researcher + writer + critic team",
@@ -484,7 +529,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "12",
+    n: "13",
     title: "Security & Guardrails",
     tagline: "Survive malicious users and handle sensitive data safely.",
     project: "Atlas locked down — guardrails, least privilege, PII redaction",
@@ -499,7 +544,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "13",
+    n: "14",
     title: "Deployment (incl. FastAPI)",
     tagline: "Real users can use your agent over the internet.",
     project: "Atlas live on the internet with a chat UI",
@@ -513,7 +558,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "14",
+    n: "15",
     title: "Monitoring & Operations",
     tagline: "See what your live agent is doing, what it costs, and how to improve it.",
     project: "A cost & quality dashboard for live Atlas",
@@ -526,7 +571,7 @@ window.COURSE_CURRICULUM = [
     ]
   },
   {
-    n: "15",
+    n: "16",
     title: "Capstone Projects & Portfolio",
     tagline: "Ship and monitor your OWN agentic product — portfolio-ready.",
     project: "Your own agentic product — built, deployed, monitored",
@@ -542,17 +587,62 @@ window.COURSE_CURRICULUM = [
   }
 ];
 
+// ── Lesson runtimes for the curriculum section ───────────────────────────
+// Modules 01–03 carry REAL runtimes (`secs:` on each submodule, from the
+// course_video_durations export). Modules 04+ have no export yet and fall back
+// to a PLACEHOLDER: each lesson's length is hashed from its own title into a
+// 6:00–19:00 range — deterministic, so module totals stay self-consistent.
+// ponytail: to replace a placeholder, add `secs` to the submodule (or `mins` to
+// the module); the helper prefers those and needs no other code changes.
+window.COURSE_DURATION = (function () {
+  function hash(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h;
+  }
+  function lessonSecs(sm) {
+    if (sm.secs) return sm.secs;
+    const parts = (sm.lessons && sm.lessons.length) ? sm.lessons : [sm.title];
+    return parts.reduce((a, t) => a + 360 + (hash(t) % 781), 0);
+  }
+  function moduleSecs(mod) {
+    if (mod.mins) return mod.mins * 60;
+    return (mod.submodules || []).reduce((a, sm) => a + lessonSecs(sm), 0);
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    lessonSecs,
+    moduleSecs,
+    // 08:21, or 1:02:03 once a lesson runs past the hour
+    clock: (s) => {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = pad(Math.round(s % 60));
+      return h ? `${h}:${pad(m)}:${sec}` : `${pad(m)}:${sec}`;
+    },
+    // 3h 05m
+    long: (s) => {
+      const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+      return h ? `${h}h ${pad(m)}m` : `${m}m`;
+    },
+  };
+})();
+
 window.COURSE_INFO = {
   title: "Generative & Agentic AI Engineering",
   flagshipName: "Agentic AI at Production Level",
-  moduleCount: 15,
-  submoduleCount: 73,
-  lessonCount: 144,
+  // ponytail: derived from COURSE_CURRICULUM above so they can't go stale when modules are added
+  moduleCount: window.COURSE_CURRICULUM.length,
+  submoduleCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.length, 0),
+  lessonCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.reduce((b, s) => b + (s.lessons || []).length, 0), 0),
   price: "Will reveal soon", // ponytail: string passes through priceFmt as-is; restore a number to show ₹ again
+  // Curriculum header CTA — put the PDF's URL here and the "Download Syllabus"
+  // button appears. Empty string = button hidden.
+  syllabusUrl: "",
   // Flagship-card fact grid (label/value pairs)
   facts: [
     { k: "Format", v: "Self-paced" },
-    { k: "Access", v: "Lifetime + all updates" },
+    { k: "Access", v: "2 years + all updates" },
     { k: "Level", v: "Starter → advanced" },
     { k: "Prereqs", v: "Start from scratch — no experience needed" },
     { k: "Projects", v: "Hands-on production builds" },
@@ -560,19 +650,19 @@ window.COURSE_INFO = {
   ],
   // Short includes list on the flagship card's price panel
   includes: [
-    "Biweekly live sessions on the latest topics",
+    "Weekly live sessions on the latest topics",
     "Session recordings available for 2 years",
     "Private WhatsApp community",
     "Production-ready starter templates & code reviews"
   ],
   // Pricing-card feature list
   pricingIncludes: [
-    "All 15 modules, fully self-paced",
+    `All ${window.COURSE_CURRICULUM.length} modules, fully self-paced`,
     "Production-ready starter templates & code",
     "Private community & code reviews",
     "Verified certificate on completion",
     "Mock interviews & resume prep assistance",
-    "Lifetime access to all future updates"
+    "2 years of access, including all updates in that window"
   ]
 };
 

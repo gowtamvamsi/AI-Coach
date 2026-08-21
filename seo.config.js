@@ -41,7 +41,7 @@ window.SEO_CONFIG = {
     roadmapVideo: 'https://www.youtube.com/watch?v=Eze6D8jAMjI',
     youtubeChannel: 'https://www.youtube.com/@balajichippada',
     linkedin: 'https://www.linkedin.com/in/balaji-chippada-0317/',
-    whatsappCommunity: 'https://chat.whatsapp.com/D8YynWP15hp286CszuB5Xa',
+    whatsappCommunity: 'https://chat.whatsapp.com/ENnDGZ41lMYBHCApJIpzo6',
   },
 
   // Plain-language summary for AI agents (also mirrored in llms.txt)

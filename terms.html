@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Terms of Service · Balaji Chippada</title>
+  <meta name="description" content="Terms governing use of balajichippada.com — accounts, masterclass registrations, payments, refunds, and content licensing." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#14131a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)" />
+  <link rel="canonical" href="https://balajichippada.com/terms" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://balajichippada.com/terms" />
+  <meta property="og:site_name" content="The Agent Engineer" />
+  <meta property="og:title" content="Terms of Service · Balaji Chippada" />
+  <meta property="og:description" content="Terms governing use of balajichippada.com, masterclass registrations, payments, and refunds." />
+
+  <!-- favicon.ico must be a real file: Googlebot falls back to /favicon.ico and the SPA rewrite would otherwise hand it index.html -->
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/svg+xml" href="/logos/fla-badge.svg" />
+  <link rel="apple-touch-icon" href="/logos/fla-badge-180.png" />
+
+  <script>
+    (() => {
+      // Fold the bare Firebase host into the canonical domain for humans.
+      if (location.hostname.endsWith('.web.app') || location.hostname.endsWith('.firebaseapp.com')) {
+        location.replace('https://balajichippada.com' + location.pathname + location.search + location.hash);
+        return;
+      }
+      // Storage can throw SecurityError when site data is blocked — see index.html.
+      try { window.localStorage.getItem('__probe'); } catch (e) {
+        const shim = Object.create({
+          getItem(k) { return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : null; },
+          setItem(k, v) { this[k] = String(v); },
+          removeItem(k) { delete this[k]; },
+          clear() { Object.keys(this).forEach((k) => delete this[k]); },
+          key(i) { const k = Object.keys(this)[i]; return k === undefined ? null : k; },
+          get length() { return Object.keys(this).length; },
+        });
+        try { Object.defineProperty(window, 'localStorage', { value: shim, configurable: true }); } catch (e2) {}
+      }
+      let t = localStorage.getItem('roadmap-theme');
+      if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=122" />
+  <style>
+    .doc { max-width: 820px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+    .doc-nav { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: space-between;
+      max-width: 820px; margin: 0 auto; padding: 1.25rem; }
+    .doc-nav a { color: var(--fg-dim); text-decoration: none; font-size: 0.92rem; }
+    .doc-nav a:hover { color: var(--c-rust); }
+    .doc-brand { font-family: 'Instrument Serif', serif; font-size: 1.3rem; color: var(--fg); }
+    .doc-nav-links { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+    .doc h1 { font-family: 'Instrument Serif', serif; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 1.5rem 0 0.75rem; }
+    .doc h2 { font-size: 1.3rem; margin: 2.25rem 0 0.6rem; color: var(--fg); }
+    .doc .lede { color: var(--fg-dim); font-size: 1.12rem; line-height: 1.6; margin-bottom: 0.5rem; }
+    .doc p, .doc li { color: var(--fg-dim); line-height: 1.7; }
+    .doc p { margin: 0.6rem 0; }
+    .doc ul { margin: 0.6rem 0; padding-left: 1.25rem; }
+    .doc li { margin: 0.35rem 0; }
+    .doc a { color: var(--c-rust); }
+    .doc .crumb { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--fg-faint); letter-spacing: 0.04em; }
+    .doc .crumb a { color: var(--fg-faint); }
+    .doc .updated { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--fg-faint); margin-bottom: 1.5rem; }
+    .doc blockquote { border-left: 3px solid var(--c-rust); margin: 1.5rem 0; padding: 0.25rem 0 0.25rem 1.1rem; color: var(--fg-dim); }
+    .doc-foot { border-top: 1px solid var(--line); margin-top: 3rem; padding-top: 1.5rem; color: var(--fg-faint); font-size: 0.88rem; }
+    .doc-foot a { color: var(--fg-dim); }
+  </style>
+</head>
+<body>
+  <nav class="doc-nav">
+    <a class="doc-brand" href="/">Balaji Chippada</a>
+    <span class="doc-nav-links">
+      <a href="/roadmap">Roadmap</a>
+      <a href="/about">About</a>
+      <a href="/privacy">Privacy</a>
+    </span>
+  </nav>
+
+  <main class="doc">
+    <div class="crumb"><a href="/">Home</a> / Terms of Service</div>
+    <h1>Terms of Service</h1>
+    <div class="updated">Last updated: 5 August 2026</div>
+
+    <p class="lede">These terms govern your use of <a href="/">balajichippada.com</a> and the masterclasses sold through it. The site is operated by Balaji Chippada ("we", "us"), based in India. By creating an account or registering for a session, you agree to these terms.</p>
+
+    <h2>1. The service</h2>
+    <p>We publish a free Agentic AI Engineer roadmap and run live, online masterclasses. Some masterclasses are free and some are paid. Registration reserves you a seat in a specific session on a specific date.</p>
+
+    <h2>2. Your account</h2>
+    <p>You need an account to register for a masterclass. You are responsible for keeping your sign-in details secure and for everything done through your account. Give us accurate contact details — we use your email address to send your joining link, and we cannot deliver access if it is wrong.</p>
+    <p>You may close your account at any time by emailing <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>.</p>
+
+    <h2>3. Payments</h2>
+    <p>Prices are shown in Indian Rupees and include applicable taxes unless stated otherwise. Payments are processed by Razorpay; we never see or store your card, UPI, or bank details. Your seat is confirmed once payment succeeds and you receive a confirmation email.</p>
+
+    <h2>4. Refunds</h2>
+    <p>You may request a full refund within 24 hours of purchase, no questions asked. Email <a href="mailto:team@balajichippada.com">team@balajichippada.com</a> with your order reference. Refunds are returned to the original payment method and typically take 5–7 working days to appear, depending on your bank.</p>
+    <p>Free masterclasses have nothing to refund.</p>
+
+    <h2>5. Scheduling and cancellation</h2>
+    <p>We aim to give at least 48 hours' notice if a session must be rescheduled. If a rescheduled time does not suit you, you may take the recording instead or request a full refund, regardless of the 24-hour window in section 4. If we cancel a session outright and do not offer a replacement, we refund in full.</p>
+    <p>If you cannot attend live, the recording is emailed to registered attendees after the session. Missing the live session is not itself a ground for a refund beyond the window in section 4.</p>
+
+    <h2>6. Content and licensing</h2>
+    <p>Masterclass recordings, slides, code, and written material are provided for your personal learning. You may use the code and techniques in your own projects, including commercial ones.</p>
+    <p>You may not redistribute, resell, publicly post, or share recordings and paid materials, and you may not use them to run your own training or course. The free roadmap content on this site may be shared and linked freely with attribution.</p>
+
+    <h2>7. Acceptable use</h2>
+    <ul>
+      <li>Do not disrupt live sessions or harass other attendees.</li>
+      <li>Do not share your account or session joining link with people who have not registered.</li>
+      <li>Do not attempt to break, scrape at scale, or gain unauthorised access to the site or its backend.</li>
+    </ul>
+    <p>We may suspend or close an account that breaches these terms. Where the breach is not deliberate or damaging, we will contact you first.</p>
+
+    <h2>8. What we do not promise</h2>
+    <p>The masterclasses are educational. We teach techniques and show working systems, but we do not guarantee a job, a certification recognised by any employer, a specific salary, or any particular outcome from applying what you learn.</p>
+    <p>The site is provided as-is. We work to keep it available but do not guarantee uninterrupted access. Live sessions depend on third-party platforms and on your own internet connection.</p>
+
+    <h2>9. Liability</h2>
+    <p>To the extent permitted by law, our total liability to you for any claim relating to the site or a masterclass is limited to the amount you paid us for that masterclass. We are not liable for indirect or consequential losses, including lost profits or business opportunities. Nothing here limits liability that cannot be limited by law.</p>
+
+    <h2>10. Privacy</h2>
+    <p>Our handling of your personal data is described in the <a href="/privacy">Privacy Policy</a>, which forms part of these terms.</p>
+
+    <h2>11. Changes</h2>
+    <p>We may update these terms. The date at the top of this page shows the current version. Changes do not apply retroactively to a masterclass you have already paid for.</p>
+
+    <h2>12. Governing law</h2>
+    <p>These terms are governed by the laws of India, and the courts of India have jurisdiction over any dispute. We would much rather sort out a problem by email first — write to <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>.</p>
+
+    <h2>13. Contact</h2>
+    <p><a href="mailto:team@balajichippada.com">team@balajichippada.com</a> — we respond within 24 hours on working days.</p>
+
+    <div class="doc-foot">
+      Balaji Chippada — The Agent Engineer ·
+      <a href="/">balajichippada.com</a> ·
+      <a href="/privacy">Privacy Policy</a> ·
+      <a href="mailto:team@balajichippada.com">team@balajichippada.com</a>
+    </div>
+  </main>
+</body>
+</html>
