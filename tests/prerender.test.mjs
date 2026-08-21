@@ -71,7 +71,7 @@ const PUBLIC_PAGES = [
 
 const APPROVED_VERSIONS = {
   'styles.css': '144',
-  'site.config.js': '19',
+  'site.config.js': '20',
   'phone-countries.js': '1',
   'advisor-widget.js': '3',
   'v2.build.js': '38',
@@ -81,7 +81,7 @@ const APPROVED_VERSIONS = {
 for (const page of PUBLIC_PAGES) {
   test(`public page assets — ${page} loads widget scripts once`, () => {
     const html = read(page);
-    assert.equal((html.match(/site\.config\.js\?v=19/g) || []).length, 1, 'one site.config.js?v=19');
+    assert.equal((html.match(/site\.config\.js\?v=20/g) || []).length, 1, 'one site.config.js?v=20');
     assert.equal((html.match(/phone-countries\.js\?v=1/g) || []).length, 1, 'one phone-countries.js?v=1');
     assert.equal((html.match(/advisor-widget\.js\?v=3/g) || []).length, 1, 'one advisor-widget.js?v=3');
     assert.match(html, /styles\.css\?v=144/, 'styles.css?v=144');

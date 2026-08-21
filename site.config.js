@@ -239,10 +239,10 @@ We will dive into the architectural patterns required to build autonomous, produ
   // Contact / integrations — used by the shared advisor widget
   // ─────────────────────────────────────────────────────────────────
   contact: {
-    // Public reCAPTCHA v3 site key (safe to commit). Leave empty until a key is
-    // registered for balajichippada.com, www.balajichippada.com, and localhost.
+    // Public reCAPTCHA v3 site key (safe to commit), registered for the
+    // production domains and localhost.
     // RECAPTCHA_SECRET_KEY lives only in Cloud Function env vars.
-    recaptchaSiteKey: '',
+    recaptchaSiteKey: "6LeOQZItAAAAAAh-NAeRwJBurf8xCMoJw59Id0MQ",
   },
 
   // ─────────────────────────────────────────────────────────────────
