@@ -75,7 +75,7 @@ const APPROVED_VERSIONS = {
   'phone-countries.js': '1',
   'advisor-widget.js': '3',
   'v2.build.js': '38',
-  'app.build.js': '120',
+  'app.build.js': '121',
 };
 
 for (const page of PUBLIC_PAGES) {
@@ -218,6 +218,24 @@ test('course page — sections follow the prospective buyer decision journey', (
   const positions = markers.map((marker) => page.indexOf(marker));
   assert.ok(positions.every((position) => position >= 0), 'all buyer-journey sections exist');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'sections appear in the approved buyer journey order');
+});
+
+test('course highlights — twelve cards cover support, practice, and career preparation', () => {
+  const source = read('app.jsx');
+  const css = read('styles.css');
+  const start = source.indexOf('const highlights = [');
+  const end = source.indexOf('\n  ];', start);
+  const highlights = source.slice(start, end);
+
+  assert.equal((highlights.match(/^    \['/gm) || []).length, 12, 'exactly twelve highlight cards are defined');
+  assert.match(highlights, /Two 1-to-1 Mock Interviews/, 'two personal mock interviews are promised');
+  assert.match(highlights, /two personal mock interviews with actionable feedback/i, 'mock interviews include feedback');
+  assert.match(highlights, /Doubt Resolution Within 24 Working Hours/, 'doubt-resolution timing is explicit');
+  assert.match(highlights, /quizzes, interview questions, and assignments/i, 'every-module practice is explicit');
+  assert.match(highlights, /Resume Preparation/, 'resume preparation is included');
+  assert.match(css, /\.cv3-highlights\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*1fr\)/, 'desktop keeps four columns');
+  assert.match(css, /\.cv3-highlights\s*\{\s*grid-template-columns:\s*repeat\(2,\s*1fr\)/, 'tablet keeps two columns');
+  assert.match(css, /\.cv3-highlights\s*\{\s*grid-template-columns:\s*1fr/, 'mobile keeps one column');
 });
 
 test('course pricing — one shared launch offer renders in both pricing surfaces', () => {
