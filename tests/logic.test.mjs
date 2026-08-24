@@ -51,6 +51,32 @@ test('phone — v2SplitE164 splits dial + local (longest-prefix match)', () => {
   assert.deepEqual(split('+971501234567'), { dial: '+971', local: '501234567' });
 });
 
+test('phone countries — shared list covers international and shared calling codes', () => {
+  const countries = g.PHONE_COUNTRIES;
+  assert.ok(Array.isArray(countries));
+  assert.ok(countries.length >= 200);
+  assert.equal(new Set(countries.map((country) => country.iso)).size, countries.length);
+  for (const iso of ['IN', 'US', 'CA', 'GB', 'AE', 'SG', 'AU', 'ZA', 'BR', 'JP']) {
+    assert.ok(countries.some((country) => country.iso === iso), `${iso} is present`);
+  }
+  assert.equal(countries.find((country) => country.iso === 'US').dial, '+1');
+  assert.equal(countries.find((country) => country.iso === 'CA').dial, '+1');
+  assert.equal(countries.find((country) => country.iso === 'RU').dial, '+7');
+  assert.equal(countries.find((country) => country.iso === 'KZ').dial, '+7');
+});
+
+test('phone countries — browser locale inference uses a supported region and falls back to India', () => {
+  const { inferIso, flag } = g.PHONE_COUNTRY_UTILS;
+  assert.equal(inferIso(['en-GB']), 'GB');
+  assert.equal(inferIso(['en-US']), 'US');
+  assert.equal(inferIso(['hi-IN']), 'IN');
+  assert.equal(inferIso(['en', 'de-DE']), 'DE');
+  assert.equal(inferIso(['fr']), 'IN');
+  assert.equal(inferIso(['xx-ZZ']), 'IN');
+  assert.equal(inferIso([]), 'IN');
+  assert.equal(flag('IN'), '🇮🇳');
+});
+
 // ── Email: format + disposable + placeholder + typo detection ────────────────
 test('email — accepts real addresses', () => {
   const V = g.V2_VALIDATE;
@@ -115,6 +141,34 @@ test('data — every seeded video maps to a module that exists in the roadmap', 
         assert.ok(known.has(mod), `video "${v.id || v.youtubeId}" tags module ${mod} which no longer exists in the roadmap`);
       }
     }
+  }
+});
+
+test('data — upcoming course modules use the approved video breakdown without placeholder durations', () => {
+  const expectedCounts = new Map([
+    ['05', 20],
+    ['06', 18],
+    ['07', 24],
+    ['08', 17],
+    ['09', 13],
+    ['10', 13],
+    ['11', 10],
+    ['12', 11],
+    ['13', 12],
+    ['14', 12],
+    ['15', 11],
+    ['16', 12],
+  ]);
+
+  for (const mod of g.COURSE_CURRICULUM.filter((item) => expectedCounts.has(item.n))) {
+    assert.equal(mod.submodules.length, expectedCounts.get(mod.n), `module ${mod.n} video count`);
+    mod.submodules.forEach((lesson, i) => {
+      assert.equal(lesson.n, `${Number(mod.n)}.${i + 1}`, `module ${mod.n} video ${i + 1} numbering`);
+      assert.equal(lesson.secs, undefined, `module ${mod.n} video ${lesson.n} has no unfinished runtime`);
+      assert.deepEqual([...lesson.lessons], [lesson.title], `module ${mod.n} video ${lesson.n} is one title-only lesson`);
+      assert.equal(g.COURSE_DURATION.lessonSecs(lesson), null, `module ${mod.n} video ${lesson.n} has no placeholder runtime`);
+    });
+    assert.equal(g.COURSE_DURATION.moduleSecs(mod), null, `module ${mod.n} has no placeholder total duration`);
   }
 });
 

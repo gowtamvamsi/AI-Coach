@@ -427,7 +427,26 @@ window.COURSE_CURRICULUM = [
     project: "A pattern library of prompts you'll reuse in every agent call",
     tools: ["Prompt patterns", "Structured output"],
     submodules: [
-      { n: "5.1", secs: 1863, title: "Applied Prompt Patterns", lessons: ["Applied Prompt Patterns"] }
+      { n: "5.1", title: "Welcome & What This Module Unlocks", lessons: ["Welcome & What This Module Unlocks"] },
+      { n: "5.2", title: "Why Prompt Engineering Exists", lessons: ["Why Prompt Engineering Exists"] },
+      { n: "5.3", title: "The 5-Part Skeleton: Overview & Why It Works", lessons: ["The 5-Part Skeleton: Overview & Why It Works"] },
+      { n: "5.4", title: "Part 1 · Role: Who the Model Should Be", lessons: ["Part 1 · Role: Who the Model Should Be"] },
+      { n: "5.5", title: "Part 2 · Instruction: Saying Exactly What to Do", lessons: ["Part 2 · Instruction: Saying Exactly What to Do"] },
+      { n: "5.6", title: "Part 3 · Context & Input", lessons: ["Part 3 · Context & Input"] },
+      { n: "5.7", title: "Part 4 · Output Format", lessons: ["Part 4 · Output Format"] },
+      { n: "5.8", title: "Prompt Templates & LCEL", lessons: ["Prompt Templates & LCEL"] },
+      { n: "5.9", title: "Zero-Shot vs Few-Shot", lessons: ["Zero-Shot vs Few-Shot"] },
+      { n: "5.10", title: "Chain-of-Thought & Reasoning Prompting", lessons: ["Chain-of-Thought & Reasoning Prompting"] },
+      { n: "5.11", title: "Structured Output With Pydantic", lessons: ["Structured Output With Pydantic"] },
+      { n: "5.12", title: "Meta-Prompting", lessons: ["Meta-Prompting"] },
+      { n: "5.13", title: "Multimodal Prompting: Images In (Optional)", lessons: ["Multimodal Prompting: Images In (Optional)"] },
+      { n: "5.14", title: "Capstone Upgrade I: Persona Editor & Template Picker", lessons: ["Capstone Upgrade I: Persona Editor & Template Picker"] },
+      { n: "5.15", title: "Prompt Versioning & Externalization", lessons: ["Prompt Versioning & Externalization"] },
+      { n: "5.16", title: "Testing Prompts: A Lightweight Eval Loop", lessons: ["Testing Prompts: A Lightweight Eval Loop"] },
+      { n: "5.17", title: "Prompt Caching", lessons: ["Prompt Caching"] },
+      { n: "5.18", title: "Robust Structured Output", lessons: ["Robust Structured Output"] },
+      { n: "5.19", title: "Observability Preview: Tracing With LangSmith", lessons: ["Observability Preview: Tracing With LangSmith"] },
+      { n: "5.20", title: "Capstone Upgrade II + Recap & Look Ahead", lessons: ["Capstone Upgrade II + Recap & Look Ahead"] }
     ]
   },
   {
@@ -437,12 +456,24 @@ window.COURSE_CURRICULUM = [
     project: "Atlas gets a ReAct brain, live tools, and self-correction",
     tools: ["ReAct", "Tool calling", "Plan-and-Solve"],
     submodules: [
-      { n: "4.1", title: "What Is an Agent? Autonomy Levels, the Agent Loop & ReAct", lessons: ["From Rule-Based to Fully Autonomous: The 5 Levels of Agent Autonomy", "LLMs vs Agents vs Workflows: The Difference Nobody Explains Clearly", "The Agent Loop: Reason → Act → Observe → Repeat (ReAct)", "Build It: Give Atlas a ReAct Brain"] },
-      { n: "4.2", title: "Giving an Agent Tools: Function Calling & Tool Use", lessons: ["Give Your LLM Hands: Tool Calling From Scratch (Include more examples)", "Build It: Atlas Gets Its First Tools (Live Search + Calculator)", "More Examples of Tool Use"] },
-      { n: "4.3", title: "Real APIs, Tool Sandboxing & Self-Correction", lessons: ["Using an Actual API as a Tool", "Tool Sandboxing: Letting an AI Run Code Without Burning Your House Down", "When Tools Fail: Retries, Backoff & the Self-Correction Loop", "Hard-Stops & Max Steps: Stopping Runaway Self-Correction"] },
-      { n: "4.4", title: "Why Tools Fall Short: An Intro to MCP", lessons: ["The Drawbacks of Tools & Why We Need MCP — The USB-C Port for AI Agents", "The Zomato Example: Plugging a Real API Into an Agent via MCP"] },
-      { n: "4.5", title: "Cognitive Framework: Plan-and-Solve", lessons: ["Plan-and-Solve: Breaking a Hard Goal Into Steps an Agent Can Do", "Build It: Atlas Plans a Multi-Step Research Task"] },
-      { n: "4.6", title: "Cognitive Framework: Self-Reflection Loop", lessons: ["Self-Reflection: How an Agent Catches Its Own Mistakes", "Build It: Atlas Critiques and Fixes Its Own Output"] }
+      { n: "6.1", title: "Kickoff: From Prompts to Agents", lessons: ["Kickoff: From Prompts to Agents"] },
+      { n: "6.2", title: "What Is an Agent? Autonomy Levels", lessons: ["What Is an Agent? Autonomy Levels"] },
+      { n: "6.3", title: "The Agent Loop: Think → Act → Observe", lessons: ["The Agent Loop: Think → Act → Observe"] },
+      { n: "6.4", title: "ReAct in Plain English", lessons: ["ReAct in Plain English"] },
+      { n: "6.5", title: "Build a Bare-Metal Agent Loop (No Framework)", lessons: ["Build a Bare-Metal Agent Loop (No Framework)"] },
+      { n: "6.6", title: "Why the Model Needs Tools", lessons: ["Why the Model Needs Tools"] },
+      { n: "6.7", title: "Function Calling 101", lessons: ["Function Calling 101"] },
+      { n: "6.8", title: "Your First Tool, End to End", lessons: ["Your First Tool, End to End"] },
+      { n: "6.9", title: "Multiple Tools & Tool Choice", lessons: ["Multiple Tools & Tool Choice"] },
+      { n: "6.10", title: "Reliable Tool Inputs with Pydantic", lessons: ["Reliable Tool Inputs with Pydantic"] },
+      { n: "6.11", title: "Calling a Real API as a Tool", lessons: ["Calling a Real API as a Tool"] },
+      { n: "6.12", title: "When Tools Fail: Errors, Retries & Self-Correction", lessons: ["When Tools Fail: Errors, Retries & Self-Correction"] },
+      { n: "6.13", title: "Tool Sandboxing: Running Actions Safely", lessons: ["Tool Sandboxing: Running Actions Safely"] },
+      { n: "6.14", title: "Cognitive Pattern: Plan-and-Solve", lessons: ["Cognitive Pattern: Plan-and-Solve"] },
+      { n: "6.15", title: "Cognitive Pattern: Self-Reflection Loop", lessons: ["Cognitive Pattern: Self-Reflection Loop"] },
+      { n: "6.16", title: "Why Tools Alone Fall Short → The Case for MCP", lessons: ["Why Tools Alone Fall Short → The Case for MCP"] },
+      { n: "6.17", title: "Capstone Upgrade: A Tool-Using Support Agent", lessons: ["Capstone Upgrade: A Tool-Using Support Agent"] },
+      { n: "6.18", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -452,12 +483,30 @@ window.COURSE_CURRICULUM = [
     project: "Document intelligence for Atlas — grounded, cited answers",
     tools: ["Vector DBs", "Chunking", "Reranking", "Graph RAG"],
     submodules: [
-      { n: "5.1", title: "Naive RAG", lessons: ["RAG Architecture: The Anatomy of a Pipeline", "Chunking Strategies", "Vector Databases", "Retrieval"] },
-      { n: "5.2", title: "Advanced RAG", lessons: ["Advanced RAG Architecture", "Search Algorithms: HNSW & IVF", "Retrieval Reranking", "LLM as a Judge", "HyDE: Hypothetical Document Embeddings", "FLARE: Forward-Looking Active Retrieval"] },
-      { n: "5.3", title: "Graph RAG", lessons: ["Graph RAG: Reasoning Over Connected Knowledge", "Vectorless RAG"] },
-      { n: "5.4", title: "Agentic RAG", lessons: ["Agentic RAG: Letting the Agent Decide When & What to Retrieve", "RAG as a Tool"] },
-      { n: "5.5", title: "Multimodal RAG", lessons: ["Multimodal RAG: Retrieving Across Text, Images & More"] },
-      { n: "5.6", title: "Evaluation", lessons: ["Is Your RAG Actually Good? Faithfulness & Relevance Metrics"] }
+      { n: "7.1", title: "Kickoff: Why LLMs Need Your Data", lessons: ["Kickoff: Why LLMs Need Your Data"] },
+      { n: "7.2", title: "The RAG Mental Model", lessons: ["The RAG Mental Model"] },
+      { n: "7.3", title: "Chunking: Splitting Docs Without Losing Meaning", lessons: ["Chunking: Splitting Docs Without Losing Meaning"] },
+      { n: "7.4", title: "Embeddings & Vector Stores, Wired Up", lessons: ["Embeddings & Vector Stores, Wired Up"] },
+      { n: "7.5", title: "Build Naive RAG End-to-End", lessons: ["Build Naive RAG End-to-End"] },
+      { n: "7.6", title: "Where Naive RAG Breaks", lessons: ["Where Naive RAG Breaks"] },
+      { n: "7.7", title: "Better Retrieval: Hybrid Search & Metadata Filters", lessons: ["Better Retrieval: Hybrid Search & Metadata Filters"] },
+      { n: "7.8", title: "Reranking: Putting the Best Chunk First", lessons: ["Reranking: Putting the Best Chunk First"] },
+      { n: "7.9", title: "Query Transformation", lessons: ["Query Transformation"] },
+      { n: "7.10", title: "Build Advanced RAG End-to-End", lessons: ["Build Advanced RAG End-to-End"] },
+      { n: "7.11", title: "Graph RAG", lessons: ["Graph RAG"] },
+      { n: "7.12", title: "Agentic RAG", lessons: ["Agentic RAG"] },
+      { n: "7.13", title: "Multimodal RAG", lessons: ["Multimodal RAG"] },
+      { n: "7.14", title: "Golden Datasets for RAG", lessons: ["Golden Datasets for RAG"] },
+      { n: "7.15", title: "RAG Evaluation Metrics", lessons: ["RAG Evaluation Metrics"] },
+      { n: "7.16", title: "Automating Evals: RAGAS + LLM-as-Judge", lessons: ["Automating Evals: RAGAS + LLM-as-Judge"] },
+      { n: "7.17", title: "Tracing a RAG Pipeline", lessons: ["Tracing a RAG Pipeline"] },
+      { n: "7.18", title: "Latency & Cost Breakdown", lessons: ["Latency & Cost Breakdown"] },
+      { n: "7.19", title: "Caching for RAG", lessons: ["Caching for RAG"] },
+      { n: "7.20", title: "Access Control: Document-Level Permissions", lessons: ["Access Control: Document-Level Permissions"] },
+      { n: "7.21", title: "Role-Based Approvals & Guardrails", lessons: ["Role-Based Approvals & Guardrails"] },
+      { n: "7.22", title: "Keeping the Index Fresh", lessons: ["Keeping the Index Fresh"] },
+      { n: "7.23", title: "Capstone Upgrade: Production-Grade RAG for the Agent", lessons: ["Capstone Upgrade: Production-Grade RAG for the Agent"] },
+      { n: "7.24", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -467,12 +516,23 @@ window.COURSE_CURRICULUM = [
     project: "An MCP server from scratch + a Gmail & Calendar MCP for Atlas",
     tools: ["MCP", "Gmail API", "Calendar API"],
     submodules: [
-      { n: "6.1", title: "What Exactly Is an MCP — and Why We Need Them", lessons: ["The M×N Problem: Why MCP Exists", "Tools vs MCP vs Prompts: What Goes Where", "Host, Client & Server: The MCP Architecture"] },
-      { n: "6.2", title: "Build Your Own MCP Server From Scratch", lessons: ["Build It: An MCP Server From Scratch (Host, Client & Server)"] },
-      { n: "6.3", title: "Build an MCP for Google (Gmail & Calendar)", lessons: ["Build It: A Gmail & Calendar MCP for Atlas"] },
-      { n: "6.4", title: "Plugging In Third-Party MCP Servers", lessons: ["How to Plug In & Use Third-Party MCP Servers"] },
-      { n: "6.5", title: "Where MCP Falls Short: Context Bloat & Limitations", lessons: ["Too Many MCPs: How Context Bloat Confuses Your Agent", "MCP Limitations: Where the Protocol Falls Short"] },
-      { n: "6.6", title: "Securing an MCP Server: Auth, Config & Secrets", lessons: ["Securing MCP: Auth, JSON Config & Environment Variables"] }
+      { n: "8.1", title: "Kickoff: The Integration Mess Before MCP", lessons: ["Kickoff: The Integration Mess Before MCP"] },
+      { n: "8.2", title: "What Is MCP? The “USB-C for Tools” Model", lessons: ["What Is MCP? The “USB-C for Tools” Model"] },
+      { n: "8.3", title: "MCP Architecture: Hosts, Clients & Servers", lessons: ["MCP Architecture: Hosts, Clients & Servers"] },
+      { n: "8.4", title: "MCP Primitives: Tools, Resources & Prompts", lessons: ["MCP Primitives: Tools, Resources & Prompts"] },
+      { n: "8.5", title: "Transport: stdio vs HTTP/SSE", lessons: ["Transport: stdio vs HTTP/SSE"] },
+      { n: "8.6", title: "Build Your First MCP Server", lessons: ["Build Your First MCP Server"] },
+      { n: "8.7", title: "Add Resources & Prompts", lessons: ["Add Resources & Prompts"] },
+      { n: "8.8", title: "Connect a Client to Your Server", lessons: ["Connect a Client to Your Server"] },
+      { n: "8.9", title: "Debugging with the MCP Inspector", lessons: ["Debugging with the MCP Inspector"] },
+      { n: "8.10", title: "Build an MCP for Gmail", lessons: ["Build an MCP for Gmail"] },
+      { n: "8.11", title: "Build an MCP for Google Calendar", lessons: ["Build an MCP for Google Calendar"] },
+      { n: "8.12", title: "OAuth for Google MCPs", lessons: ["OAuth for Google MCPs"] },
+      { n: "8.13", title: "Plugging In Third-Party MCP Servers", lessons: ["Plugging In Third-Party MCP Servers"] },
+      { n: "8.14", title: "Where MCP Falls Short", lessons: ["Where MCP Falls Short"] },
+      { n: "8.15", title: "Securing an MCP Server", lessons: ["Securing an MCP Server"] },
+      { n: "8.16", title: "Capstone Upgrade: An MCP Toolbelt for the Agent", lessons: ["Capstone Upgrade: An MCP Toolbelt for the Agent"] },
+      { n: "8.17", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -482,11 +542,19 @@ window.COURSE_CURRICULUM = [
     project: "Atlas remembers your preferences across sessions — on a token budget",
     tools: ["Vector memory", "Context engineering", "Token budgeting"],
     submodules: [
-      { n: "7.1", title: "Short-Term Memory & the Context Window", lessons: ["The Context Window: Why Your Agent Forgets Mid-Conversation", "Build It: Conversation Memory for Atlas"] },
-      { n: "7.2", title: "Long-Term Memory (Vector DBs, Profiling)", lessons: ["Long-Term Memory: How Production Agents Remember You", "Build It: Atlas Remembers Your Preferences Across Sessions"] },
-      { n: "7.3", title: "Episodic vs Semantic Memory", lessons: ["Episodic vs Semantic Memory: Specific Logs vs Learned Facts", "Build It: Atlas Recalls Past Research and Generalizes From It"] },
-      { n: "7.4", title: "Context Optimization & Token Budgeting", lessons: ["Lost in the Middle: Why Long Context Degrades & How to Fight It", "Build It: Trim, Summarize & Budget Atlas's Context for Cost"] },
-      { n: "7.5", title: "Context Engineering & Loop Engineering", lessons: ["Context Engineering: Designing Exactly What the Agent Sees", "Loop Engineering: Controlling How an Agent Iterates", "Build It: Apply Context & Loop Engineering to Atlas"] }
+      { n: "9.1", title: "Kickoff: Why Agents Forget (and Why It Hurts)", lessons: ["Kickoff: Why Agents Forget (and Why It Hurts)"] },
+      { n: "9.2", title: "Short-Term Memory & the Context Window", lessons: ["Short-Term Memory & the Context Window"] },
+      { n: "9.3", title: "Conversation Buffers", lessons: ["Conversation Buffers"] },
+      { n: "9.4", title: "Summarization Memory", lessons: ["Summarization Memory"] },
+      { n: "9.5", title: "Long-Term Memory with Vector DBs", lessons: ["Long-Term Memory with Vector DBs"] },
+      { n: "9.6", title: "User Profiling & Personalization", lessons: ["User Profiling & Personalization"] },
+      { n: "9.7", title: "Episodic vs Semantic Memory", lessons: ["Episodic vs Semantic Memory"] },
+      { n: "9.8", title: "Retrieving Memories: When to Recall What", lessons: ["Retrieving Memories: When to Recall What"] },
+      { n: "9.9", title: "Token Budgeting", lessons: ["Token Budgeting"] },
+      { n: "9.10", title: "Context Optimization", lessons: ["Context Optimization"] },
+      { n: "9.11", title: "Context Engineering & Loop Engineering", lessons: ["Context Engineering & Loop Engineering"] },
+      { n: "9.12", title: "Capstone Upgrade: Give the Agent Durable Memory", lessons: ["Capstone Upgrade: Give the Agent Durable Memory"] },
+      { n: "9.13", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -496,10 +564,19 @@ window.COURSE_CURRICULUM = [
     project: "Atlas re-architected on LangGraph with approval checkpoints",
     tools: ["LangGraph", "State machines", "Human-in-the-loop"],
     submodules: [
-      { n: "8.1", title: "From Loops to State: Why Agents Need a Single Source of Truth", lessons: ["Why Loops Aren't Enough: State as the Single Source of Truth — and the Drawbacks of Context & Loop Engineering"] },
-      { n: "8.2", title: "Modeling Agents as Graphs: Nodes, Edges & State in LangGraph", lessons: ["Agents as Graphs: The Mental Model Behind LangGraph", "Build It: Re-Architect Atlas on LangGraph"] },
-      { n: "8.3", title: "Deterministic Routing: Letting Code Decide the Path", lessons: ["Conditional Routing: Letting Code Decide When the AI Shouldn't", "Build It: Add Smart Routing to Atlas"] },
-      { n: "8.4", title: "Human-in-the-Loop: Pausing for Approval Before Risky Actions", lessons: ["Human-in-the-Loop: Pausing an Agent for Approval Before It Acts", "Build It: An Approval Checkpoint Before Atlas Takes Risky Actions"] }
+      { n: "10.1", title: "Kickoff: When the Agent Loop Becomes Spaghetti", lessons: ["Kickoff: When the Agent Loop Becomes Spaghetti"] },
+      { n: "10.2", title: "State as a Single Source of Truth", lessons: ["State as a Single Source of Truth"] },
+      { n: "10.3", title: "Nodes, Edges & the Graph Model", lessons: ["Nodes, Edges & the Graph Model"] },
+      { n: "10.4", title: "Your First LangGraph", lessons: ["Your First LangGraph"] },
+      { n: "10.5", title: "Defining & Updating State", lessons: ["Defining & Updating State"] },
+      { n: "10.6", title: "Conditional Edges", lessons: ["Conditional Edges"] },
+      { n: "10.7", title: "Deterministic Routing", lessons: ["Deterministic Routing"] },
+      { n: "10.8", title: "Cycles & Controlled Loops", lessons: ["Cycles & Controlled Loops"] },
+      { n: "10.9", title: "Persistence & Checkpointing", lessons: ["Persistence & Checkpointing"] },
+      { n: "10.10", title: "Human-in-the-Loop: Interrupts & Approvals", lessons: ["Human-in-the-Loop: Interrupts & Approvals"] },
+      { n: "10.11", title: "Streaming Graph State to a UI", lessons: ["Streaming Graph State to a UI"] },
+      { n: "10.12", title: "Capstone Upgrade: Rebuild the Agent as a Graph", lessons: ["Capstone Upgrade: Rebuild the Agent as a Graph"] },
+      { n: "10.13", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -509,10 +586,16 @@ window.COURSE_CURRICULUM = [
     project: "A regression suite that blocks bad Atlas changes",
     tools: ["LLM-as-Judge", "Eval datasets", "Trajectory benchmarks"],
     submodules: [
-      { n: "9.1", title: "Why Agents Are Hard to Evaluate", lessons: ["Non-Deterministic Nightmares: Why You Can't Unit-Test an Agent"] },
-      { n: "9.2", title: "Success-Rate Evaluation: Scoring Non-Deterministic Agents", lessons: ["Success Rate: Scoring an Agent That Answers Differently Every Time", "Build It: A Success-Rate Eval Harness for Atlas"] },
-      { n: "9.3", title: "Trajectory Benchmarking: Did the Agent Take the Efficient Path?", lessons: ["Trajectory Benchmarking: Did the Agent Take the Efficient Path?", "Build It: Measure How Atlas Gets to the Answer, Not Just the Answer"] },
-      { n: "9.4", title: "LLM-as-Judge, Eval Datasets & Regression Suites", lessons: ["LLM-as-Judge & Eval Datasets: Building a Test Set for Agents", "Build It: A Regression Suite That Blocks Bad Atlas Changes"] }
+      { n: "11.1", title: "Kickoff: You Can't Improve What You Can't Measure", lessons: ["Kickoff: You Can't Improve What You Can't Measure"] },
+      { n: "11.2", title: "Why Agents Are Hard to Evaluate", lessons: ["Why Agents Are Hard to Evaluate"] },
+      { n: "11.3", title: "Building an Eval Dataset (Golden Set)", lessons: ["Building an Eval Dataset (Golden Set)"] },
+      { n: "11.4", title: "Success-Rate / Outcome Evaluation", lessons: ["Success-Rate / Outcome Evaluation"] },
+      { n: "11.5", title: "Trajectory Evaluation", lessons: ["Trajectory Evaluation"] },
+      { n: "11.6", title: "LLM-as-Judge", lessons: ["LLM-as-Judge"] },
+      { n: "11.7", title: "Component vs End-to-End Evals", lessons: ["Component vs End-to-End Evals"] },
+      { n: "11.8", title: "Regression Suites in CI", lessons: ["Regression Suites in CI"] },
+      { n: "11.9", title: "Capstone Upgrade: An Eval Harness for the Agent", lessons: ["Capstone Upgrade: An Eval Harness for the Agent"] },
+      { n: "11.10", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -522,10 +605,17 @@ window.COURSE_CURRICULUM = [
     project: "Atlas becomes a researcher + writer + critic team",
     tools: ["LangGraph", "OpenAI Agents SDK", "CrewAI"],
     submodules: [
-      { n: "10.1", title: "Specialized Agents: When a Team Beats One Generalist", lessons: ["One Genius vs a Team: When Multiple Agents Beat One"] },
-      { n: "10.2", title: "Orchestration Patterns: Hierarchical vs Peer-to-Peer Teams", lessons: ["Hierarchical vs Peer-to-Peer: How Agent Teams Are Organized", "Build It: Turn Atlas Into a Researcher + Writer + Critic Team"] },
-      { n: "10.3", title: "How Agents Communicate: Message Passing vs Shared Memory (A2A / M2M)", lessons: ["How Agents Talk: Message Passing vs Shared Memory (A2A / M2M)", "Build It: Wire Up Communication Between Atlas's Agents"] },
-      { n: "10.4", title: "Choosing a Multi-Agent Framework: LangGraph vs OpenAI SDK vs CrewAI", lessons: ["LangGraph vs OpenAI Agents SDK vs CrewAI: When to Use Which", "Build It: The Same Atlas Team, Rebuilt in the OpenAI Agents SDK"] }
+      { n: "12.1", title: "Kickoff: When One Agent Isn't Enough", lessons: ["Kickoff: When One Agent Isn't Enough"] },
+      { n: "12.2", title: "Specialized Agents: Roles & Responsibilities", lessons: ["Specialized Agents: Roles & Responsibilities"] },
+      { n: "12.3", title: "Pattern: Supervisor / Hierarchical", lessons: ["Pattern: Supervisor / Hierarchical"] },
+      { n: "12.4", title: "Pattern: Peer-to-Peer / Network", lessons: ["Pattern: Peer-to-Peer / Network"] },
+      { n: "12.5", title: "Handoffs: Passing Control Between Agents", lessons: ["Handoffs: Passing Control Between Agents"] },
+      { n: "12.6", title: "Communication: Shared State vs Message Passing (A2A / M2M)", lessons: ["Communication: Shared State vs Message Passing (A2A / M2M)"] },
+      { n: "12.7", title: "Build a Supervisor Team in LangGraph", lessons: ["Build a Supervisor Team in LangGraph"] },
+      { n: "12.8", title: "Framework Tour: LangGraph vs OpenAI Agents SDK vs CrewAI", lessons: ["Framework Tour: LangGraph vs OpenAI Agents SDK vs CrewAI"] },
+      { n: "12.9", title: "Failure Modes: Loops, Deadlocks & Runaway Cost", lessons: ["Failure Modes: Loops, Deadlocks & Runaway Cost"] },
+      { n: "12.10", title: "Capstone Upgrade: Split the Agent Into a Team", lessons: ["Capstone Upgrade: Split the Agent Into a Team"] },
+      { n: "12.11", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -535,12 +625,18 @@ window.COURSE_CURRICULUM = [
     project: "Atlas locked down — guardrails, least privilege, PII redaction",
     tools: ["Guardrails", "Prompt-injection defense", "Sandboxing"],
     submodules: [
-      { n: "11.1", title: "Input & Output Guardrails: The First Line of Defense", lessons: ["Input & Output Guardrails: The First Line of Defense", "Build It: Input & Output Guardrails for Atlas"] },
-      { n: "11.2", title: "Tool Guardrails: Constraining What an Agent Can Do", lessons: ["Tool Guardrails: Constraining What an Agent Is Allowed to Do", "Build It: Guardrails Around Atlas's Tools"] },
-      { n: "11.3", title: "Human-in-the-Loop Guardrails: Approval Gates for Risky Actions", lessons: ["Human-in-the-Loop Guardrails: Approval Gates for Risky Actions", "Build It: A Human Approval Guardrail for Atlas"] },
-      { n: "11.4", title: "Prompt Injection: How to Break Agents", lessons: ["Prompt Injection: How One Sentence Hijacks Your Agent", "Breaking Agents: Jailbreaks, Adversarial Inputs & Red-Teaming"] },
-      { n: "11.5", title: "Sandboxing & Least Privilege: Don't Hand Over the Master Key", lessons: ["Least Privilege for Agents: Don't Give the AI the Master Key", "Build It: Lock Down Atlas's Tools and Permissions"] },
-      { n: "11.6", title: "Secrets, PII & Data Handling: What an Agent Must Never Leak", lessons: ["Secrets, PII & Compliance: What an Agent Must Never Leak", "Build It: Safe Secrets & PII Redaction in Atlas"] }
+      { n: "13.1", title: "Kickoff: An Agent Is an Attack Surface", lessons: ["Kickoff: An Agent Is an Attack Surface"] },
+      { n: "13.2", title: "Input Guardrails", lessons: ["Input Guardrails"] },
+      { n: "13.3", title: "Output Guardrails", lessons: ["Output Guardrails"] },
+      { n: "13.4", title: "Tool Guardrails", lessons: ["Tool Guardrails"] },
+      { n: "13.5", title: "Human-in-the-Loop Approval Gates", lessons: ["Human-in-the-Loop Approval Gates"] },
+      { n: "13.6", title: "Prompt Injection: How to Break Agents", lessons: ["Prompt Injection: How to Break Agents"] },
+      { n: "13.7", title: "Defending Against Injection", lessons: ["Defending Against Injection"] },
+      { n: "13.8", title: "Sandboxing & Least Privilege", lessons: ["Sandboxing & Least Privilege"] },
+      { n: "13.9", title: "Secrets Management", lessons: ["Secrets Management"] },
+      { n: "13.10", title: "PII Detection & Redaction", lessons: ["PII Detection & Redaction"] },
+      { n: "13.11", title: "Capstone Upgrade: Harden the Agent", lessons: ["Capstone Upgrade: Harden the Agent"] },
+      { n: "13.12", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -550,11 +646,18 @@ window.COURSE_CURRICULUM = [
     project: "Atlas live on the internet with a chat UI",
     tools: ["FastAPI", "Docker", "Async", "CI/CD"],
     submodules: [
-      { n: "12.1", title: "Serving an Agent as an API With FastAPI", lessons: ["From Notebook to API: Serving an Agent With FastAPI", "Build It: Wrap Atlas in a FastAPI Service"] },
-      { n: "12.2", title: "Containerizing Your Agent With Docker", lessons: ["Docker for AI Apps: “It Works on My Machine” Is Not a Deploy", "Build It: Dockerize Atlas"] },
-      { n: "12.3", title: "Async for Agents: Don't Let One Call Freeze Everything", lessons: ["Why Agents Need Async: One Hanging LLM Call Shouldn't Freeze Everything", "Build It: Make Atlas's API Async & Streaming"] },
-      { n: "12.4", title: "Shipping to the Cloud With CI/CD", lessons: ["From Localhost to the Internet: Deploying Agents to the Cloud", "Build It: Deploy Atlas to the Cloud With CI/CD"] },
-      { n: "12.5", title: "Reliability: Retries, Timeouts, Queues & Scaling", lessons: ["Reliability for Agents: Timeouts, Queues & Surviving Traffic", "Build It: A Chat UI + Reliability Layer for Atlas"] }
+      { n: "14.1", title: "Kickoff: From Notebook to Service", lessons: ["Kickoff: From Notebook to Service"] },
+      { n: "14.2", title: "Serving an Agent with FastAPI", lessons: ["Serving an Agent with FastAPI"] },
+      { n: "14.3", title: "Streaming Responses over HTTP (SSE)", lessons: ["Streaming Responses over HTTP (SSE)"] },
+      { n: "14.4", title: "Async for Agents", lessons: ["Async for Agents"] },
+      { n: "14.5", title: "Containerizing with Docker", lessons: ["Containerizing with Docker"] },
+      { n: "14.6", title: "Config & Secrets in Production", lessons: ["Config & Secrets in Production"] },
+      { n: "14.7", title: "CI/CD: Ship on Every Push", lessons: ["CI/CD: Ship on Every Push"] },
+      { n: "14.8", title: "Deploying to the Cloud", lessons: ["Deploying to the Cloud"] },
+      { n: "14.9", title: "Reliability: Retries, Timeouts & Queues", lessons: ["Reliability: Retries, Timeouts & Queues"] },
+      { n: "14.10", title: "Scaling: Workers, Concurrency & Rate Limits", lessons: ["Scaling: Workers, Concurrency & Rate Limits"] },
+      { n: "14.11", title: "Capstone Upgrade: Deploy the Agent as an API", lessons: ["Capstone Upgrade: Deploy the Agent as an API"] },
+      { n: "14.12", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -564,10 +667,17 @@ window.COURSE_CURRICULUM = [
     project: "A cost & quality dashboard for live Atlas",
     tools: ["Langfuse", "LangSmith", "Tracing"],
     submodules: [
-      { n: "13.1", title: "Tracing Every Step of a Live Agent", lessons: ["You Can't Fix What You Can't See: Tracing Every Agent Step", "Build It: Full-Trace Logging for Live Atlas"] },
-      { n: "13.2", title: "Observability Tooling: Langfuse & LangSmith", lessons: ["Observability for Agents: Traces, Dashboards & Alerts", "Langfuse vs LangSmith: Choosing Your Observability Stack", "Build It: Instrument Atlas With Langfuse & LangSmith"] },
-      { n: "13.3", title: "Token & Cost Optimization in Production", lessons: ["The 3 AM Bill: Cutting Agent Token Costs in Production", "Build It: A Cost & Quality Dashboard for Atlas"] },
-      { n: "13.4", title: "Feedback Loops & Continuous Improvement", lessons: ["Closing the Loop: Turning Live Feedback Into a Better Agent", "Build It: A Feedback → Eval → Improve Loop for Atlas"] }
+      { n: "15.1", title: "Kickoff: Flying Blind in Production", lessons: ["Kickoff: Flying Blind in Production"] },
+      { n: "15.2", title: "Tracing an Agent, Step by Step", lessons: ["Tracing an Agent, Step by Step"] },
+      { n: "15.3", title: "Observability with LangSmith", lessons: ["Observability with LangSmith"] },
+      { n: "15.4", title: "Observability with Langfuse", lessons: ["Observability with Langfuse"] },
+      { n: "15.5", title: "Logging & Structured Events", lessons: ["Logging & Structured Events"] },
+      { n: "15.6", title: "Token & Cost Dashboards", lessons: ["Token & Cost Dashboards"] },
+      { n: "15.7", title: "Latency & Performance Monitoring", lessons: ["Latency & Performance Monitoring"] },
+      { n: "15.8", title: "Alerting on Failures & Regressions", lessons: ["Alerting on Failures & Regressions"] },
+      { n: "15.9", title: "Feedback Loops & Continuous Improvement", lessons: ["Feedback Loops & Continuous Improvement"] },
+      { n: "15.10", title: "Capstone Upgrade: Instrument the Deployed Agent", lessons: ["Capstone Upgrade: Instrument the Deployed Agent"] },
+      { n: "15.11", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
     ]
   },
   {
@@ -577,37 +687,36 @@ window.COURSE_CURRICULUM = [
     project: "Your own agentic product — built, deployed, monitored",
     tools: ["Full production stack", "Portfolio", "Interview prep"],
     submodules: [
-      { n: "14.1", title: "Choosing & Scoping Your Capstone", lessons: ["How to Scope an Agentic Project That Actually Ships"] },
-      { n: "14.2", title: "Capstone A — Customer-Support Agent", lessons: ["Build, Deploy & Monitor a Support Agent End-to-End"] },
-      { n: "14.3", title: "Capstone B — Coding / Dev Agent", lessons: ["Build, Deploy & Monitor a Coding Agent End-to-End"] },
-      { n: "14.4", title: "Capstone C — Personal-Finance Agent", lessons: ["Build, Deploy & Monitor a Finance Agent End-to-End"] },
-      { n: "14.5", title: "Portfolio, Resume & Interview Prep", lessons: ["From Project to Job: Portfolio, Resume & Agent-Engineer Interview Prep"] },
-      { n: "14.6", title: "Bonus Capstone — Voice-to-Voice Agent", lessons: ["A Voice-to-Voice Atlas (STT → Agent → TTS)"] }
+      { n: "16.1", title: "Kickoff: Turning Skills Into a Portfolio", lessons: ["Kickoff: Turning Skills Into a Portfolio"] },
+      { n: "16.2", title: "Choosing & Scoping Your Capstone", lessons: ["Choosing & Scoping Your Capstone"] },
+      { n: "16.3", title: "Capstone A — Customer-Support Agent: Design", lessons: ["Capstone A — Customer-Support Agent: Design"] },
+      { n: "16.4", title: "Capstone A — Build It Live", lessons: ["Capstone A — Build It Live"] },
+      { n: "16.5", title: "Capstone B — Coding / Dev Agent: Design", lessons: ["Capstone B — Coding / Dev Agent: Design"] },
+      { n: "16.6", title: "Capstone B — Build It Live", lessons: ["Capstone B — Build It Live"] },
+      { n: "16.7", title: "Capstone C — Personal-Finance Agent: Design", lessons: ["Capstone C — Personal-Finance Agent: Design"] },
+      { n: "16.8", title: "Capstone C — Build It Live", lessons: ["Capstone C — Build It Live"] },
+      { n: "16.9", title: "Bonus — Voice-to-Voice Agent", lessons: ["Bonus — Voice-to-Voice Agent"] },
+      { n: "16.10", title: "Portfolio & GitHub Polish", lessons: ["Portfolio & GitHub Polish"] },
+      { n: "16.11", title: "Resume & Interview Prep", lessons: ["Resume & Interview Prep"] },
+      { n: "16.12", title: "Course Wrap & What's Next", lessons: ["Course Wrap & What's Next"] }
     ]
   }
 ];
 
 // ── Lesson runtimes for the curriculum section ───────────────────────────
-// Modules 01–03 carry REAL runtimes (`secs:` on each submodule, from the
-// course_video_durations export). Modules 04+ have no export yet and fall back
-// to a PLACEHOLDER: each lesson's length is hashed from its own title into a
-// 6:00–19:00 range — deterministic, so module totals stay self-consistent.
-// ponytail: to replace a placeholder, add `secs` to the submodule (or `mins` to
-// the module); the helper prefers those and needs no other code changes.
+// Recorded lessons carry real runtimes (`secs:` on each submodule). Upcoming
+// lessons return null until their recordings are complete, so the UI can omit
+// both lesson runtimes and module totals instead of inventing placeholder time.
 window.COURSE_DURATION = (function () {
-  function hash(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return h;
-  }
   function lessonSecs(sm) {
-    if (sm.secs) return sm.secs;
-    const parts = (sm.lessons && sm.lessons.length) ? sm.lessons : [sm.title];
-    return parts.reduce((a, t) => a + 360 + (hash(t) % 781), 0);
+    return Number.isFinite(sm.secs) && sm.secs > 0 ? sm.secs : null;
   }
   function moduleSecs(mod) {
-    if (mod.mins) return mod.mins * 60;
-    return (mod.submodules || []).reduce((a, sm) => a + lessonSecs(sm), 0);
+    if (Number.isFinite(mod.mins) && mod.mins > 0) return mod.mins * 60;
+    const lessonTimes = (mod.submodules || []).map(lessonSecs);
+    return lessonTimes.length && lessonTimes.every((secs) => secs != null)
+      ? lessonTimes.reduce((total, secs) => total + secs, 0)
+      : null;
   }
   const pad = (n) => String(n).padStart(2, '0');
   return {
@@ -635,12 +744,13 @@ window.COURSE_INFO = {
   moduleCount: window.COURSE_CURRICULUM.length,
   submoduleCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.length, 0),
   lessonCount: window.COURSE_CURRICULUM.reduce((a, m) => a + m.submodules.reduce((b, s) => b + (s.lessons || []).length, 0), 0),
-  price: "Will reveal soon", // ponytail: string passes through priceFmt as-is; restore a number to show ₹ again
+  price: 29999,
+  listPrice: 34999,
+  priceOfferLabel: "Launch offer · First 45 days",
+  priceTaxCaption: "18% GST is already included and paid to the Government.",
   // Curriculum header CTA — put the PDF's URL here and the "Download Syllabus"
   // button appears. Empty string = button hidden.
   syllabusUrl: "",
-  // "Enroll now" CTAs on the Courses page point here (external checkout).
-  enrollUrl: "https://balajichippadacourse.edmingle.com/course/GenerativeAgenticAIEngineering-111299",
   // Flagship-card fact grid (label/value pairs)
   facts: [
     { k: "Format", v: "Self-paced" },
@@ -670,12 +780,78 @@ window.COURSE_INFO = {
 
 // "Projects you will build" cards for the Courses tab.
 window.COURSE_PROJECTS = [
-  { num: "01", title: "Agent From Scratch", desc: "A working agent in ~40 lines — no frameworks, no magic. You understand every line of the loop.", tags: ["Agent loop", "LLM APIs"] },
-  { num: "02", title: "Tool-Using Assistant", desc: "A ReAct-style agent with live search, real API calls, and a self-correction loop.", tags: ["ReAct", "Tool calling"] },
-  { num: "03", title: "RAG Knowledge Agent", desc: "Grounded, cited answers over your own documents — from naive RAG to agentic retrieval.", tags: ["Vector DBs", "Reranking"] },
-  { num: "04", title: "Memory-Enabled Assistant", desc: "An agent that remembers users across sessions without blowing the context window.", tags: ["Long-term memory", "Context engineering"] },
-  { num: "05", title: "Multi-Agent Research System", desc: "A researcher + writer + critic team that collaborates without runaway cost.", tags: ["Orchestration", "A2A communication"] },
-  { num: "06", title: "Deployed Capstone Product", desc: "Your own agentic product — support, coding, or finance — shipped live and monitored.", tags: ["FastAPI + Docker", "Observability"] }
+  {
+    num: "01",
+    title: "Mini LangChain From Scratch",
+    desc: "Build the core building blocks behind LangChain — model loading, chat-model abstractions, provider integrations, and APIs.",
+    tags: ["Python OOPs", "Abstractions", "Model Providers", "Streaming", "APIs"],
+    lightImage: "uploads/Project1-light_mode.png",
+    darkImage: "uploads/project1-dark-mode.png",
+  },
+  {
+    num: "02",
+    title: "Semantic Search Over Your Documents",
+    desc: "Use embedding models and cosine similarity to build a semantic search engine over your own documents — from chunking to top-K results.",
+    tags: ["Embeddings", "Semantic Search", "Cosine Similarity", "Vector Store", "Python"],
+    lightImage: "uploads/project2_light_mode.png",
+    darkImage: "uploads/project2_dark_mode.png",
+  },
+  {
+    num: "03",
+    title: "Multi-Model Chatbot With Full Control",
+    desc: "Build a powerful chatbot that lets users switch providers and tune temperature, reasoning, and streaming with LangChain and Streamlit.",
+    tags: ["LangChain", "Multi-Model", "Custom Parameters", "Streaming", "Streamlit", "Python"],
+    lightImage: "uploads/project3_light_mode.png",
+    darkImage: "uploads/project3_dark_mode.png",
+  },
+  {
+    num: "04",
+    title: "Upgrade Your Chatbot With Advanced Prompting",
+    desc: "Add prompt templates, versioning, LCEL chains, conversation history, and prompt caching for faster, more reliable responses.",
+    tags: ["Prompt Templates", "Prompt Versioning", "LCEL", "Conversation History", "Prompt Caching", "Python"],
+    lightImage: "uploads/project4_light_mode.png",
+    darkImage: "uploads/project4_dark_mode.png",
+  },
+  {
+    num: "05",
+    title: "Upgrade Your Chatbot With Agentic Power",
+    desc: "Add an agentic loop with Plan-Act-Observe-Reflect, powerful tools, self-correction, retry limits, and a plan-and-solve strategy.",
+    tags: ["Agentic Loop", "Tools", "Web Search", "Email Reader", "APIs", "Self-Correction", "Retry & Limits", "Plan & Solve", "Python"],
+    lightImage: "uploads/project5_light_mode.png",
+    darkImage: "uploads/project5_dark_mode.png",
+  },
+  {
+    num: "06",
+    title: "Advanced RAG System",
+    desc: "Build a production-ready RAG system with advanced indexing, hybrid search, reranking, low-latency design, evaluations, and RBAC.",
+    tags: ["Indexing Pipeline", "Hybrid Search", "Reranking", "Metadata Filtering", "Low Latency", "Evaluations", "RBAC", "Production Ready", "Python"],
+    lightImage: "uploads/project6_light_mode.png",
+    darkImage: "uploads/project6_dark_mode.png",
+  },
+  {
+    num: "07",
+    title: "Build MCP Server for Google Services & Integrate with Chatbot",
+    desc: "Build an MCP server from scratch for Google Calendar, Gmail, Google Drive, and more, then integrate it with a LangChain chatbot.",
+    tags: ["MCP", "MCP from Scratch", "Google Calendar", "Gmail", "Google Drive", "OAuth 2.0", "LangChain Agent", "Secure & Scalable", "Python"],
+    lightImage: "uploads/project7_light_mode.png",
+    darkImage: "uploads/project7_dark_mode.png",
+  },
+  {
+    num: "08",
+    title: "Memory-Powered Personalized Chatbot",
+    desc: "Add short-term, summary, long-term, profile, and episodic memory with intelligent recall for smarter, personalized conversations.",
+    tags: ["Conversation Buffer", "Summarization", "Vector DB", "User Profiles", "Episodic Memory", "Memory Router", "Personalization", "Python"],
+    lightImage: "uploads/project8_light_mode.png",
+    darkImage: "uploads/project8_dark_mode.png",
+  },
+  {
+    num: "09",
+    title: "LangGraph Multi-Agent System",
+    desc: "Build planner, researcher, coder, and reviewer agents that collaborate through A2A and M2M protocols with shared tools and memory.",
+    tags: ["LangGraph", "Multi-Agent", "A2A Protocol", "M2M Protocol", "Shared Memory", "Scalable", "Production Ready"],
+    lightImage: "uploads/project9_light_mode.png",
+    darkImage: "uploads/project9_dark_mode.png",
+  }
 ];
 
 // Courses tab FAQ.
@@ -702,18 +878,12 @@ window.COURSE_TESTIMONIALS = [];
 // Hero + instructor copy for the Courses tab. Social links themselves live in
 // V2_BRAND (v2.jsx); this only carries the marketing copy/stats.
 window.COURSE_INSTRUCTOR = {
-  // Hero checklist chips.
-  heroChips: [
-    "Build RAG and tool-using agents",
-    "Learn evaluation and observability",
-    "Deploy real-world production workflows",
-  ],
   // Instructor section.
-  roleLine: "9+ years in AI/ML · Production agentic AI · 26K+ on YouTube",
+  roleLine: "9+ years in AI/ML · Production agentic AI · 35K+ on YouTube",
   quote: "I show the agent working first, then explain the mental model — LLM, workflow, agent. Numbers and artefacts beat adjectives.",
   stats: [
-    { num: "26K+", label: "Subscribers" },
+    { num: "35K+", label: "Subscribers" },
     { num: "5,000+", label: "Mentored" },
-    { num: "170K+", label: "Roadmap views" },
+    { num: "230K+", label: "Roadmap views" },
   ],
 };

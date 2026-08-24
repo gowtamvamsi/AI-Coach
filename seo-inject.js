@@ -13,7 +13,7 @@
     : { title: cfg.title, description: cfg.description, canonical: url + '/' };
 
   const title = route.title || cfg.title;
-  const desc = (route.description || cfg.description).replace('170K+', stats.roadmapViews || '170K+');
+  const desc = (route.description || cfg.description).replace('230K+', stats.roadmapViews || '230K+');
   const canonical = route.canonical || (url + '/');
 
   document.title = title;

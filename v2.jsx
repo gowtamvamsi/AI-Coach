@@ -176,7 +176,7 @@ if (typeof window !== 'undefined') window.V2_VALIDATE = V2_VALIDATE;
 // India first (default selection); the rest alphabetical by name for findability.
 // `max` overrides the default 10-digit national-number cap where a country runs
 // longer (e.g. China/Germany mobiles can be 11).
-const V2_DIAL_CODES = [
+const V2_DIAL_CODES_FALLBACK = [
   { iso: 'IN', dial: '+91', name: 'India' },
   { iso: 'AF', dial: '+93', name: 'Afghanistan' },
   { iso: 'AL', dial: '+355', name: 'Albania' },
@@ -381,8 +381,12 @@ const V2_DIAL_CODES = [
   { iso: 'ZM', dial: '+260', name: 'Zambia' },
   { iso: 'ZW', dial: '+263', name: 'Zimbabwe' },
 ];
+const V2_DIAL_CODES = Array.isArray(window.PHONE_COUNTRIES) && window.PHONE_COUNTRIES.length
+  ? window.PHONE_COUNTRIES
+  : V2_DIAL_CODES_FALLBACK;
 // Flag emoji from an ISO-2 code (regional indicator letters).
 function v2Flag(iso) {
+  if (window.PHONE_COUNTRY_UTILS?.flag) return window.PHONE_COUNTRY_UTILS.flag(iso);
   try { return String.fromCodePoint(...[...iso.toUpperCase()].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)); }
   catch (e) { return ''; }
 }
@@ -554,8 +558,8 @@ const V2_BRAND = Object.assign({
 }, (_SC.brand || {}));
 
 const V2_SOCIAL = Object.assign({
-  youtubeSubs: '26K+',
-  roadmapViews: '170K+',
+  youtubeSubs: '35K+',
+  roadmapViews: '230K+',
   studentsTrained: '3000+',
 }, ((_SC.brand && _SC.brand.stats) || {}));
 
@@ -3124,36 +3128,6 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
         </div>
       </RevealOnScroll>
     </section>
-  );
-}
-
-function V2WhatsAppButton() {
-  // On mobile the FAB sits over the hero and clipped the hero microcopy at
-  // certain scroll positions. Fade it in only after scrolling past the hero
-  // (CSS applies the hide on small screens only — desktop is unaffected).
-  const [atTop, setAtTop] = useState(typeof window !== 'undefined' ? window.scrollY < 560 : true);
-  useEffect(() => {
-    const onScroll = () => setAtTop(window.scrollY < 560);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  return (
-    <a
-      className={`v2-whatsapp-float${atTop ? ' v2-whatsapp-float--attop' : ''}`}
-      href={V2_BRAND.whatsappCommunity}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Join WhatsApp community"
-      title="Join WhatsApp community"
-    >
-      <span className="v2-whatsapp-float__icon-wrap" aria-hidden="true">
-        <svg className="v2-whatsapp-float__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-        </svg>
-      </span>
-      <span className="v2-whatsapp-float__label">Join</span>
-    </a>
   );
 }
 
