@@ -3127,42 +3127,6 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
   );
 }
 
-function V2MobileStickyBar({ nextMc, onReserve, reserved, onManage }) {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 400);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  if (!nextMc) return null;
-  const free = isMcFree(nextMc);
-  // Already reserved → stop nudging; show a quiet "registered" confirmation.
-  if (reserved) {
-    return (
-      <div className={`v2-mobile-sticky v2-mobile-sticky--reserved ${visible ? 'is-visible' : ''}`}>
-        <div className="v2-mobile-sticky-meta">
-          <span className="v2-mobile-sticky-date">✓ You&apos;re registered</span>
-          <span className="v2-mobile-sticky-seats">{formatMcShortDate(nextMc.dateTime)}</span>
-        </div>
-        <button type="button" className="hero__primary-cta v2-mobile-sticky-btn" onClick={() => onManage && onManage()}>
-          View
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className={`v2-mobile-sticky ${visible ? 'is-visible' : ''}`}>
-      <div className="v2-mobile-sticky-meta">
-        <span className="v2-mobile-sticky-date">{formatMcShortDate(nextMc.dateTime)}</span>
-      </div>
-      <button type="button" className="hero__primary-cta v2-mobile-sticky-btn" onClick={() => onReserve(nextMc)}>
-        {free ? <>Reserve · <V2McPrice mc={nextMc} /></> : `Book · ${formatMcPriceShort(nextMc)}`}
-      </button>
-    </div>
-  );
-}
-
 function V2WhatsAppButton() {
   // On mobile the FAB sits over the hero and clipped the hero microcopy at
   // certain scroll positions. Fade it in only after scrolling past the hero

@@ -639,6 +639,8 @@ window.COURSE_INFO = {
   // Curriculum header CTA — put the PDF's URL here and the "Download Syllabus"
   // button appears. Empty string = button hidden.
   syllabusUrl: "",
+  // "Enroll now" CTAs on the Courses page point here (external checkout).
+  enrollUrl: "https://balajichippadacourse.edmingle.com/course/GenerativeAgenticAIEngineering-111299",
   // Flagship-card fact grid (label/value pairs)
   facts: [
     { k: "Format", v: "Self-paced" },

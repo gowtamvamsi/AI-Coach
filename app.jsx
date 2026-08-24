@@ -5215,7 +5215,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
             ))}
           </p>
           <div className="cv3-hero-ctas">
-            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
+            <a href={info.enrollUrl} className="cv3-btn cv3-btn--accent" rel="noopener">Enroll now</a>
             <a href="#cv3-curriculum" className="cv3-btn cv3-btn--ghost" onClick={scrollToId('cv3-curriculum')}>View curriculum →</a>
           </div>
           <div className="cv3-hero-stats">
@@ -5281,7 +5281,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
               <div className="cv3-price">{priceFmt(info.price)}</div>
               <div className="cv3-price-note">Inclusive of GST · No subscription</div>
             </div>
-            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
+            <a href={info.enrollUrl} className="cv3-btn cv3-btn--accent" rel="noopener">Enroll now</a>
             <div className="cv3-flagship-includes">
               {(info.includes || []).map((inc) => (
                 <div key={inc} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{inc}</div>
@@ -8862,7 +8862,6 @@ function App() {
         </div>
       )}
 
-      <V2MobileStickyBar nextMc={nextMasterclass} onReserve={openBooking} reserved={nextMcReserved} onManage={goToAccount} />
       <V2WhatsAppButton />
       <V2LegalModal page={legalPage} onClose={() => setLegalPage(null)} />
 
