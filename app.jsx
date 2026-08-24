@@ -5421,7 +5421,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           <span className="cv3-pricing-pill">Full access for 2 years</span>
           <div className="cv3-pricing-name">{info.flagshipName}</div>
           <CoursesPriceDisplay info={info} full />
-          <button type="button" className="cv3-btn cv3-btn--accent cv3-pricing-cta" disabled style={{ cursor: "default", opacity: 0.7 }}>Enrollment opening soon</button>
+          <button type="button" className="cv3-btn cv3-btn--accent cv3-pricing-cta" disabled style={{ cursor: "default", opacity: 0.7 }}>Enrollment opens Aug 25, 2026</button>
           <div className="cv3-pricing-features">
             {(info.pricingIncludes || []).map((feat) => (
               <div key={feat} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{feat}</div>
