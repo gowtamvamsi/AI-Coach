@@ -75,7 +75,7 @@ const APPROVED_VERSIONS = {
   'phone-countries.js': '1',
   'advisor-widget.js': '3',
   'v2.build.js': '39',
-  'app.build.js': '123',
+  'app.build.js': '127',
 };
 
 for (const page of PUBLIC_PAGES) {
@@ -385,8 +385,8 @@ test('site contact bar — permanent support details sit above navigation', () =
   assert.ok(start >= 0 && end > start, 'contact-bar component exists');
   assert.ok(renderAt >= 0 && navAt > renderAt, 'contact bar renders before navigation');
   assert.match(contact, /role="region"[\s\S]*?aria-label="Contact information"/, 'contact strip is exposed as a labeled region');
-  assert.match(contact, /\+91 XXXXXXXXXX/, 'temporary phone number is displayed');
-  assert.doesNotMatch(contact, /href=["']tel:/, 'temporary phone number is not an invalid telephone link');
+  assert.match(contact, /\+91 79817 09999/, 'support phone number is displayed');
+  assert.doesNotMatch(contact, /XXXXXXXXXX/, 'no placeholder phone number remains');
   assert.match(contact, /href="mailto:team@balajichippada\.com"/, 'email address is actionable');
   assert.doesNotMatch(source, /<V2TopBanner\b/, 'old enrollment banner no longer competes for the top slot');
   assert.match(css, /--top-banner-h:\s*38px/, 'desktop reserves space for the permanent bar');

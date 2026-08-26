@@ -5148,6 +5148,8 @@ function CoursesPriceDisplay({ info, full = false }) {
   );
 }
 
+const COURSE_CHECKOUT_URL = "https://balajichippadacourse.edmingle.com/course/ProductionLevelAgenticAICourse-111299";
+
 function CoursesTabView({ setActiveMainTab, setLegalPage }) {
   const info = window.COURSE_INFO || {};
   const projects = window.COURSE_PROJECTS || [];
@@ -5244,7 +5246,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
             Learn directly from Balaji Chippada to architect, evaluate, and deploy reliable AI agents — from first principles to production monitoring.
           </p>
           <div className="cv3-hero-ctas">
-            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>
+            <a href={COURSE_CHECKOUT_URL} className="cv3-btn cv3-btn--accent">
               Enroll Now
               <svg className="cv3-hero-cta-chevrons" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="m5 5 7 7-7 7" />
@@ -5329,7 +5331,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
               <div className="cv3-price-label">One-time payment</div>
               <CoursesPriceDisplay info={info} />
             </div>
-            <a href="#cv3-pricing" className="cv3-btn cv3-btn--accent" onClick={scrollToId('cv3-pricing')}>Enroll now</a>
+            <a href={COURSE_CHECKOUT_URL} className="cv3-btn cv3-btn--accent">Enroll now</a>
             <div className="cv3-flagship-includes">
               {(info.includes || []).map((inc) => (
                 <div key={inc} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{inc}</div>
@@ -5421,7 +5423,7 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           <span className="cv3-pricing-pill">Full access for 2 years</span>
           <div className="cv3-pricing-name">{info.flagshipName}</div>
           <CoursesPriceDisplay info={info} full />
-          <button type="button" className="cv3-btn cv3-btn--accent cv3-pricing-cta" disabled style={{ cursor: "default", opacity: 0.7 }}>Enrollment opens Aug 25, 2026</button>
+          <a href={COURSE_CHECKOUT_URL} className="cv3-btn cv3-btn--accent cv3-pricing-cta">Enroll now</a>
           <div className="cv3-pricing-features">
             {(info.pricingIncludes || []).map((feat) => (
               <div key={feat} className="cv3-check-row"><span className="cv3-check" aria-hidden="true">✓</span>{feat}</div>
@@ -6060,11 +6062,16 @@ function AdminEnquiriesPanel() {
   // outstanding work and a bulk send never re-hits someone already handled.
   const hasNoMessage = (q) => !String(q.message || '').trim();
   const noMessage = enquiries.filter((q) => hasNoMessage(q) && !isReplied(q));
+  // Contact status (sales pipeline) — set via the per-lead dropdown; absent = not contacted.
+  const statusOf = (q) => q.contactStatus || 'not_contacted';
+  const STATUS_IDS = ['not_contacted', 'contacted', 'converted'];
   const shown = filter === 'all'
     ? enquiries
     : filter === 'nomessage'
       ? noMessage
-      : enquiries.filter((q) => isReplied(q) === (filter === 'replied'));
+      : STATUS_IDS.includes(filter)
+        ? enquiries.filter((q) => statusOf(q) === filter)
+        : enquiries.filter((q) => isReplied(q) === (filter === 'replied'));
 
   const exportCsv = () => {
     const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
@@ -6105,21 +6112,29 @@ function AdminEnquiriesPanel() {
         <p style={{ fontSize: '14px', color: 'var(--fg-faint)', marginTop: '16px' }}>No enquiries yet.</p>
       )}
       {enquiries.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '16px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '16px', alignItems: 'center' }}>
           {[
             { id: 'all', label: 'All', count: enquiries.length },
             { id: 'replied', label: 'Replied', count: repliedCount },
             { id: 'pending', label: 'Yet to be replied', count: pendingCount },
             { id: 'nomessage', label: 'No message', count: noMessage.length },
+            { divider: true, id: 'div' },
+            { id: 'not_contacted', label: 'Not Contacted', count: enquiries.filter((q) => statusOf(q) === 'not_contacted').length },
+            { id: 'contacted', label: 'Contacted', count: enquiries.filter((q) => statusOf(q) === 'contacted').length },
+            { id: 'converted', label: 'Converted', count: enquiries.filter((q) => statusOf(q) === 'converted').length },
           ].map((f) => (
-            <button
-              key={f.id}
-              className={`dash-tab${filter === f.id ? ' is-active' : ''}`}
-              onClick={() => setFilter(f.id)}
-            >
-              {f.label}
-              <span className="dash-tab__count">{f.count}</span>
-            </button>
+            f.divider ? (
+              <span key={f.id} aria-hidden="true" style={{ width: '1px', alignSelf: 'stretch', background: 'var(--line)', margin: '2px 4px' }} />
+            ) : (
+              <button
+                key={f.id}
+                className={`dash-tab${filter === f.id ? ' is-active' : ''}`}
+                onClick={() => setFilter(f.id)}
+              >
+                {f.label}
+                <span className="dash-tab__count">{f.count}</span>
+              </button>
+            )
           ))}
         </div>
       )}
@@ -6129,7 +6144,9 @@ function AdminEnquiriesPanel() {
             ? 'No replied enquiries yet.'
             : filter === 'nomessage'
               ? 'Nothing waiting — every empty-message enquiry has been replied to.'
-              : 'All enquiries have been replied to.'}
+              : STATUS_IDS.includes(filter)
+                ? 'No enquiries with this status yet.'
+                : 'All enquiries have been replied to.'}
         </p>
       )}
       {filter === 'nomessage' && noMessage.length > 0 && <EnquiryBulkEmailBox enquiries={noMessage} />}
@@ -6156,7 +6173,24 @@ function AdminEnquiriesPanel() {
                   </span>
                 )}
               </div>
-              <span style={{ fontSize: '12px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono' }}>{fmtDate(q.createdAt)}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Lead status — persists to the leads doc; onSnapshot re-renders it. */}
+                <select
+                  value={q.contactStatus || 'not_contacted'}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    db.collection('leads').doc(q.id).update({ contactStatus: e.target.value });
+                  }}
+                  title="Lead status"
+                  style={{ fontSize: '11px', fontFamily: 'JetBrains Mono', padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--fg-dim)', cursor: 'pointer' }}
+                >
+                  <option value="not_contacted">Not Contacted</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="converted">Converted</option>
+                </select>
+                <span style={{ fontSize: '12px', color: 'var(--fg-faint)', fontFamily: 'JetBrains Mono' }}>{fmtDate(q.createdAt)}</span>
+              </div>
             </div>
             <div style={{ fontSize: '13px', color: 'var(--fg-dim)', marginTop: '4px', fontFamily: 'JetBrains Mono' }}>
               <a href={`mailto:${q.email}`} style={{ color: 'inherit' }}>{q.email}</a>
@@ -6418,11 +6452,11 @@ function SiteContactBar() {
     <div className="site-contact-bar" role="region" aria-label="Contact information">
       <div className="site-contact-bar__inner">
         <span className="site-contact-bar__prompt">Have a question?</span>
-        <span className="site-contact-bar__item" aria-label="Temporary contact number +91 XXXXXXXXXX">
+        <span className="site-contact-bar__item" aria-label="Contact number +91 79817 09999">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z" />
           </svg>
-          <span>+91 XXXXXXXXXX</span>
+          <span>+91 79817 09999</span>
         </span>
         <a className="site-contact-bar__item" href="mailto:team@balajichippada.com">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
