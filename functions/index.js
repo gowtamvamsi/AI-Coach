@@ -203,30 +203,17 @@ function icsAttachment(ics) {
   }];
 }
 
-// Markdown-lite → HTML for email bodies, so **bold** and [label](url) written
-// in the admin composer render in recipients' inboxes. Everything else stays
-// plain text (escaped), with newlines as <br>. A stripped text version is sent
-// alongside as the fallback part for text-only mail clients.
-function escapeHtml(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function emailBodyToHtml(body) {
-  const html = escapeHtml(body)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/\r?\n/g, "<br>\n");
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222">${html}</div>`;
-}
-function emailBodyToText(body) {
-  return String(body)
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, "$1 ($2)");
-}
+// Email body rendering (markdown-lite for composer text, raw passthrough for a
+// designed HTML template) lives in lib/email-body.js so it unit-tests offline.
+const { escapeHtml, isHtmlBody, emailBodyToHtml, emailBodyToText } = require("./lib/email-body");
 
 // Substitute {{placeholders}} in an admin-edited email template, per recipient.
 // Supported: {{name}} {{title}} {{date}} {{zoom}} {{prep}}.
 function applyTemplate(str, vars) {
-  return String(str || "").replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : ""));
+  // Values are escaped when substituting into an HTML template — {{name}} comes
+  // from an admin-uploaded spreadsheet, so a stray "<" must not become markup.
+  const esc = isHtmlBody(str) ? escapeHtml : (v) => v;
+  return String(str || "").replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] != null ? esc(String(vars[k])) : ""));
 }
 
 exports.createRazorpayOrder = functions.https.onCall(async (data, context) => {
@@ -510,7 +497,7 @@ exports.sendAudienceEmail = functions.runWith({ timeoutSeconds: 540, memory: "51
 
     // To protect recipient privacy, we send to SMTP_EMAIL and add leads to BCC!
     const mailOptions = {
-      from: `"Balaji Chippada Masterclass" <${smtpEmail}>`,
+      from: `"Balaji Chippada" <${smtpEmail}>`,
       to: smtpEmail,
       bcc: emails.join(","),
       subject: subject,
@@ -738,7 +725,7 @@ exports.onLeadCreated = functions.firestore
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+            from: "Balaji Chippada <team@balajichippada.com>",
             to: email,
             subject: subject,
             text: body
@@ -783,7 +770,7 @@ exports.onLeadCreated = functions.firestore
         });
 
         await transporter.sendMail({
-          from: `"Balaji Chippada Masterclass" <${smtpEmail}>`,
+          from: `"Balaji Chippada" <${smtpEmail}>`,
           to: email,
           subject: subject,
           text: body
@@ -845,12 +832,12 @@ async function sendEmailHelper({ email, name, subject, body, resendApiKey, smtpE
   // (e.g. a gmail.com SMTP login), so when Resend is active we must use the
   // verified domain address — never the SMTP login. Precedence:
   //   explicit `from` arg  →  EMAIL_FROM env  →  domain default (Resend) / SMTP login (SMTP).
-  const DOMAIN_FROM = "Balaji Chippada Masterclass <team@balajichippada.com>";
+  const DOMAIN_FROM = "Balaji Chippada <team@balajichippada.com>";
   const defaultFrom = from
     || process.env.EMAIL_FROM
     || (resendApiKey
       ? DOMAIN_FROM
-      : (smtpEmail ? `"Balaji Chippada Masterclass" <${smtpEmail}>` : DOMAIN_FROM));
+      : (smtpEmail ? `"Balaji Chippada" <${smtpEmail}>` : DOMAIN_FROM));
   const atts = Array.isArray(attachments) ? attachments : [];
 
   if (resendApiKey) {
@@ -1145,7 +1132,7 @@ exports.onRegistrationCompleted = functions.firestore
             resendApiKey: process.env.RESEND_API_KEY,
             smtpEmail: process.env.SMTP_EMAIL,
             smtpPass: process.env.SMTP_PASSWORD,
-            from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+            from: "Balaji Chippada <team@balajichippada.com>",
             attachments: icsAttachment(buildMasterclassICS(effectiveSession, sessionTitle, sessionId)),
           });
           await change.after.ref.update({
@@ -1204,7 +1191,7 @@ exports.onRegistrationCompleted = functions.firestore
           resendApiKey,
           smtpEmail,
           smtpPass,
-          from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+          from: "Balaji Chippada <team@balajichippada.com>",
           attachments: icsAttachment(buildMasterclassICS(effectiveSession, sessionTitle, sessionId))
         });
 
@@ -1296,7 +1283,7 @@ exports.onUserSignupWelcome = functions.firestore
         resendApiKey,
         smtpEmail,
         smtpPass,
-        from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+        from: "Balaji Chippada <team@balajichippada.com>",
       });
 
       // Stamp only after a successful send so a transient failure can retry on
@@ -1387,7 +1374,7 @@ exports.requestPasswordReset = functions.https.onCall(async (data) => {
       resendApiKey: process.env.RESEND_API_KEY,
       smtpEmail: process.env.SMTP_EMAIL,
       smtpPass: process.env.SMTP_PASSWORD,
-      from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+      from: "Balaji Chippada <team@balajichippada.com>",
     });
   } catch (err) {
     console.error("[PWRESET] failed to send code to", email, err);
@@ -1485,7 +1472,7 @@ exports.requestSignupOtp = functions.https.onCall(async (data) => {
       resendApiKey: process.env.RESEND_API_KEY,
       smtpEmail: process.env.SMTP_EMAIL,
       smtpPass: process.env.SMTP_PASSWORD,
-      from: "Balaji Chippada Masterclass <team@balajichippada.com>",
+      from: "Balaji Chippada <team@balajichippada.com>",
     });
   } catch (err) {
     console.error("[SIGNUP-OTP] failed to send code to", email, err);
@@ -1957,7 +1944,7 @@ exports.processEmailBatch = functions
           subject: applyTemplate(subjectTpl, vars),
           body: applyTemplate(bodyTpl, vars),
           resendApiKey, smtpEmail, smtpPass,
-          from: process.env.EMAIL_FROM || "Balaji Chippada Masterclass <team@balajichippada.com>",
+          from: process.env.EMAIL_FROM || "Balaji Chippada <team@balajichippada.com>",
           attachments,
         });
         if (regRef) {

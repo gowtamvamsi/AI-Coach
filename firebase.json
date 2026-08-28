@@ -33,6 +33,7 @@
       "package-lock.json",
       "scripts/**",
       "tests/**",
+      "email-templates/**",
       "*.jsx",
       "*.md",
       "PAYMENTS-TODO.md",

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!--
+  Course-launch campaign email.
+
+  HOW TO SEND: Dashboard → Marketing → Bulk Email from Spreadsheet. Upload the
+  recipient .xlsx/.csv, then paste this ENTIRE file into the Body box. The body
+  starts with "<", so functions/lib/email-body.js sends it as-is instead of
+  escaping it, and derives the plain-text part automatically.
+
+  TEST FIRST: upload a one-row spreadsheet containing only your own address.
+
+  EDIT ME — the only things that usually change per campaign:
+    Enroll link      https://balajichippada.com/
+    Curriculum link  https://balajichippada.com/roadmap
+    Phone            +91 79817 09999
+  {{name}} is substituted per recipient (falls back to "there").
+
+  RULES if you edit the layout: tables only (no flex/grid), inline styles on
+  everything that matters, absolute https:// image URLs only — never data: URIs,
+  because this whole string is stored on the job doc and copied into every
+  Cloud Tasks payload, and both cap at 1MB. Keep it under ~50KB.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agentic AI Production Ready Course</title>
+<!-- Progressive enhancement only. Everything below is also inlined, so a client
+     that strips this block still renders the layout correctly. -->
+<style>
+  @media only screen and (max-width:600px) {
+    .sm-full { width:100% !important; max-width:100% !important; }
+    .sm-btn { padding-left:0 !important; padding-right:0 !important; }
+    .sm-stack { display:block !important; width:100% !important; }
+    .sm-center { text-align:center !important; }
+    .sm-pad { padding-left:22px !important; padding-right:22px !important; }
+    .sm-h1 { font-size:30px !important; }
+    .sm-h2 { font-size:25px !important; }
+    .sm-gap { padding-top:12px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f1ec;">
+<!-- Preheader: the grey line Gmail shows next to the subject. -->
+<div style="display:none;font-size:1px;color:#f4f1ec;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">Enrollment is now open for the Agentic AI Production Ready Course — hands-on projects, 1:1 mentoring, and interview prep.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f1ec;">
+<tr><td align="center" style="padding:28px 12px;">
+
+  <table role="presentation" class="sm-full" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #e7e1d7;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+
+    <!-- ── Header bar ─────────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:18px 26px;border-bottom:1px solid #eeeae2;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td class="sm-stack sm-center" width="55%" style="vertical-align:middle;">
+          <img src="https://balajichippada.com/logos/fla-badge-180.png" width="34" height="34" alt="" style="display:inline-block;vertical-align:middle;border:0;border-radius:8px;">
+          <span style="display:inline-block;vertical-align:middle;padding-left:10px;font-size:19px;font-weight:bold;color:#1a1814;letter-spacing:-0.2px;">Balaji Chippada</span>
+        </td>
+        <td class="sm-stack sm-center sm-gap" width="45%" align="right" style="vertical-align:middle;font-size:13px;font-weight:bold;color:#c2533c;">
+          &#128227;&nbsp;Course Launch Announcement
+        </td>
+      </tr></table>
+    </td></tr>
+
+    <!-- ── Hero ───────────────────────────────────────────────── -->
+    <!-- To use a designed banner image instead, replace this whole <td> with:
+         <td style="padding:0;"><img src="https://balajichippada.com/email/banner.png"
+           width="600" alt="Agentic AI Production Ready Course — now open for enrollments"
+           style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td> -->
+    <tr><td class="sm-pad" style="background-color:#1a1814;padding:40px 34px 36px;">
+      <div class="sm-h1" style="font-size:42px;line-height:1.06;font-weight:bold;color:#d18a2a;letter-spacing:-1px;">Agentic AI</div>
+      <div class="sm-h2" style="font-size:36px;line-height:1.14;font-weight:bold;color:#ffffff;letter-spacing:-0.8px;padding-top:4px;">Production<br>Ready Course</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:26px;"><tr>
+        <td style="background-color:#d18a2a;border-radius:26px;padding:13px 28px;font-size:16px;font-weight:bold;color:#1a1814;white-space:nowrap;">
+          &#128640;&nbsp; Now Open for Enrollments
+        </td>
+      </tr></table>
+    </td></tr>
+
+    <!-- ── Body copy ──────────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:30px 34px 4px;font-size:16px;line-height:1.62;color:#1a1814;">
+      <p style="margin:0 0 16px;font-weight:bold;">Hello {{name}},</p>
+      <p style="margin:0 0 14px;">We are excited to announce the launch of our
+        <a href="https://balajichippada.com/" style="color:#c2533c;font-weight:bold;text-decoration:none;">Agentic AI Production Ready Course</a>.</p>
+      <p style="margin:0;">This course is designed to help you build real-world, production-ready Agentic AI skills through hands-on learning.</p>
+    </td></tr>
+
+    <!-- ── Feature list ───────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:24px 34px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#faf7f2;border:1px solid #eeeae2;border-radius:12px;">
+        <tr>
+          <td width="58" align="center" style="padding:15px 0 15px 16px;font-size:21px;line-height:1;border-bottom:1px solid #eeeae2;">&#128736;&#65039;</td>
+          <td style="padding:15px 18px 15px 6px;font-size:16px;font-weight:bold;color:#1a1814;border-bottom:1px solid #eeeae2;">Hands-on Projects</td>
+        </tr>
+        <tr>
+          <td width="58" align="center" style="padding:15px 0 15px 16px;font-size:21px;line-height:1;border-bottom:1px solid #eeeae2;">&#9881;&#65039;</td>
+          <td style="padding:15px 18px 15px 6px;font-size:16px;font-weight:bold;color:#1a1814;border-bottom:1px solid #eeeae2;">Production-Ready Workflows</td>
+        </tr>
+        <tr>
+          <td width="58" align="center" style="padding:15px 0 15px 16px;font-size:21px;line-height:1;border-bottom:1px solid #eeeae2;">&#128100;</td>
+          <td style="padding:15px 18px 15px 6px;font-size:16px;font-weight:bold;color:#1a1814;border-bottom:1px solid #eeeae2;">1:1 Mentoring Support</td>
+        </tr>
+        <tr>
+          <td width="58" align="center" style="padding:15px 0 15px 16px;font-size:21px;line-height:1;border-bottom:1px solid #eeeae2;">&#128188;</td>
+          <td style="padding:15px 18px 15px 6px;font-size:16px;font-weight:bold;color:#1a1814;border-bottom:1px solid #eeeae2;">Resume &amp; Interview Guidance</td>
+        </tr>
+        <tr>
+          <td width="58" align="center" style="padding:15px 0 15px 16px;font-size:21px;line-height:1;">&#128214;</td>
+          <td style="padding:15px 18px 15px 6px;font-size:16px;font-weight:bold;color:#1a1814;">Detailed Curriculum</td>
+        </tr>
+      </table>
+    </td></tr>
+
+    <!-- ── CTAs ───────────────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:26px 34px 6px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td class="sm-stack sm-btn" width="50%" style="padding-right:8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td align="center" style="background-color:#c2533c;border-radius:9px;">
+              <a href="https://balajichippada.com/" style="display:block;padding:16px 10px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;">Enroll Now &nbsp;&#8594;</a>
+            </td>
+          </tr></table>
+        </td>
+        <td class="sm-stack sm-btn sm-gap" width="50%" style="padding-left:8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td align="center" style="background-color:#ffffff;border:1px solid #1a1814;border-radius:9px;">
+              <a href="https://balajichippada.com/roadmap" style="display:block;padding:15px 10px;font-size:16px;font-weight:bold;color:#1a1814;text-decoration:none;">&#128214;&nbsp; View Curriculum</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+    </td></tr>
+
+    <!-- ── Contact strip ──────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:22px 34px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f1ec;border-radius:12px;"><tr>
+        <td class="sm-stack sm-center" width="50%" style="padding:16px 10px 16px 20px;font-size:14px;color:#5c564d;line-height:1.5;">
+          &#127760;&nbsp; Website<br>
+          <a href="https://balajichippada.com/" style="color:#c2533c;font-weight:bold;text-decoration:none;">balajichippada.com</a>
+        </td>
+        <td class="sm-stack sm-center" width="50%" style="padding:16px 20px 16px 10px;font-size:14px;color:#5c564d;line-height:1.5;">
+          &#128172;&nbsp; WhatsApp / Call<br>
+          <a href="tel:+917981709999" style="color:#1a1814;font-weight:bold;text-decoration:none;">+91 79817 09999</a>
+        </td>
+      </tr></table>
+    </td></tr>
+
+    <!-- ── Sign-off ───────────────────────────────────────────── -->
+    <tr><td class="sm-pad" style="padding:24px 34px 30px;border-top:1px solid #eeeae2;margin-top:20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr>
+        <td width="46" style="vertical-align:middle;">
+          <img src="https://balajichippada.com/logos/fla-badge-180.png" width="38" height="38" alt="" style="display:block;border:0;border-radius:9px;">
+        </td>
+        <td style="vertical-align:middle;padding-left:12px;font-size:15px;line-height:1.5;color:#5c564d;">
+          Best regards,<br><span style="font-weight:bold;color:#1a1814;">Team Balaji Chippada</span>
+        </td>
+      </tr></table>
+    </td></tr>
+
+  </table>
+
+  <table role="presentation" class="sm-full" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;font-family:Arial,Helvetica,sans-serif;">
+    <tr><td align="center" style="padding:18px 24px 6px;font-size:12px;line-height:1.6;color:#8a8378;">
+      You are receiving this because you signed up for updates from Balaji Chippada.<br>
+      Reply to this email with &ldquo;unsubscribe&rdquo; and we will remove you.
+    </td></tr>
+  </table>
+
+</td></tr>
+</table>
+</body>
+</html>

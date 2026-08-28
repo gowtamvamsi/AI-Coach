@@ -9,7 +9,7 @@
     "prerender": "node scripts/prerender.mjs",
     "build": "npm run build:js && npm run prerender",
     "verify": "node scripts/verify-render.mjs",
-    "test": "node --test tests/logic.test.mjs tests/prerender.test.mjs tests/otp.test.mjs tests/course-enquiry.test.mjs tests/advisor-widget.test.mjs",
+    "test": "node --test tests/logic.test.mjs tests/prerender.test.mjs tests/otp.test.mjs tests/course-enquiry.test.mjs tests/advisor-widget.test.mjs tests/email-body.test.mjs",
     "pretest": "npm run build",
     "pdf": "node scripts/roadmap-to-pdf.mjs"
   },
