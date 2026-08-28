@@ -33,8 +33,9 @@
   }
 
   function getWhatsappUrl() {
-    var brand = getConfig().brand || {};
-    return brand.whatsappCommunity || '';
+    // ponytail: direct chat to the same number as the contact bar (app.jsx).
+    // Hardcoded like the contact bar — the number isn't centralized in config.
+    return 'https://wa.me/917981709999';
   }
 
   function getRecaptchaSiteKey() {

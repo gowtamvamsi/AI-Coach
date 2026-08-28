@@ -5126,6 +5126,17 @@ function CoursesFAQ() {
   );
 }
 
+// ponytail: recomputed on each render (page load), not a ticking timer — the badge
+// only changes by the day. Rolls over at the viewer's local midnight.
+function offerBadgeLabel(info) {
+  if (!info.offerStartISO || !info.offerDays) return info.priceOfferLabel;
+  const end = new Date(info.offerStartISO + 'T00:00:00');
+  end.setDate(end.getDate() + info.offerDays);
+  const daysLeft = Math.ceil((end - Date.now()) / 86400000);
+  if (daysLeft <= 0) return 'Launch offer';
+  return `Launch offer · ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+}
+
 function CoursesPriceDisplay({ info, full = false }) {
   const formatPrice = (value) => (
     typeof value === 'number' ? '₹' + value.toLocaleString('en-IN') : value
@@ -5139,7 +5150,7 @@ function CoursesPriceDisplay({ info, full = false }) {
     <div className={`cv3-price-display ${full ? 'cv3-price-display--full' : 'cv3-price-display--compact'}`}>
       <div className="cv3-price-offer-line">
         <span className="cv3-price-list">{formatPrice(info.listPrice)}</span>
-        <span className="cv3-price-offer-badge">{info.priceOfferLabel}</span>
+        <span className="cv3-price-offer-badge">{offerBadgeLabel(info)}</span>
       </div>
       <div className={currentPriceClass}>{formatPrice(info.price)}</div>
       <div className="cv3-price-note">{note}</div>
@@ -6452,12 +6463,12 @@ function SiteContactBar() {
     <div className="site-contact-bar" role="region" aria-label="Contact information">
       <div className="site-contact-bar__inner">
         <span className="site-contact-bar__prompt">Have a question?</span>
-        <span className="site-contact-bar__item" aria-label="Contact number +91 79817 09999">
+        <a className="site-contact-bar__item" href="tel:+917981709999" aria-label="Call +91 79817 09999">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z" />
           </svg>
           <span>+91 79817 09999</span>
-        </span>
+        </a>
         <a className="site-contact-bar__item" href="mailto:team@balajichippada.com">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3" y="5" width="18" height="14" rx="2" />

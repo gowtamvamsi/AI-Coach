@@ -1692,7 +1692,7 @@ function V2HeroSection({ nextMc, onReserve, onRoadmap, onExploreCurriculum, rese
                   ) : (
                     <>
                       <span className="v2-hero-microcopy-lock" aria-hidden="true">🔒</span>
-                      Razorpay · 100% refund within 24h
+                      Razorpay · 100% refund within 7 days
                     </>
                   )}
                 </p>
@@ -1987,7 +1987,7 @@ function V2BookingWizard({
             <button type="button" className="form-btn v2-pay-btn" disabled={bookingLoading} onClick={onSubmitPayment}>
               {bookingLoading ? 'Processing…' : `Pay ₹${price.toLocaleString()} securely →`}
             </button>
-            <p className="v2-booking-hint">🔒 Razorpay · UPI · card · netbanking · 100% refund within 24h</p>
+            <p className="v2-booking-hint">🔒 Razorpay · UPI · card · netbanking · 100% refund within 7 days</p>
             <button type="button" className="v2-modal-back" onClick={() => setStep(1)}>← Back</button>
           </div>
         )}
@@ -2444,7 +2444,7 @@ function V2FAQSection({ onLegal }) {
   const [open, setOpen] = useState(0);
   const faqs = (_SC.faqs && _SC.faqs.length) ? _SC.faqs : [
     { q: "I'm a beginner — is this too advanced?", a: "If you can write Python and use a terminal — Phase 1 of the free roadmap — you're ready." },
-    { q: "What's the refund policy?", a: '100% refund within 24 hours of purchase, no questions asked.', link: 'refund' },
+    { q: "What's the refund policy?", a: '100% refund within 7 days of purchase, no questions asked.', link: 'refund' },
   ];
 
   return (
@@ -3111,7 +3111,7 @@ function V2ClosingCTA({ nextMc, onReserve, reserved, onManage }) {
         </h2>
         <p className="closing-cta__sub">
           2 hours live · {free ? 'free first masterclass' : 'single price'} · recording &amp; slides included
-          {free ? ' · WhatsApp community access' : ' · 100% refund within 24h'}.
+          {free ? ' · WhatsApp community access' : ' · 100% refund within 7 days'}.
         </p>
         <button
           className="hero__primary-cta v2-closing-btn"
@@ -3138,7 +3138,7 @@ function V2LegalModal({ page, onClose }) {
     // (/privacy, /terms) — the footer and FAQ link straight to them. Do NOT add
     // summarised privacy/terms entries back: Google's OAuth review needs a
     // crawlable policy page, and a modal stub would drift out of sync with it.
-    refund: { title: 'Refund Policy', body: '100% refund within 24 hours of purchase, no questions asked. Email team@balajichippada.com with your order ID.' },
+    refund: { title: 'Refund Policy', body: '100% refund within 7 days of purchase, no questions asked. Email team@balajichippada.com with your order ID.' },
     contact: {
       title: 'Contact',
       body: (

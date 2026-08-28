@@ -206,12 +206,12 @@ test('setEnabled(false) hides sticky and closes an open dialog', async () => {
   await page.close();
 });
 
-test('modal includes WhatsApp link with configured URL', async () => {
+test('modal WhatsApp link opens a direct chat to the contact number', async () => {
   const page = await newPage();
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
   const href = await page.$eval('.advisor-widget-whatsapp', (el) => el.href);
   const text = await page.$eval('.advisor-widget-whatsapp', (el) => el.textContent.trim());
-  assert.equal(href, 'https://example.com/whatsapp');
+  assert.equal(href, 'https://wa.me/917981709999');
   assert.match(text, /Talk to us on WhatsApp/);
   await page.close();
 });

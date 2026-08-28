@@ -73,7 +73,7 @@ window.SEO_CONFIG = {
       tab: 'masterclass',
       title: 'Live Agentic AI Masterclasses — Demo-First Builds · Balaji Chippada',
       description:
-        'Live, demo-first masterclasses where you ship a production-grade AI agent on the call: RAG, Claude Code, LangGraph, multi-agent systems, guardrails, and deployment. First class free, recording + certificate included, 100% refund within 24 hours.',
+        'Live, demo-first masterclasses where you ship a production-grade AI agent on the call: RAG, Claude Code, LangGraph, multi-agent systems, guardrails, and deployment. First class free, recording + certificate included, 100% refund within 7 days.',
     },
     '/about': {
       tab: 'masterclass',

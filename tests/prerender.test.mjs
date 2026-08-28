@@ -73,9 +73,9 @@ const APPROVED_VERSIONS = {
   'styles.css': '144',
   'site.config.js': '20',
   'phone-countries.js': '1',
-  'advisor-widget.js': '3',
-  'v2.build.js': '39',
-  'app.build.js': '127',
+  'advisor-widget.js': '4',
+  'v2.build.js': '40',
+  'app.build.js': '129',
 };
 
 for (const page of PUBLIC_PAGES) {
@@ -83,10 +83,10 @@ for (const page of PUBLIC_PAGES) {
     const html = read(page);
     assert.equal((html.match(/site\.config\.js\?v=20/g) || []).length, 1, 'one site.config.js?v=20');
     assert.equal((html.match(/phone-countries\.js\?v=1/g) || []).length, 1, 'one phone-countries.js?v=1');
-    assert.equal((html.match(/advisor-widget\.js\?v=3/g) || []).length, 1, 'one advisor-widget.js?v=3');
+    assert.equal((html.match(/advisor-widget\.js\?v=4/g) || []).length, 1, 'one advisor-widget.js?v=4');
     assert.match(html, /styles\.css\?v=144/, 'styles.css?v=144');
     assert.ok(
-      html.indexOf('phone-countries.js?v=1') < html.indexOf('advisor-widget.js?v=3'),
+      html.indexOf('phone-countries.js?v=1') < html.indexOf('advisor-widget.js?v=4'),
       'country data loads before advisor widget',
     );
   });
@@ -252,7 +252,10 @@ test('course pricing — one shared launch offer renders in both pricing surface
   assert.match(info, /priceOfferLabel:\s*"Launch offer · First 45 days"/, 'launch label is centralized');
   assert.match(info, /priceTaxCaption:\s*"18% GST is already included and paid to the Government\."/, 'GST caption is centralized');
   assert.doesNotMatch(info, /Will reveal soon/, 'placeholder price is removed');
-  assert.doesNotMatch(info, /offerEnd|offerExpiry|countdown|deadline/i, 'offer has no automatic expiry');
+  assert.match(info, /offerStartISO:\s*"2026-08-25"/, 'offer start date drives the countdown');
+  assert.match(info, /offerDays:\s*45/, 'offer window is 45 days');
+  assert.match(source, /function offerBadgeLabel\(info\)/, 'shared countdown helper exists');
+  assert.match(source, /daysLeft === 1 \? 'day' : 'days'/, 'badge shows a live days-left countdown');
   assert.match(source, /function CoursesPriceDisplay\(\{\s*info,\s*full\s*=\s*false\s*\}\)/, 'shared price component exists');
   assert.equal((source.match(/<CoursesPriceDisplay\b/g) || []).length, 2, 'both public price surfaces use the shared component');
   assert.match(css, /\.cv3-price-list\s*\{[^}]*text-decoration:\s*line-through/, 'standard price is struck through');
