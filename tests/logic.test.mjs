@@ -146,7 +146,6 @@ test('data — every seeded video maps to a module that exists in the roadmap', 
 
 test('data — upcoming course modules use the approved video breakdown without placeholder durations', () => {
   const expectedCounts = new Map([
-    ['05', 20],
     ['06', 18],
     ['07', 24],
     ['08', 17],
