@@ -11,9 +11,9 @@ window.SEO_CONFIG = {
   locale: 'en_IN',
   language: 'en',
 
-  title: 'Balaji Chippada · Agentic AI Engineer Roadmap & Live Masterclasses (2026)',
+  title: 'Production-grade Agentic AI Course',
   description:
-    'Free 26-week Agentic AI Engineer roadmap (230K+ YouTube views) plus live demo-first masterclasses from Balaji Chippada. Learn Python, RAG, LangGraph, MCP, multi-agent systems, guardrails, and AWS deployment — production-grade, not tutorial fluff.',
+    'Build production-grade Agentic AI with someone who ships it. Learn to architect, evaluate, and deploy reliable AI agents — RAG, tool use, multi-agent systems, evals, guardrails and cloud deployment. Plus the free 26-week roadmap.',
   keywords: [
     'agentic AI',
     'AI engineer roadmap 2026',
@@ -30,8 +30,8 @@ window.SEO_CONFIG = {
     'free AI roadmap',
   ].join(', '),
 
-  ogImage: 'https://balajichippada.com/uploads/balaji-chippada.png',
-  ogImageAlt: 'Balaji Chippada — The Agent Engineer, creator of the 2026 Agentic AI roadmap',
+  ogImage: 'https://balajichippada.com/uploads/og-share.jpg',
+  ogImageAlt: 'Balaji Chippada — The Agent Engineer: RAG, tool use, multi-agent, evals, guardrails, observability, deployment',
 
   twitterHandle: '@balajichippada',
 
@@ -46,11 +46,11 @@ window.SEO_CONFIG = {
 
   // Plain-language summary for AI agents (also mirrored in llms.txt)
   aiSummary: [
-    'Balaji Chippada (The Agent Engineer) teaches production-grade agentic AI engineering.',
-    'This site hosts: (1) a free interactive 26-week / 9-phase AI Engineer roadmap with embedded YouTube lessons and progress tracking, and (2) live paid/free masterclasses (demo-first builds: RAG, Claude Code, LangGraph, deployment).',
-    'Audience: software engineers moving from ChatGPT user to production agent engineer.',
-    'Roadmap phases: Python Foundations → LLM Mental Model → Prompt Engineering → RAG & Evaluation → Tools/MCP/Single Agents → Memory → Multi-Agent → Guardrails/LLMOps → Cloud Deployment.',
-    '3 capstone projects: distributed RAG pipeline, multi-agent system, production deployment on AWS.',
+    'Balaji Chippada (The Agent Engineer) teaches software engineers to architect, evaluate and deploy production-grade AI agents.',
+    'Two tracks: (1) the paid flagship course "Agentic AI at Production Level" — 16 modules, 265 self-paced lessons, no prerequisites (Python taught inside), one-time payment, 2 years of access with biweekly updates, quizzes and reviewed assignments, 9 hands-on projects plus 3 capstones, 24-hour doubt support, weekly live sessions, 2 mock interviews and resume prep, and a certificate awarded only on demonstrated completion; and (2) a free, open 26-week / 9-phase Agentic AI Engineer roadmap with embedded YouTube lessons and progress tracking. Live demo-first masterclasses (RAG, Claude Code, LangGraph, deployment) run alongside both.',
+    'Audience: complete beginners starting from zero, and working engineers targeting roles like Forward Deployed Engineer who can code but have never taken an agent to production.',
+    'Course modules: Python Fundamentals → Advanced Python → NLP Basics → LLM Internals & LangChain → Prompt Engineering → Foundations of Agentic Systems → RAG → MCP → Memory & Optimization → LangGraph → Evaluation → Multi-Agent Orchestration → Security & Guardrails → Deployment → Monitoring & Operations → Capstones.',
+    'Full detail for AI agents: https://balajichippada.com/llms.txt and https://balajichippada.com/llms-full.txt.',
   ].join(' '),
 
   // ── Per-route metadata (single source of truth for routing + SEO) ──

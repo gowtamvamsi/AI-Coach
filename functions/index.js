@@ -1216,6 +1216,7 @@ const BOOTSTRAP_ADMIN_EMAILS = [
   "balajichippada.20@gmail.com",
   "mayupatil199@gmail.com",
   "bhargavsinguluri@gmail.com",
+  "aravindswamy.tatikonda@gmail.com",
 ];
 
 // ===============================================================

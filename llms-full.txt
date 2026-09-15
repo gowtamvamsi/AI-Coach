@@ -1,10 +1,202 @@
 # The Agent Engineer — Full Curriculum Detail (for AI agents)
 
-> Extended machine-readable outline of the 2026 Agentic AI Engineer Roadmap hosted at https://balajichippada.com/
+> Extended machine-readable outline of both learning tracks at https://balajichippada.com/ — the
+> paid flagship course "Agentic AI at Production Level" (16 modules, 265 lessons) and the
+> free 26-week Agentic AI Engineer Roadmap (9 phases). Summary: https://balajichippada.com/llms.txt
 
 ## Site purpose
 
-Interactive learning platform + live masterclasses by Balaji Chippada. Target audience: software engineers with basic Python who want to build production agentic AI (RAG, tools, MCP, LangGraph, deployment).
+Learning platform by Balaji Chippada for engineers who want to build production agentic AI — RAG,
+tools, MCP, LangGraph, multi-agent systems, evaluation, guardrails, deployment and monitoring.
+Two tracks: a structured paid course that starts from zero Python, and a free open roadmap.
+Live masterclasses run alongside both.
+
+---
+
+# Part 1 — Course: "Agentic AI at Production Level"
+
+## Course facts
+
+- **Format**: Self-paced
+- **Access**: 2 years + all updates
+- **Level**: Starter → advanced
+- **Prereqs**: Start from scratch — no experience needed
+- **Projects**: Hands-on production builds
+- **Certificate**: Verified on completion
+- **Scale**: 16 modules, 265 lessons
+- **Price**: ₹29,999 (Launch offer — First 45 days, through 2026-10-09); regular price ₹34,999
+- **Tax**: 18% GST is already included and paid to the Government.
+- **Payment**: One-time. No subscription.
+
+## What is included
+
+- Weekly live sessions on the latest topics
+- Session recordings available for 2 years
+- Private WhatsApp community
+- Production-ready starter templates & code reviews
+- Quiz after every video; multiple assignments per module with concrete inputs, a deliverable, and "done when" criteria
+- Doubts answered within 24 working hours
+- 2 one-to-one mock interviews with feedback, plus resume preparation
+- Biweekly content updates; 2 years of access covering every update in that window
+- Certificate awarded only after the full course, all assignments reviewed and approved, and all mock interviews
+
+## The through-line project: "Atlas"
+
+One product is carried through the entire course and upgraded module by module — from a plain LLM
+client to a ReAct agent, then grounded with RAG, connected over MCP, given memory, re-architected on
+LangGraph, evaluated, split into a multi-agent team, locked down with guardrails, deployed, and
+finally monitored in production.
+
+## Modules (16)
+
+### Module 01 — Python Fundamentals (32 lessons · 8h 59m)
+
+The Python you actually need before touching an LLM — from Colab setup to file handling.
+
+- **You will build**: Command your Python basics: data structures, control flow, functions & file I/O
+- **Tools**: Python, Google Colab
+
+### Module 02 — Advanced Python (22 lessons · 5h 31m)
+
+The Python that agent frameworks are actually written in — OOP, APIs, and your first LangChain build.
+
+- **You will build**: Your own mini LangChain, built from scratch and installable as a package
+- **Tools**: Python OOP, Dataclasses, requests, OpenAI & Groq APIs, LangChain
+
+### Module 03 — NLP Basics, Intuition-First (17 lessons · 5h 26m)
+
+Understand what text becomes before an LLM ever sees it.
+
+- **You will build**: Semantic search over your own notes
+- **Tools**: Tokens, Embeddings, Vector similarity, Transformers
+
+### Module 04 — LLM Internals and LangChain (17 lessons · 5h 53m)
+
+Pick and control the right model for a job — and predict its cost.
+
+- **You will build**: A cost-aware LLM client: multi-turn chat, controlled output, the right model per job
+- **Tools**: OpenAI API, Anthropic API, LangChain
+
+### Module 05 — Prompt Engineering (24 lessons · 9h 05m)
+
+Reliably get the behavior you want — the skill every agent call depends on.
+
+- **You will build**: A pattern library of prompts you'll reuse in every agent call
+- **Tools**: Prompt patterns, Structured output
+
+### Module 06 — Foundations of Agentic Systems (18 lessons)
+
+Understand the agent loop deeply — because you built it by hand.
+
+- **You will build**: Atlas gets a ReAct brain, live tools, and self-correction
+- **Tools**: ReAct, Tool calling, Plan-and-Solve
+
+### Module 07 — RAG — Retrieval-Augmented Generation (24 lessons)
+
+Answer from your own documents — grounded and cited, not from memory.
+
+- **You will build**: Document intelligence for Atlas — grounded, cited answers
+- **Tools**: Vector DBs, Chunking, Reranking, Graph RAG
+
+### Module 08 — MCP — Model Context Protocol (17 lessons)
+
+Connect your agent to anything through one universal standard.
+
+- **You will build**: An MCP server from scratch + a Gmail & Calendar MCP for Atlas
+- **Tools**: MCP, Gmail API, Calendar API
+
+### Module 09 — Memory & Optimization (13 lessons)
+
+Remember across sessions without blowing the context window.
+
+- **You will build**: Atlas remembers your preferences across sessions — on a token budget
+- **Tools**: Vector memory, Context engineering, Token budgeting
+
+### Module 10 — State Machines & DAGs (LangGraph) (13 lessons)
+
+Control an agent's flow deterministically — and pause for a human.
+
+- **You will build**: Atlas re-architected on LangGraph with approval checkpoints
+- **Tools**: LangGraph, State machines, Human-in-the-loop
+
+### Module 11 — Evaluation (10 lessons)
+
+Prove your agent works and catch regressions before users do.
+
+- **You will build**: A regression suite that blocks bad Atlas changes
+- **Tools**: LLM-as-Judge, Eval datasets, Trajectory benchmarks
+
+### Module 12 — Multi-Agent Orchestration (11 lessons)
+
+Make specialized agents collaborate without burning $400 in a loop.
+
+- **You will build**: Atlas becomes a researcher + writer + critic team
+- **Tools**: LangGraph, OpenAI Agents SDK, CrewAI
+
+### Module 13 — Security & Guardrails (12 lessons)
+
+Survive malicious users and handle sensitive data safely.
+
+- **You will build**: Atlas locked down — guardrails, least privilege, PII redaction
+- **Tools**: Guardrails, Prompt-injection defense, Sandboxing
+
+### Module 14 — Deployment (incl. FastAPI) (12 lessons)
+
+Real users can use your agent over the internet.
+
+- **You will build**: Atlas live on the internet with a chat UI
+- **Tools**: FastAPI, Docker, Async, CI/CD
+
+### Module 15 — Monitoring & Operations (11 lessons)
+
+See what your live agent is doing, what it costs, and how to improve it.
+
+- **You will build**: A cost & quality dashboard for live Atlas
+- **Tools**: Langfuse, LangSmith, Tracing
+
+### Module 16 — Capstone Projects & Portfolio (12 lessons)
+
+Ship and monitor your OWN agentic product — portfolio-ready.
+
+- **You will build**: Your own agentic product — built, deployed, monitored
+- **Tools**: Full production stack, Portfolio, Interview prep
+
+## Hands-on projects (9)
+
+- **Mini LangChain From Scratch** — Build the core building blocks behind LangChain — model loading, chat-model abstractions, provider integrations, and APIs.
+  Tags: Python OOPs, Abstractions, Model Providers, Streaming, APIs
+- **Semantic Search Over Your Documents** — Use embedding models and cosine similarity to build a semantic search engine over your own documents — from chunking to top-K results.
+  Tags: Embeddings, Semantic Search, Cosine Similarity, Vector Store, Python
+- **Multi-Model Chatbot With Full Control** — Build a powerful chatbot that lets users switch providers and tune temperature, reasoning, and streaming with LangChain and Streamlit.
+  Tags: LangChain, Multi-Model, Custom Parameters, Streaming, Streamlit, Python
+- **Upgrade Your Chatbot With Advanced Prompting** — Add prompt templates, versioning, LCEL chains, conversation history, and prompt caching for faster, more reliable responses.
+  Tags: Prompt Templates, Prompt Versioning, LCEL, Conversation History, Prompt Caching, Python
+- **Upgrade Your Chatbot With Agentic Power** — Add an agentic loop with Plan-Act-Observe-Reflect, powerful tools, self-correction, retry limits, and a plan-and-solve strategy.
+  Tags: Agentic Loop, Tools, Web Search, Email Reader, APIs, Self-Correction, Retry & Limits, Plan & Solve, Python
+- **Advanced RAG System** — Build a production-ready RAG system with advanced indexing, hybrid search, reranking, low-latency design, evaluations, and RBAC.
+  Tags: Indexing Pipeline, Hybrid Search, Reranking, Metadata Filtering, Low Latency, Evaluations, RBAC, Production Ready, Python
+- **Build MCP Server for Google Services & Integrate with Chatbot** — Build an MCP server from scratch for Google Calendar, Gmail, Google Drive, and more, then integrate it with a LangChain chatbot.
+  Tags: MCP, MCP from Scratch, Google Calendar, Gmail, Google Drive, OAuth 2.0, LangChain Agent, Secure & Scalable, Python
+- **Memory-Powered Personalized Chatbot** — Add short-term, summary, long-term, profile, and episodic memory with intelligent recall for smarter, personalized conversations.
+  Tags: Conversation Buffer, Summarization, Vector DB, User Profiles, Episodic Memory, Memory Router, Personalization, Python
+- **LangGraph Multi-Agent System** — Build planner, researcher, coder, and reviewer agents that collaborate through A2A and M2M protocols with shared tools and memory.
+  Tags: LangGraph, Multi-Agent, A2A Protocol, M2M Protocol, Shared Memory, Scalable, Production Ready
+
+The course also includes 3 capstone projects and 2 personal projects.
+
+## Who the course is for
+
+- Complete beginners — no Python, no AI/ML background, no CS degree, no work experience required
+- Working software engineers targeting roles like Forward Deployed Engineer (FDE) who can code but
+  have never taken an agent to production: evaluation, observability, guardrails, memory, cost
+  control and deployment are where the course spends its time
+
+---
+
+# Part 2 — Free 26-week Agentic AI Engineer Roadmap
+
+Open and free, no paywall. 9 phases, 60+ modules, 3 capstones, with embedded YouTube lessons and
+account-synced progress tracking at https://balajichippada.com/roadmap
 
 ## Phase 1 — Python Foundations (Weeks 1–3, 6 modules)
 
@@ -99,27 +291,57 @@ Interactive learning platform + live masterclasses by Balaji Chippada. Target au
 
 **Capstone 3**: Production agent on AWS
 
+---
+
+## Course vs. free roadmap
+
+The YouTube channel and the roadmap explain the concepts and will always stay free. They are
+one-way: nothing checks whether you built anything. The course adds one enforced sequence, quizzes,
+reviewed assignments, capstones, the Atlas product you keep upgrading, 24-hour doubt support,
+weekly live sessions, mock interviews, resume prep, and biweekly updates.
+
 ## Video content
 
-- Overview: https://www.youtube.com/watch?v=Eze6D8jAMjI
-- Core Python playlist embedded in module 1.1
-- OOP playlist embedded in module 1.2
-- Additional deep-dive videos per module on the interactive site
+- Roadmap overview: https://www.youtube.com/watch?v=Eze6D8jAMjI
+- YouTube channel: https://www.youtube.com/@balajichippada (35K+ subscribers, 230K+ roadmap views)
+- Per-module deep-dive videos embedded on the interactive site
+
+## Instructor
+
+Balaji Chippada — production agentic AI engineer and educator, 9+ years in AI/ML. Production
+experience at Swisscom, Warner Bros. Discovery, T-Mobile and Infosys. 5,000+ students and working
+professionals mentored over the last three years.
 
 ## FAQ (common questions)
 
-Q: Is this for beginners?
-A: If you can write Python and use a terminal (Phase 1 level), you are ready.
+Q: Is the course for beginners?
+A: Yes, completely. Python is taught inside the course; no prior coding or AI background is needed.
 
 Q: Is the roadmap free?
-A: Yes — open, no paywall. Masterclasses are separate live sessions (some free, some paid).
+A: Yes — open, no paywall, and staying that way. Masterclasses are separate live sessions (some
+free, some paid). The course is the paid, structured track.
 
-Q: How is this different from YouTube?
-A: YouTube teaches the mental model. The site adds structured modules, embedded playlists, progress tracking, and live build sessions.
+Q: How is the course different from YouTube?
+A: YouTube tells you what to learn. The course makes sure you build it — enforced sequence,
+quizzes, reviewed assignments, capstones, 24-hour doubt support, live sessions, mock interviews.
+
+Q: Does the course get you a job?
+A: No guarantees are made. It covers what the market hires for (RAG, agents, MCP, evaluation,
+deployment) and includes mock interviews and resume prep.
+
+Q: Will it stay current?
+A: Content is updated biweekly; 2 years of access covers every update in that window.
 
 ## Links
 
-- Site: https://balajichippada.com/
-- GitHub roadmap: https://ch-balaji.github.io/ai-engineer-roadmap/
+- Site / course: https://balajichippada.com/
+- Free roadmap: https://balajichippada.com/roadmap
+- Masterclasses: https://balajichippada.com/masterclasses
+- Guide — How to Become an Agentic AI Engineer: https://balajichippada.com/guides/how-to-become-an-agentic-ai-engineer
+- Glossary: https://balajichippada.com/glossary
+- GitHub roadmap mirror: https://ch-balaji.github.io/ai-engineer-roadmap/
 - YouTube: https://www.youtube.com/@balajichippada
 - llms.txt (summary): https://balajichippada.com/llms.txt
+- Contact: team@balajichippada.com · +91 79817 09999
+
+Pricing and offer dates change — https://balajichippada.com/ is authoritative for the current price.

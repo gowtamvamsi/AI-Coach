@@ -3983,7 +3983,7 @@ ${mcRawSyllabus}`;
     return { totalRevenue: revenue, totalSeats: seats };
   }, [filteredRegistrations]);
 
-  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
+  const ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com', 'aravindswamy.tatikonda@gmail.com'];
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase());
 
   // ── Marketing Segmentation & Deduplication Computations ──
@@ -6729,7 +6729,7 @@ function App() {
         try {
           const userDoc = await db.collection('users').doc(u.uid).get();
           const emailLower = (u.email || '').toLowerCase();
-          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com';
+          const isBootstrapAdmin = emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com' || emailLower === 'aravindswamy.tatikonda@gmail.com';
           
           let role = 'client';
           let hasProfile = false;
@@ -6762,7 +6762,7 @@ function App() {
               await db.collection('users').doc(u.uid).set({
                 email: u.email,
                 role: 'admin',
-                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' ? 'Balaji Chippada' : emailLower === 'bhargavsinguluri@gmail.com' ? 'Bhargav Singuluri' : 'Gowtam Singulur')
+                name: u.displayName || (emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' ? 'Balaji Chippada' : emailLower === 'bhargavsinguluri@gmail.com' ? 'Bhargav Singuluri' : emailLower === 'aravindswamy.tatikonda@gmail.com' ? 'Aravind Swamy Tatikonda' : 'Gowtam Singulur')
               });
               setUserRole('admin');
               role = 'admin';
@@ -6790,7 +6790,7 @@ function App() {
         } catch (err) {
           console.error("Error reading role document:", err);
           const emailLower = (u.email || '').toLowerCase();
-          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com') {
+          if (emailLower === 'gowtamsbh1234@gmail.com' || emailLower === 'balajichippada.20@gmail.com' || emailLower === 'mayupatil199@gmail.com' || emailLower === 'bhargavsinguluri@gmail.com' || emailLower === 'aravindswamy.tatikonda@gmail.com') {
             setUserRole('admin');
           } else {
             setUserRole('client');
@@ -7823,7 +7823,7 @@ function App() {
   // Expose whether the signed-in user may add/edit per-video "Code" links inline
   // in the roadmap. Mirrors the videoCodeLinks Firestore rule (admins / bootstrap
   // emails). Set during render so the video players (v2.jsx) read it immediately.
-  const CODE_ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com'];
+  const CODE_ADMIN_EMAILS = ['gowtamsbh1234@gmail.com', 'balajichippada.20@gmail.com', 'mayupatil199@gmail.com', 'bhargavsinguluri@gmail.com', 'aravindswamy.tatikonda@gmail.com'];
   if (typeof window !== 'undefined') {
     window.__CODE_ADMIN = !!(user && !user.isAnonymous &&
       (userRole === 'admin' || CODE_ADMIN_EMAILS.includes((user.email || '').toLowerCase())));
@@ -9015,6 +9015,10 @@ function App() {
   );
 }
 
+// Static markup the prerender step baked into #root. React's createRoot wipes it on
+// first render, so grab it now and reuse it if the app crashes.
+const PRERENDERED_ROOT_HTML = (document.getElementById('root') || {}).innerHTML || '';
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -9028,9 +9032,15 @@ class ErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) {
+      // ponytail: fall back to the prerendered page instead of printing the stack —
+      // Googlebot once indexed "React Error: ..." as the /roadmap snippet. Stack is in
+      // the console (componentDidCatch) for debugging.
+      if (PRERENDERED_ROOT_HTML) {
+        return React.createElement('div', { dangerouslySetInnerHTML: { __html: PRERENDERED_ROOT_HTML } });
+      }
       return React.createElement('div', {
-        style: { padding: '40px', fontFamily: 'monospace', color: '#c00', background: '#fff', fontSize: '13px', whiteSpace: 'pre-wrap' }
-      }, React.createElement('strong', null, 'React Error:\n'), (this.state.error && this.state.error.stack) || String(this.state.error));
+        style: { padding: '40px', textAlign: 'center', fontSize: '15px' }
+      }, 'Something went wrong loading this page. Please refresh — if it keeps happening, email team@balajichippada.com.');
     }
     return this.props.children;
   }
