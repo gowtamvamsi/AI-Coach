@@ -54,8 +54,8 @@ window.ROADMAP = [
       { n: "3.2", title: "Prompt Engineering", items: ["Prompt anatomy — system prompt vs user turn vs assistant prefill", "Role & persona assignment; positive framing over negative constraints", "Structuring prompts — Markdown vs XML, and when each wins", "Zero-shot vs few-shot with curated examples", "COSTAR framework (Context, Objective, Style, Tone, Audience, Response) + iterative refinement loop"] },
       { n: "3.3", title: "Context Engineering", items: ["Context engineering vs prompt engineering — supplying the right info, not just better wording", "What goes in the window — retrieved docs, tool outputs, memory, system state", "Token budgeting & ordering — avoiding \"lost in the middle\"", "Compression, summarization, and selective inclusion to stay in budget"] },
       { n: "3.4", title: "Applied prompt patterns", items: ["Extraction (entities, dates, relationships)", "Classification (intent, sentiment, routing)", "Transformation (summarize, translate, reformat)", "Generation (reports, SQL, code)", "Decomposition (break complex queries into sub-prompts)"] },
-      { n: "3.5", title: "Advanced reasoning techniques", items: ["Chain of Thought — \"think step by step\"", "Self-Consistency — sample multiple paths, majority vote", "Self-Refine — generate, critique, refine loop", "Least-to-Most — decompose hard problems into ordered sub-problems", "Tree of Thought (research-flavoured; mention but don't drill)"] },
-      { n: "3.6", title: "Prompt management & cost in production", items: ["Versioning prompts in code vs as managed resources", "A/B testing prompt variants", "AWS Bedrock Prompt Management for the lifecycle without code deploys", "Prompt caching — Anthropic cache_control and OpenAI's automatic cached input pricing (5–10× cost cuts on long system prompts)", "DSPy — programmatic prompt optimisation when you want the framework to tune your prompts for you (mention; depth is optional)"] }
+      { n: "3.5", title: "Prompt Templates", items: ["Why templates — one reusable prompt with typed variables instead of copy-pasted strings", "Placeholders & safe substitution (f-strings vs str.format vs a template library)", "Chat templates — system/user/assistant turns as reusable parts", "Few-shot templates — swapping curated examples in and out per task", "Versioning templates in code, and keeping them testable"] },
+      { n: "3.6", title: "Prompt Caching", items: ["What prompt caching actually caches — the static prefix of your prompt, not the whole call", "Anthropic cache_control breakpoints and the 5-minute TTL", "OpenAI's automatic cached-input pricing — no code change, but prefix order matters", "Structuring prompts so the stable part comes first (system + docs + examples, then the user turn)", "Measuring the win — cache hit rate, latency drop, and 5-10x cost cuts on long system prompts"] }
     ]
   },
   {
@@ -74,8 +74,8 @@ window.ROADMAP = [
       { n: "4.2", title: "Chunking strategies", items: ["Fixed-width chunking and why it breaks", "Semantic chunking by structure", "Overlap windows", "Parent-child chunking", "Late chunking — embed first, chunk later — preserves context across boundaries", "Chunk size vs retrieval quality tradeoff"] },
       { n: "4.3", title: "RAG pipeline — ingestion, retrieval, embeddings", items: ["The two halves: indexing (parse → chunk → embed → store) and retrieval (embed query → similarity search → generate)", "Parsing and loading documents, then chunking from scratch — no LangChain, so you see what the one-liner hides", "Embedding models — all-MiniLM-L6-v2 (384-dim, free) vs OpenAI text-embedding-3 (1536-dim, paid); dimensions vs quality vs storage cost", "Storing chunks + vectors + metadata (source file) in ChromaDB, and why metadata is what makes answers citable", "Cosine similarity and top-k retrieval — scoring the query against every chunk, and how k=3 vs k=10 changes the answer", "Grounded generation — stuffing retrieved chunks into the prompt, a system prompt that forces \"I don't have enough context\", temperature ~0.2"] },
       { n: "4.4", title: "Agentic RAG", items: ["Why naive RAG breaks — one-shot retrieval, no query rewriting, wrong-k failures, no idea when it's wrong", "Retrieval as a tool — the `finish_reason: tool_calls` branch, letting the model decide *whether* and *what* to search", "Query planning and rewriting — decomposing multi-part questions, multi-hop retrieval across documents", "Self-correcting retrieval — grade the retrieved chunks, re-query when relevance is low (Corrective RAG, Self-RAG)", "Routing — choosing the right collection, index, or tool per query instead of one global vector store", "Loop control — max retrieval steps, latency and token budgets, and falling back to \"I don't know\" instead of looping forever"] },
-      { n: "4.5", title: "Chunk enrichment", items: ["PII detection and redaction", "NER for entities", "Key-phrase extraction", "Metadata for hybrid search"] },
-      { n: "4.6", title: "Vector databases", items: ["Pinecone, Weaviate, pgvector", "Chroma for local dev", "S3 Vector Buckets, OpenSearch", "HNSW vs IVF indexes", "Decision matrix: managed (Pinecone) vs self-hosted (Weaviate, Qdrant) vs in-process (Chroma, FAISS) vs already-in-your-stack (pgvector)"] },
+      { n: "4.5", title: "Vector databases", items: ["Pinecone, Weaviate, pgvector", "Chroma for local dev", "S3 Vector Buckets, OpenSearch", "HNSW vs IVF indexes", "Decision matrix: managed (Pinecone) vs self-hosted (Weaviate, Qdrant) vs in-process (Chroma, FAISS) vs already-in-your-stack (pgvector)"] },
+      { n: "4.6", title: "Chunk enrichment", items: ["PII detection and redaction", "NER for entities", "Key-phrase extraction", "Metadata for hybrid search"] },
       { n: "4.7", title: "Hybrid retrieval & next-gen retrievers", items: ["Vector search + BM25 keyword", "Reranking with cross-encoders (Cohere Rerank, BGE)", "Metadata filtering", "Query expansion", "Late-interaction retrievers — ColBERT (text), ColPali (multimodal/PDF pages as images) — when they beat dense retrieval and what they cost"] },
       { n: "4.8", title: "Graph-augmented RAG", items: ["Neo4j basics", "Cypher query language", "When graph relationships beat pure vector search", "Multi-hop queries"] },
       { n: "4.9", title: "RAG evaluation — the part most courses skip", items: ["LLM-as-judge: RAG Triad — Faithfulness, Context Relevance, Answer Relevance", "Deterministic retrieval metrics: Precision@k, Recall@k, F1, Hit Rate@k, MRR, NDCG@k", "Tooling: Ragas (the de-facto eval framework), MLflow for run logging, LangSmith for tracing", "Golden datasets: Q&A pairs with expected chunks, regression testing on every code change"] }
@@ -87,7 +87,7 @@ window.ROADMAP = [
     short: "Tools, MCP & Single Agents",
     color: "emerald",
     weeks: "Weeks 13–16",
-    weeksDetail: "4 weeks · 8 modules",
+    weeksDetail: "4 weeks · 9 modules",
     difficulty: 4,
     summary: "The brain gets hands and legs.",
     endState: "You can build a single agent that searches the web, reads internal docs, queries a DB, and emails you a summary — and stops if it tries to do something dumb.",
@@ -98,8 +98,9 @@ window.ROADMAP = [
       { n: "5.4", title: "The ReAct pattern", items: ["Reasoning + Acting loop", "Thought → action → observation → thought", "Why \"thinking\" models exist", "When to force ReAct vs let the model decide"] },
       { n: "5.5", title: "LangChain agents", items: ["create_agent — model + tools + middleware + store", "@tool(parse_docstring=True) for auto schemas", "Parallel tool execution with asyncio.gather", "Structured outputs via Pydantic"] },
       { n: "5.6", title: "Human in the loop", items: ["HumanInTheLoopMiddleware for sensitive operations", "Checkpointers and InMemorySaver", "Resume flows after human approval", "When to pause (DB writes, payments, emails)"] },
-      { n: "5.7", title: "Tool security", items: ["Retrieval Sanitiser — strip injection patterns from tool results", "Read-only DB enforcement", "Max retries per tool", "Timeouts on every external call"] },
-      { n: "5.8", title: "Computer use & app SDKs — agents with eyes and a mouse", items: ["Anthropic Computer Use — agent takes screenshots and drives a desktop/browser", "OpenAI Operator / Apps SDK — agent runs inside ChatGPT or controls a browser tab", "Browser-automation agents (Playwright + LLM, browser-use, Stagehand)", "When this is the right tool vs API integration", "Sandboxing, audit trails, and \"are you sure?\" gates — these agents can do real damage"] }
+      { n: "5.7", title: "Tool Sandboxing", items: ["Run agent-generated code and tool calls in isolated sandboxes", "Containers, microVMs, and hosted code-execution sandboxes", "Least-privilege filesystem, network, and credential access", "Resource limits — CPU, memory, and wall-clock timeouts"] },
+      { n: "5.8", title: "Tool security", items: ["Retrieval Sanitiser — strip injection patterns from tool results", "Read-only DB enforcement", "Max retries per tool", "Timeouts on every external call"] },
+      { n: "5.9", title: "Computer use & app SDKs — agents with eyes and a mouse", items: ["Anthropic Computer Use — agent takes screenshots and drives a desktop/browser", "OpenAI Operator / Apps SDK — agent runs inside ChatGPT or controls a browser tab", "Browser-automation agents (Playwright + LLM, browser-use, Stagehand)", "When this is the right tool vs API integration", "Sandboxing, audit trails, and \"are you sure?\" gates — these agents can do real damage"] }
     ]
   },
   {
@@ -449,8 +450,10 @@ window.COURSE_CURRICULUM = [
       { n: "5.20", secs: 703, title: "Structured Output with Pydantic", lessons: ["Structured Output with Pydantic"] },
       { n: "5.21", secs: 1076, title: "Images & Screenshots — Multimodal Inputs", lessons: ["Images & Screenshots — Multimodal Inputs"] },
       { n: "5.22", secs: 1007, title: "Images & Screenshots — Python Implementation", lessons: ["Images & Screenshots — Python Implementation"] },
-      { n: "5.23", secs: 1846, title: "Applied Prompt Patterns — Customer Support Workflow Part 1", lessons: ["Applied Prompt Patterns — Customer Support Workflow Part 1"] },
-      { n: "5.24", secs: 5129, title: "Capstone Project — Production Prompt Engineering Chatbot Control Panel", lessons: ["Capstone Project — Production Prompt Engineering Chatbot Control Panel"] }
+      { n: "5.23", secs: 1066, title: "Prompt Caching — Theory", lessons: ["Prompt Caching — Theory"] },
+      { n: "5.24", secs: 1168, title: "Prompt Caching — Code", lessons: ["Prompt Caching — Code"] },
+      { n: "5.25", secs: 1846, title: "Applied Prompt Patterns — Customer Support Workflow Part 1", lessons: ["Applied Prompt Patterns — Customer Support Workflow Part 1"] },
+      { n: "5.26", secs: 5129, title: "Capstone Project — Production Prompt Engineering Chatbot Control Panel", lessons: ["Capstone Project — Production Prompt Engineering Chatbot Control Panel"] }
     ]
   },
   {
@@ -460,24 +463,32 @@ window.COURSE_CURRICULUM = [
     project: "Atlas gets a ReAct brain, live tools, and self-correction",
     tools: ["ReAct", "Tool calling", "Plan-and-Solve"],
     submodules: [
-      { n: "6.1", title: "Kickoff: From Prompts to Agents", lessons: ["Kickoff: From Prompts to Agents"] },
-      { n: "6.2", title: "What Is an Agent? Autonomy Levels", lessons: ["What Is an Agent? Autonomy Levels"] },
-      { n: "6.3", title: "The Agent Loop: Think → Act → Observe", lessons: ["The Agent Loop: Think → Act → Observe"] },
-      { n: "6.4", title: "ReAct in Plain English", lessons: ["ReAct in Plain English"] },
-      { n: "6.5", title: "Build a Bare-Metal Agent Loop (No Framework)", lessons: ["Build a Bare-Metal Agent Loop (No Framework)"] },
-      { n: "6.6", title: "Why the Model Needs Tools", lessons: ["Why the Model Needs Tools"] },
-      { n: "6.7", title: "Function Calling 101", lessons: ["Function Calling 101"] },
-      { n: "6.8", title: "Your First Tool, End to End", lessons: ["Your First Tool, End to End"] },
-      { n: "6.9", title: "Multiple Tools & Tool Choice", lessons: ["Multiple Tools & Tool Choice"] },
-      { n: "6.10", title: "Reliable Tool Inputs with Pydantic", lessons: ["Reliable Tool Inputs with Pydantic"] },
-      { n: "6.11", title: "Calling a Real API as a Tool", lessons: ["Calling a Real API as a Tool"] },
-      { n: "6.12", title: "When Tools Fail: Errors, Retries & Self-Correction", lessons: ["When Tools Fail: Errors, Retries & Self-Correction"] },
-      { n: "6.13", title: "Tool Sandboxing: Running Actions Safely", lessons: ["Tool Sandboxing: Running Actions Safely"] },
-      { n: "6.14", title: "Cognitive Pattern: Plan-and-Solve", lessons: ["Cognitive Pattern: Plan-and-Solve"] },
-      { n: "6.15", title: "Cognitive Pattern: Self-Reflection Loop", lessons: ["Cognitive Pattern: Self-Reflection Loop"] },
-      { n: "6.16", title: "Why Tools Alone Fall Short → The Case for MCP", lessons: ["Why Tools Alone Fall Short → The Case for MCP"] },
-      { n: "6.17", title: "Capstone Upgrade: A Tool-Using Support Agent", lessons: ["Capstone Upgrade: A Tool-Using Support Agent"] },
-      { n: "6.18", title: "Recap & Look Ahead", lessons: ["Recap & Look Ahead"] }
+      { n: "6.1", secs: 1370, title: "From Chatbots to Agents", lessons: ["From Chatbots to Agents"] },
+      { n: "6.2", secs: 860, title: "Inside an Agent — The ReAct Brain", lessons: ["Inside an Agent — The ReAct Brain"] },
+      { n: "6.3", secs: 1556, title: "Build an Agent from Scratch", lessons: ["Build an Agent from Scratch"] },
+      { n: "6.4", secs: 1163, title: "Build the Agent Loop from Scratch", lessons: ["Build the Agent Loop from Scratch"] },
+      { n: "6.5", secs: 1005, title: "From Our Loop to LangChain Create Agent", lessons: ["From Our Loop to LangChain Create Agent"] },
+      { n: "6.6", secs: 828, title: "LangChain Tools and Pydantic Schemas", lessons: ["LangChain Tools and Pydantic Schemas"] },
+      { n: "6.7", secs: 533, title: "Build Pydantic Tools in Code", lessons: ["Build Pydantic Tools in Code"] },
+      { n: "6.8", secs: 393, title: "The Plan Agent with Three Real Tools", lessons: ["The Plan Agent with Three Real Tools"] },
+      { n: "6.9", secs: 339, title: "Weather API Key Setup", lessons: ["Weather API Key Setup"] },
+      { n: "6.10", secs: 412, title: "Tavily Search API Key Setup", lessons: ["Tavily Search API Key Setup"] },
+      { n: "6.11", secs: 261, title: "Resend Email API Key Setup", lessons: ["Resend Email API Key Setup"] },
+      { n: "6.12", secs: 1716, title: "Build a Real Tool Using Agent", lessons: ["Build a Real Tool Using Agent"] },
+      { n: "6.13", secs: 1551, title: "Trace Your Agent with LangSmith", lessons: ["Trace Your Agent with LangSmith"] },
+      { n: "6.14", secs: 2171, title: "Tool Idempotency and Side Effects", lessons: ["Tool Idempotency and Side Effects"] },
+      { n: "6.15", secs: 3119, title: "Tool Sandboxing — Securing Agent Actions", lessons: ["Tool Sandboxing — Securing Agent Actions"] },
+      { n: "6.16", secs: 1620, title: "Why Agents Fail — The Need for Middleware", lessons: ["Why Agents Fail — The Need for Middleware"] },
+      { n: "6.17", secs: 630, title: "Handling Tool Errors with Middleware", lessons: ["Handling Tool Errors with Middleware"] },
+      { n: "6.18", secs: 692, title: "Self-Correcting Agents with Middleware", lessons: ["Self-Correcting Agents with Middleware"] },
+      { n: "6.19", secs: 848, title: "Reliable Tool Calls — Retry Middleware and Timeouts", lessons: ["Reliable Tool Calls — Retry Middleware and Timeouts"] },
+      { n: "6.20", secs: 883, title: "Controlling Model and Tool Limits", lessons: ["Controlling Model and Tool Limits"] },
+      { n: "6.21", secs: 1378, title: "Middleware Execution Order and Agent Control Flow", lessons: ["Middleware Execution Order and Agent Control Flow"] },
+      { n: "6.22", secs: 2274, title: "Human in the Loop — Approve, Edit or Reject", lessons: ["Human in the Loop — Approve, Edit or Reject"] },
+      { n: "6.23", secs: 1626, title: "Keep Long Chats in Budget — Summarization Middleware", lessons: ["Keep Long Chats in Budget — Summarization Middleware"] },
+      { n: "6.24", secs: 1750, title: "When the Model Fails — Model Retry and Fallback", lessons: ["When the Model Fails — Model Retry and Fallback"] },
+      { n: "6.25", secs: 785, title: "Write Your Own Middleware", lessons: ["Write Your Own Middleware"] },
+      { n: "6.26", secs: 3625, title: "Jev TypesafeAI Masterclass", lessons: ["Jev TypesafeAI Masterclass"] }
     ]
   },
   {

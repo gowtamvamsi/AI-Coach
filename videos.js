@@ -544,7 +544,7 @@ window.ROADMAP_VIDEOS = [
       { phaseId: 2, modules: ['2.1', '2.2', '2.3', '2.4', '2.5'], startSec: 686 },
       { phaseId: 3, modules: ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6'], startSec: 788 },
       { phaseId: 4, modules: ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9'], startSec: 878 },
-      { phaseId: 5, modules: ['5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8'], startSec: 1013 },
+      { phaseId: 5, modules: ['5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8', '5.9'], startSec: 1013 },
       { phaseId: 6, modules: ['6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '6.7'], startSec: 1100 },
       { phaseId: 7, modules: ['7.1', '7.2', '7.3', '7.4', '7.5', '7.6', '7.7', '7.8'], startSec: 1146 },
       { phaseId: 8, modules: ['8.1', '8.2', '8.3', '8.4'], startSec: 1192 },
@@ -615,6 +615,24 @@ window.ROADMAP_VIDEOS = [
     ],
   },
   {
+    id: 'phase3-prompt-templates',
+    youtubeId: 'JwZqVSfLQdI',
+    title: 'Prompt Templates',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 3, modules: ['3.5'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase3-prompt-caching',
+    youtubeId: 'U2VskjzlxZ4',
+    title: 'Prompt Caching',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 3, modules: ['3.6'], startSec: 0 },
+    ],
+  },
+  {
     id: 'phase5-function-calling',
     youtubeId: 'g_A9hNZ3eok',
     title: 'Function Calling & Tool Use',
@@ -630,6 +648,15 @@ window.ROADMAP_VIDEOS = [
     kind: 'deep-dive',
     mappings: [
       { phaseId: 5, modules: ['5.2'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase5-tool-sandboxing',
+    youtubeId: '1MAtfbuX9vg',
+    title: 'Tool Sandboxing',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 5, modules: ['5.7'], startSec: 0 },
     ],
   },
   {
@@ -666,6 +693,15 @@ window.ROADMAP_VIDEOS = [
     kind: 'deep-dive',
     mappings: [
       { phaseId: 4, modules: ['4.3'], startSec: 0 },
+    ],
+  },
+  {
+    id: 'phase4-vector-databases',
+    youtubeId: '_Sk7DvC5cEA',
+    title: 'Vector Databases',
+    kind: 'deep-dive',
+    mappings: [
+      { phaseId: 4, modules: ['4.5'], startSec: 0 },
     ],
   },
   {

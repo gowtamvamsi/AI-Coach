@@ -1,7 +1,7 @@
 # The Agent Engineer — Full Curriculum Detail (for AI agents)
 
 > Extended machine-readable outline of both learning tracks at https://balajichippada.com/ — the
-> paid flagship course "Agentic AI at Production Level" (16 modules, 265 lessons) and the
+> paid flagship course "Agentic AI at Production Level" (16 modules, 275 lessons) and the
 > free 26-week Agentic AI Engineer Roadmap (9 phases). Summary: https://balajichippada.com/llms.txt
 
 ## Site purpose
@@ -23,7 +23,7 @@ Live masterclasses run alongside both.
 - **Prereqs**: Start from scratch — no experience needed
 - **Projects**: Hands-on production builds
 - **Certificate**: Verified on completion
-- **Scale**: 16 modules, 265 lessons
+- **Scale**: 16 modules, 275 lessons
 - **Price**: ₹29,999 (Launch offer — First 45 days, through 2026-10-09); regular price ₹34,999
 - **Tax**: 18% GST is already included and paid to the Government.
 - **Payment**: One-time. No subscription.
@@ -84,7 +84,7 @@ Reliably get the behavior you want — the skill every agent call depends on.
 - **You will build**: A pattern library of prompts you'll reuse in every agent call
 - **Tools**: Prompt patterns, Structured output
 
-### Module 06 — Foundations of Agentic Systems (18 lessons)
+### Module 06 — Foundations of Agentic Systems (26 lessons · 9h 16m)
 
 Understand the agent loop deeply — because you built it by hand.
 
@@ -247,8 +247,9 @@ account-synced progress tracking at https://balajichippada.com/roadmap
 - 5.4 ReAct pattern
 - 5.5 LangChain agents
 - 5.6 Human in the loop
-- 5.7 Tool security
-- 5.8 Computer use & app SDKs
+- 5.7 Tool Sandboxing
+- 5.8 Tool security
+- 5.9 Computer use & app SDKs
 
 ## Phase 6 — Memory & Context Engineering (Weeks 17–19, 7 modules)
 
