@@ -1331,7 +1331,7 @@ function CoursesInstructorSection() {
     <section className="cv3-instructor" id="cv3-instructor">
       <div className="cv3-instructor-inner">
         <div className="cv3-instructor-photo">
-          <img src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" loading="lazy" decoding="async" />
+          <img loading="lazy" src="uploads/balaji-chippada-portrait.webp" alt="Balaji Chippada" decoding="async" />
         </div>
         <div>
           <div className="cv3-eyebrow">Your instructor</div>
@@ -2062,10 +2062,10 @@ function TestimonialCard({ item, index, total, scrollYProgress }) {
       <div className="testimonial-blast-card__footer">
         <div className="testimonial-blast-card__user">
           <img
+            loading="lazy"
             src={item.image}
             alt={item.name}
             className="testimonial-blast-card__avatar"
-            loading="lazy"
             decoding="async"
           />
           <div className="testimonial-blast-card__meta">
@@ -5060,9 +5060,9 @@ function CoursesCertificateSection() {
           <span className="cv3-certificate-sample">Sample certificate</span>
           <img
             className="cv3-certificate-image"
-            src="logos/FLA Course Completion Certificate.svg"
-            alt="Sample Forward Learning Academy course completion certificate"
             loading="lazy"
+            src="logos/FLA Course Completion Certificate.webp"
+            alt="Sample Forward Learning Academy course completion certificate"
             decoding="async"
           />
           <span className="cv3-certificate-view">
@@ -5091,7 +5091,7 @@ function CoursesCertificateSection() {
             </div>
             <img
               className="cv3-certificate-dialog-image"
-              src="logos/FLA Course Completion Certificate.svg"
+              src="logos/FLA Course Completion Certificate.webp"
               alt="Sample Forward Learning Academy course completion certificate"
             />
           </div>
@@ -5273,19 +5273,20 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
           </div>
         </div>
         <div className="cv3-creator-visual">
+          {/* loading stays before src: React sets props in order, and a src set first starts the fetch before lazy applies. A display:none lazy image then never downloads, so only the active theme's art is fetched. */}
           <img
             className="cv3-creator-art cv3-creator-art--light"
-            src="uploads/Hero_section_light.png"
+            loading="lazy"
+            src="uploads/Hero_section_light.webp"
             alt="Balaji Chippada surrounded by the Agentic AI skills taught in the course"
-            loading="eager"
             decoding="async"
             fetchpriority="high"
           />
           <img
             className="cv3-creator-art cv3-creator-art--dark"
-            src="uploads/Hero_Section_Dark_mODE.png"
+            loading="lazy"
+            src="uploads/Hero_Section_Dark_mODE.webp"
             alt="Balaji Chippada surrounded by the Agentic AI skills taught in the course"
-            loading="eager"
             decoding="async"
             fetchpriority="high"
           />
@@ -5369,8 +5370,8 @@ function CoursesTabView({ setActiveMainTab, setLegalPage }) {
                 <div className={`cv3-project-visual ${p.lightImage && p.darkImage ? 'cv3-project-visual--art' : ''}`} aria-hidden="true">
                   {p.lightImage && p.darkImage ? (
                     <>
-                      <img className="cv3-project-art cv3-project-art--light" src={p.lightImage} alt="" loading="lazy" decoding="async" />
-                      <img className="cv3-project-art cv3-project-art--dark" src={p.darkImage} alt="" loading="lazy" decoding="async" />
+                      <img className="cv3-project-art cv3-project-art--light" loading="lazy" src={p.lightImage} alt="" decoding="async" />
+                      <img className="cv3-project-art cv3-project-art--dark" loading="lazy" src={p.darkImage} alt="" decoding="async" />
                     </>
                   ) : (
                     <>

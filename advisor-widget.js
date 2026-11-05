@@ -62,13 +62,8 @@
     return iso === 'IN' ? '\uD83C\uDDEE\uD83C\uDDF3' : '';
   }
 
+  // ponytail: default is always India; locale inference sent US visitors to +1.
   function inferPhoneCountry() {
-    var languages = navigator.languages && navigator.languages.length
-      ? navigator.languages
-      : [navigator.language];
-    if (window.PHONE_COUNTRY_UTILS && window.PHONE_COUNTRY_UTILS.inferIso) {
-      return window.PHONE_COUNTRY_UTILS.inferIso(languages);
-    }
     return 'IN';
   }
 

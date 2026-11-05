@@ -1224,9 +1224,9 @@ function V2PlaylistEmbed({ playlistId, title, onVideoProgress, mappingId, module
               >
                 <img
                   className="v2-playlist-track-thumb"
+                  loading={i < 8 ? 'eager' : 'lazy'}
                   src={H.youtubeThumbnail ? H.youtubeThumbnail(v.videoId) : `https://i.ytimg.com/vi/${v.videoId}/maxresdefault.jpg`}
                   alt=""
-                  loading={i < 8 ? 'eager' : 'lazy'}
                   decoding="async"
                   fetchPriority={i < 4 ? 'high' : 'auto'}
                   onError={(e) => {
@@ -2786,7 +2786,7 @@ function V2WelcomePopup({ nextMc, onReserve, onResolve }) {
             <div className="v2-welcome-section-label">Instructor</div>
             <div className="v2-welcome-instructor">
               {instructor.photo ? (
-                <img className="v2-welcome-instructor-photo" src={instructor.photo} alt={instructor.name} loading="lazy" decoding="async" />
+                <img className="v2-welcome-instructor-photo" loading="lazy" src={instructor.photo} alt={instructor.name} decoding="async" />
               ) : (
                 <div className="v2-welcome-instructor-photo v2-welcome-instructor-photo--initials">{initials}</div>
               )}
@@ -2910,7 +2910,7 @@ function V2Curriculum({ nextMc, onReserve, reserved, onManage }) {
       {/* Instructor strip */}
       <div className="v2-curriculum-instructor">
         {instructor.photo ? (
-          <img className="v2-curriculum-photo" src={instructor.photo} alt={instructor.name} loading="lazy" decoding="async" />
+          <img className="v2-curriculum-photo" loading="lazy" src={instructor.photo} alt={instructor.name} decoding="async" />
         ) : (
           <div className="v2-curriculum-photo v2-curriculum-photo--initials">{initials}</div>
         )}

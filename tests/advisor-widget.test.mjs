@@ -248,7 +248,7 @@ test('modal restores the previous icon-led course guidance design', async () => 
   await page.close();
 });
 
-test('phone selector detects the browser country and exposes the full country list', async () => {
+test('phone selector defaults to India regardless of locale and exposes the full country list', async () => {
   const page = await browser.newPage();
   await loadWidgetPage(page, { languages: ['en-GB'] });
   await page.evaluate(() => window.AdvisorWidget.open(document.getElementById('trigger')));
@@ -262,9 +262,9 @@ test('phone selector detects the browser country and exposes the full country li
       nationalAutocomplete: document.querySelector('[name="phone"]')?.autocomplete,
     };
   });
-  assert.equal(phoneUi.selectedIso, 'GB');
+  assert.equal(phoneUi.selectedIso, 'IN');
   assert.ok(phoneUi.optionCount >= 200);
-  assert.equal(phoneUi.selectedDisplay, '🇬🇧 +44');
+  assert.equal(phoneUi.selectedDisplay, '🇮🇳 +91');
   assert.equal(phoneUi.countryAutocomplete, 'tel-country-code');
   assert.equal(phoneUi.nationalAutocomplete, 'tel-national');
   await page.close();
@@ -396,7 +396,7 @@ test('valid submission executes recaptcha and posts normalized payload', async (
   assert.deepEqual(body, {
     name: 'Asha Rao',
     email: 'asha@example.com',
-    phone: '+14155550132',
+    phone: '+914155550132',
     occupation: 'Student',
     message: 'Please call after 6 PM.',
     recaptchaToken: 'test-token',

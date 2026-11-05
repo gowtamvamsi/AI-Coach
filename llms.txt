@@ -22,7 +22,7 @@ Balaji Chippada teaches software engineers to architect, evaluate and deploy rel
 
 A production-first engineering course: design agent architectures, wire up tools and memory, orchestrate multiple agents, and stand up the evals, guardrails and monitoring you need in front of real users.
 
-- **Format**: Self-paced video course — 16 modules, 265+ lessons
+- **Format**: Self-paced video course — 16 modules, 275+ lessons
 - **Level**: Starter → advanced. **Prerequisites: none** — Python is taught inside the course; no AI/ML background, CS degree, or work experience required
 - **Price**: ₹29,999 launch offer for the first 45 days (regular ₹34,999). One-time payment, 18% GST included, no subscription
 - **Access**: 2 years, including every update released in that window. Content refreshed biweekly
@@ -40,7 +40,7 @@ A production-first engineering course: design agent architectures, wire up tools
 3. NLP Basics, Intuition-First — 17 lessons
 4. LLM Internals and LangChain — 17 lessons
 5. Prompt Engineering — 24 lessons
-6. Foundations of Agentic Systems — 18 lessons
+6. Foundations of Agentic Systems — 26 lessons
 7. RAG — Retrieval-Augmented Generation — 24 lessons
 8. MCP — Model Context Protocol — 17 lessons
 9. Memory & Optimization — 13 lessons

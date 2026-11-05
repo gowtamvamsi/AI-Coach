@@ -73,9 +73,9 @@ const APPROVED_VERSIONS = {
   'styles.css': '144',
   'site.config.js': '20',
   'phone-countries.js': '1',
-  'advisor-widget.js': '4',
-  'v2.build.js': '40',
-  'app.build.js': '131',
+  'advisor-widget.js': '5',
+  'v2.build.js': '41',
+  'app.build.js': '132',
 };
 
 for (const page of PUBLIC_PAGES) {
@@ -83,10 +83,10 @@ for (const page of PUBLIC_PAGES) {
     const html = read(page);
     assert.equal((html.match(/site\.config\.js\?v=20/g) || []).length, 1, 'one site.config.js?v=20');
     assert.equal((html.match(/phone-countries\.js\?v=1/g) || []).length, 1, 'one phone-countries.js?v=1');
-    assert.equal((html.match(/advisor-widget\.js\?v=4/g) || []).length, 1, 'one advisor-widget.js?v=4');
+    assert.equal((html.match(/advisor-widget\.js\?v=5/g) || []).length, 1, 'one advisor-widget.js?v=5');
     assert.match(html, /styles\.css\?v=144/, 'styles.css?v=144');
     assert.ok(
-      html.indexOf('phone-countries.js?v=1') < html.indexOf('advisor-widget.js?v=4'),
+      html.indexOf('phone-countries.js?v=1') < html.indexOf('advisor-widget.js?v=5'),
       'country data loads before advisor widget',
     );
   });
@@ -104,8 +104,12 @@ for (const page of ['index.html', 'roadmap.html']) {
 test('app bundle — courses tab includes creator-led landing sections (v3 design)', () => {
   const js = read('app.build.js');
   assert.match(js, /cv3-creator-visual/, 'courses page has creator-led hero visual');
-  assert.match(js, /uploads\/Hero_section_light\.png/, 'creator hero uses the approved composite artwork');
-  assert.match(js, /uploads\/Hero_Section_Dark_mODE\.png/, 'dark theme uses its dedicated composite artwork');
+  assert.match(js, /uploads\/Hero_section_light\.webp/, 'creator hero uses the approved composite artwork');
+  assert.match(js, /uploads\/Hero_Section_Dark_mODE\.webp/, 'dark theme uses its dedicated composite artwork');
+  assert.doesNotMatch(read('app.jsx'), /Hero_[A-Za-z_]+\.webp"[^>]*loading="eager"/, 'hidden-theme hero art must stay lazy so it never downloads');
+  for (const file of ['app.jsx', 'v2.jsx']) {
+    assert.doesNotMatch(read(file), /<img\b[^>]*\ssrc=[^>]*\sloading=/, `${file}: loading must precede src or React fetches the image immediately`);
+  }
   assert.doesNotMatch(js, /uploads\/Hero_Section\.png/, 'superseded cutout portrait is not rendered');
   assert.doesNotMatch(js, /hero_Section_bacground(?:_dark_mode)?\.png/, 'old hero background artwork is removed');
   assert.match(js, /Enroll Now/, 'hero enrollment CTA uses approved capitalization');
@@ -304,24 +308,24 @@ test('course projects — first nine cards use numbered light and dark artwork',
   const data = read('data.js');
   const css = read('styles.css');
   const artwork = [
-    'uploads/Project1-light_mode.png',
-    'uploads/project1-dark-mode.png',
-    'uploads/project2_light_mode.png',
-    'uploads/project2_dark_mode.png',
-    'uploads/project3_light_mode.png',
-    'uploads/project3_dark_mode.png',
-    'uploads/project4_light_mode.png',
-    'uploads/project4_dark_mode.png',
-    'uploads/project5_light_mode.png',
-    'uploads/project5_dark_mode.png',
-    'uploads/project6_light_mode.png',
-    'uploads/project6_dark_mode.png',
-    'uploads/project7_light_mode.png',
-    'uploads/project7_dark_mode.png',
-    'uploads/project8_light_mode.png',
-    'uploads/project8_dark_mode.png',
-    'uploads/project9_light_mode.png',
-    'uploads/project9_dark_mode.png',
+    'uploads/Project1-light_mode.webp',
+    'uploads/project1-dark-mode.webp',
+    'uploads/project2_light_mode.webp',
+    'uploads/project2_dark_mode.webp',
+    'uploads/project3_light_mode.webp',
+    'uploads/project3_dark_mode.webp',
+    'uploads/project4_light_mode.webp',
+    'uploads/project4_dark_mode.webp',
+    'uploads/project5_light_mode.webp',
+    'uploads/project5_dark_mode.webp',
+    'uploads/project6_light_mode.webp',
+    'uploads/project6_dark_mode.webp',
+    'uploads/project7_light_mode.webp',
+    'uploads/project7_dark_mode.webp',
+    'uploads/project8_light_mode.webp',
+    'uploads/project8_dark_mode.webp',
+    'uploads/project9_light_mode.webp',
+    'uploads/project9_dark_mode.webp',
   ];
   for (const path of artwork) {
     assert.match(data, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `course data maps ${path}`);
@@ -409,7 +413,7 @@ test('course certificate — earned credential follows projects with an accessib
   const highlightsAt = page.indexOf('id="cv3-highlights"');
 
   assert.ok(projectsAt >= 0 && certificateAt > projectsAt && highlightsAt > certificateAt, 'certificate appears directly between Projects and Highlights');
-  assert.match(source, /logos\/FLA Course Completion Certificate\.svg/, 'uses the supplied certificate artwork');
+  assert.match(source, /logos\/FLA Course Completion Certificate\.webp/, 'uses the supplied certificate artwork');
   assert.match(source, /Complete the full course/, 'requires full course completion');
   assert.match(source, /every assignment reviewed and approved/, 'requires every assignment to pass review');
   assert.match(source, /Complete all mock interviews/, 'requires completion of every mock interview');
