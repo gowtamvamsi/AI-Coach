@@ -75,7 +75,7 @@ const APPROVED_VERSIONS = {
   'phone-countries.js': '1',
   'advisor-widget.js': '5',
   'v2.build.js': '41',
-  'app.build.js': '132',
+  'app.build.js': '133',
 };
 
 for (const page of PUBLIC_PAGES) {

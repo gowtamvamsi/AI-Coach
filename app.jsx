@@ -4079,6 +4079,36 @@ ${mcRawSyllabus}`;
     return list;
   }, [activeRegistrations, paidEmails, userByEmail]);
 
+  // All Leads: every signed-up user plus any registrant (any status) without
+  // an account, deduped by email. Users first so account data wins.
+  const allLeadsList = React.useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    users.forEach(u => {
+      const e = norm(u.email);
+      if (!e || seen.has(e)) return;
+      list.push({
+        name: u.name || u.displayName || "Signed Up Student",
+        email: u.email,
+        phone: u.phone || "",
+        userType: u.userType || "Not Specified"
+      });
+      seen.add(e);
+    });
+    activeRegistrations.forEach(r => {
+      const e = norm(r.studentEmail);
+      if (!e || seen.has(e)) return;
+      list.push({
+        name: r.studentName || "Registrant",
+        email: r.studentEmail,
+        phone: r.studentPhone || "",
+        userType: "Not Specified"
+      });
+      seen.add(e);
+    });
+    return list;
+  }, [users, activeRegistrations]);
+
   // Session Campaign Filter Roster
   const activeMcCampaignSession = React.useMemo(
     () => sessions.find(s => s.id === selectedMcCampaignId) || masterclasses.find(m => m.id === selectedMcCampaignId),
@@ -4410,10 +4440,40 @@ ${mcRawSyllabus}`;
           Deduplicate, filter, and organize student accounts, registrants, and failed checkouts. Export segmented contacts into HubSpot, Klaviyo, or custom audiences.
         </p>
 
-        {/* 5 Targeted Audience Segments Grid */}
+        {/* 6 Targeted Audience Segments Grid */}
         <h3 className="form-label" style={{ marginBottom: "16px", fontSize: "11px", color: "var(--fg-faint)" }}>Standard Marketing Segments</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "32px" }}>
           
+          {/* Segment 0: All Leads */}
+          <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="dashboard__role-badge" style={{ background: "transparent", color: "var(--fg-dim)", borderColor: "var(--line-strong)" }}>Full Audience</span>
+                <span style={{ fontSize: "12px", color: "var(--fg-faint)", fontFamily: "JetBrains Mono" }}>{allLeadsList.length} Contacts</span>
+              </div>
+              <h4 style={{ margin: "12px 0 6px 0", fontSize: "17px", fontWeight: "600" }}>All Leads</h4>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--fg-dim)", lineHeight: "1.4" }}>
+                Every signed-up account plus every masterclass registrant, deduplicated by email.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+              <button 
+                onClick={() => handleExportCSV(allLeadsList, "All Leads")}
+                className="form-btn" 
+                style={{ background: "transparent", border: "1px solid var(--line-strong)", color: "var(--fg)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                CSV
+              </button>
+              <button 
+                onClick={() => openBroadcastModal(allLeadsList, "All Leads")}
+                className="form-btn form-btn--accent" 
+                style={{ background: "var(--c-rust)", margin: 0, flex: 1, padding: "10px" }}
+              >
+                Email
+              </button>
+            </div>
+          </div>
+
           {/* Segment 1: Paid Customers */}
           <div className="dash-seg-card" style={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", justifyBetween: "space-between", gap: "12px" }}>
             <div>
